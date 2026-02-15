@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Jefe de Estudios - Sistema Universitario EAEN</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Reset y tipografía */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #FFFFFF, #E6F0FF); /* Gradiente sutil para fondo elegante */
+            color: #003366;
+            display: flex;
+            height: 100vh;
+            overflow: hidden; /* Para layout full-screen */
+        }
+
+        /* Sidebar (Navbar) innovador */
+        .sidebar {
+            background-color: #003366; /* Azul principal */
+            color: #FFFFFF;
+            width: 250px;
+            padding: 20px;
+            transition: width 0.3s ease;
+            position: relative;
+            z-index: 10;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar h2 {
+            font-size: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .sidebar ul {
+            list-style: none;
+        }
+
+        .sidebar li {
+            margin: 15px 0;
+        }
+
+        .sidebar a {
+            color: #FFFFFF;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            border-radius: 8px;
+            transition: background 0.3s ease, transform 0.2s ease;
+        }
+
+        .sidebar a:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateX(5px); /* Animación de expansión al hover para innovación */
+        }
+
+        .sidebar .icon {
+            margin-right: 10px;
+            font-size: 20px;
+        }
+
+        /* Toggle para móvil */
+        .sidebar-toggle {
+            display: none; /* Oculto en desktop */
+            background: #FF6600;
+            color: #FFFFFF;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 20;
+        }
+
+        /* Contenido principal */
+        .main-content {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            background: #FFFFFF;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .header .logo {
+            width: 80px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #003366;
+        }
+
+        .profile {
+            display: flex;
+            align-items: center;
+        }
+
+        .profile img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .logout-btn {
+            background: #FF6600;
+            color: #FFFFFF;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            background: #CC5200;
+        }
+
+        /* Dashboard cards - Innovador con grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: #FFFFFF;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .card-icon {
+            font-size: 40px;
+            color: #FF6600;
+            margin-bottom: 10px;
+        }
+
+        .card h3 {
+            color: #003366;
+            margin-bottom: 10px;
+        }
+
+        .card p {
+            color: #666666;
+            font-size: 14px;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 12px;
+            color: #666666;
+            border-top: 1px solid #E6E6E6;
+            margin-top: 40px;
+        }
+
+        /* Responsivo */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 0;
+                padding: 0;
+                overflow: hidden;
+            }
+
+            .sidebar.open {
+                width: 250px;
+                padding: 20px;
+            }
+
+            .sidebar-toggle {
+                display: block;
+            }
+
+            .main-content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar (Navbar) -->
+    <nav class="sidebar">
+        <h2>Panel Jefe de Estudios</h2>
+        <ul>
+            <li><a href="#usuarios"><span class="icon">👥</span>Gestión de Usuarios</a></li>
+            <li><a href="#cursos"><span class="icon">📚</span>Gestión de Cursos</a></li>
+            <li><a href="#notificaciones"><span class="icon">🔔</span>Gestión de Notificaciones</a></li>
+            <li><a href="#educativa"><span class="icon">🎓</span>Gestión Educativa</a></li>
+        </ul>
+    </nav>
+
+    <!-- Toggle para sidebar en móvil -->
+    <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
+
+    <!-- Contenido principal -->
+    <div class="main-content">
+        <header class="header">
+            <img src="logo-eaen.png" alt="Logo EAEN" class="logo"> <!-- Reemplaza con tu logo -->
+            <h1>Dashboard Jefe de Estudios - EAEN Avaroa</h1>
+            <div class="profile">
+                <img src="profile-placeholder.png" alt="Perfil"> <!-- Reemplaza con imagen de perfil -->
+                <span>Jefe de Estudios</span>
+                <button class="logout-btn" onclick="alert('Cerrando sesión...')">Logout</button>
+            </div>
+        </header>
+
+        <!-- Dashboard inicial con cards -->
+        <section class="dashboard-grid">
+            <div class="card" id="usuarios">
+                <div class="card-icon">👥</div>
+                <h3>Gestión de Usuarios</h3>
+                <p>Administre usuarios: oficiales, personal civil y estudiantes de postgrado.</p>
+                <button class="card-btn">Acceder</button>
+            </div>
+            <div class="card" id="cursos">
+                <div class="card-icon">📚</div>
+                <h3>Gestión de Cursos</h3>
+                <p>Cree y edite cursos para formación superior militar y civil.</p>
+                <button class="card-btn">Acceder</button>
+            </div>
+            <div class="card" id="notificaciones">
+                <div class="card-icon">🔔</div>
+                <h3>Gestión de Notificaciones</h3>
+                <p>Envíe alertas y actualizaciones a usuarios.</p>
+                <button class="card-btn">Acceder</button>
+            </div>
+            <div class="card" id="educativa">
+                <div class="card-icon">🎓</div>
+                <h3>Gestión Educativa</h3>
+                <p>Supervise evaluaciones, calificaciones y progreso académico.</p>
+                <button class="card-btn">Acceder</button>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <p>&copy; 2026 Escuela de Altos Estudios Nacionales. Todos los derechos reservados.</p>
+        </footer>
+    </div>
+
+    <script>
+        // Toggle sidebar para móvil
+        function toggleSidebar() {
+            document.querySelector('.sidebar').classList.toggle('open');
+        }
+
+        // Simulación de clics en navbar (puedes expandir para cambiar contenido dinámico)
+        document.querySelectorAll('.sidebar a').forEach(link => {
+            link.addEventListener('click', function(event) {
+                // event.preventDefault(); // Descomenta si usas anchors reales
+                alert(`Navegando a: ${this.textContent}`);
+                // Aquí podrías cargar contenido dinámico en .main-content
+            });
+        });
+    </script>
+</body>
+</html>

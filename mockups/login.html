@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Sistema Universitario EAEN</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Reset básico y tipografía */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #FFFFFF, #E6F0FF); /* Gradiente sutil de blanco a azul claro para elegancia */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #003366; /* Azul principal para texto */
+        }
+
+        /* Contenedor principal con animación de fade-in */
+        .login-container {
+            background-color: #FFFFFF;
+            border-radius: 15px; /* Bordes más redondeados para suavidad */
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15); /* Sombra más profunda y elegante */
+            padding: 50px 40px; /* Más padding para amplitud */
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+            animation: fadeIn 1s ease-in-out; /* Animación de entrada suave */
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Header */
+        .login-header {
+            margin-bottom: 40px;
+        }
+
+        .logo {
+            width: 120px; /* Logo un poco más grande para impacto */
+            margin-bottom: 25px;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1)); /* Sombra sutil en logo */
+        }
+
+        h1 {
+            font-size: 26px; /* Tamaño ligeramente mayor */
+            color: #003366;
+            margin-bottom: 12px;
+            font-weight: 700;
+        }
+
+        p {
+            font-size: 15px;
+            color: #555555; /* Gris un poco más oscuro para profundidad */
+            line-height: 1.4;
+        }
+
+        /* Formulario */
+        .login-form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            text-align: left;
+            margin-bottom: 8px;
+            font-weight: 700;
+            color: #003366;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 25px;
+        }
+
+        input {
+            padding: 12px 40px 12px 12px; /* Espacio para icono de ojo */
+            border: 1px solid #003366;
+            border-radius: 8px; /* Bordes más redondeados */
+            font-size: 16px;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+            width: 100%;
+        }
+
+        input:focus {
+            border-color: #FF6600;
+            box-shadow: 0 0 8px rgba(255, 102, 0, 0.3); /* Sombra naranja en foco para elegancia */
+            outline: none;
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #003366;
+            font-size: 18px;
+        }
+
+        .login-button {
+            background: linear-gradient(135deg, #FF6600, #FF8533); /* Gradiente naranja para botón más elegante */
+            color: #FFFFFF;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.2s ease;
+        }
+
+        .login-button:hover {
+            background: linear-gradient(135deg, #CC5200, #E65C00);
+            transform: translateY(-2px); /* Efecto de elevación al hover */
+        }
+
+        /* Footer */
+        .login-footer {
+            margin-top: 25px;
+            font-size: 13px;
+        }
+
+        a {
+            color: #003366;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        a:hover {
+            color: #FF6600; /* Cambia a naranja al hover para acento */
+            text-decoration: underline;
+        }
+
+        /* Responsivo para móviles */
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <header class="login-header">
+            <img src="logo-eaen.png" alt="Logo Escuela de Altos Estudios Nacionales" class="logo"> <!-- Reemplaza con tu logo -->
+            <h1>Bienvenido al Sistema Universitario EAEN - Avaroa</h1>
+            <p>Formación de Oficiales Militares Superiores y Personal Civil - Nivel Postgrado</p>
+        </header>
+        <form id="login-form" class="login-form">
+            <label for="username">Usuario:</label>
+            <div class="input-group">
+                <input type="text" id="username" name="username" placeholder="Ingrese su usuario" required>
+            </div>
+            
+            <label for="password">Contraseña:</label>
+            <div class="input-group">
+                <input type="password" id="password" name="password" placeholder="Ingrese su contraseña" required>
+                <span class="toggle-password" onclick="togglePassword()">👁️</span> <!-- Icono de ojo (puedes usar un SVG o font-awesome si prefieres) -->
+            </div>
+            
+            <button type="submit" class="login-button">Iniciar Sesión</button>
+        </form>
+        <footer class="login-footer">
+            <a href="#">¿Olvidaste tu contraseña?</a>
+            <p>&copy; 2026 Escuela de Altos Estudios Nacionales. Todos los derechos reservados.</p>
+        </footer>
+    </div>
+    <script>
+        // Función para mostrar/ocultar contraseña
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const toggleIcon = document.querySelector('.toggle-password');
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleIcon.textContent = '🙈'; // Cambia icono (oculto)
+            } else {
+                passwordInput.type = 'password';
+                toggleIcon.textContent = '👁️'; // Cambia icono (visible)
+            }
+        }
+
+        document.getElementById('login-form').addEventListener('submit', function(event) {
+            event.preventDefault(); // Previene el envío real (para demo)
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (username && password) {
+                alert('¡Bienvenido! Iniciando sesión...'); // Mensaje amigable (en producción, conecta a un backend)
+                // Aquí iría la lógica real de login, como una llamada API
+            } else {
+                alert('Por favor, complete todos los campos.');
+            }
+        });
+    </script>
+</body>
+</html>
