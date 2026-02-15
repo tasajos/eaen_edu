@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Usuarios - Sistema Universitario EAEN</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Reset y tipografía */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #FFFFFF, #E6F0FF); /* Gradiente sutil para fondo elegante */
+            color: #003366;
+            display: flex;
+            height: 100vh;
+            overflow: hidden; /* Para layout full-screen */
+        }
+
+        /* Sidebar (Navbar) innovador */
+        .sidebar {
+            background-color: #003366; /* Azul principal */
+            color: #FFFFFF;
+            width: 250px;
+            padding: 20px;
+            transition: width 0.3s ease;
+            position: relative;
+            z-index: 10;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar h2 {
+            font-size: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .sidebar ul {
+            list-style: none;
+        }
+
+        .sidebar li {
+            margin: 15px 0;
+        }
+
+        .sidebar a {
+            color: #FFFFFF;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            border-radius: 8px;
+            transition: background 0.3s ease, transform 0.2s ease;
+        }
+
+        .sidebar a:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateX(5px); /* Animación de expansión al hover */
+        }
+
+        .sidebar a.active {
+            background: rgba(255, 102, 0, 0.3); /* Resaltado para ítem activo (naranja sutil) */
+        }
+
+        .sidebar .icon {
+            margin-right: 10px;
+            font-size: 20px;
+        }
+
+        /* Toggle para móvil */
+        .sidebar-toggle {
+            display: none; /* Oculto en desktop */
+            background: #FF6600;
+            color: #FFFFFF;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 20;
+        }
+
+        /* Contenido principal */
+        .main-content {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            background: #FFFFFF;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .header .logo {
+            width: 80px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #003366;
+        }
+
+        .profile {
+            display: flex;
+            align-items: center;
+        }
+
+        .profile img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .logout-btn {
+            background: #FF6600;
+            color: #FFFFFF;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            background: #CC5200;
+        }
+
+        /* Grid de cards para Gestión de Usuarios */
+        .users-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px; /* Más espacio para elegancia */
+        }
+
+        .card {
+            background: #FFFFFF;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+        }
+
+        .card:hover {
+            transform: scale(1.05); /* Animación de escala al hover para innovación */
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .card-icon {
+            font-size: 50px; /* Íconos más grandes para impacto */
+            color: #FF6600;
+            margin-bottom: 15px;
+        }
+
+        .card h3 {
+            color: #003366;
+            margin-bottom: 10px;
+            font-size: 20px;
+        }
+
+        .card p {
+            color: #666666;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .card-btn {
+            background: linear-gradient(135deg, #FF6600, #FF8533); /* Gradiente para botón elegante */
+            color: #FFFFFF;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s ease, height 0.6s ease;
+        }
+
+        .card-btn:active::before {
+            width: 300px;
+            height: 300px; /* Efecto ripple al clic para innovación */
+        }
+
+        .card-btn:hover {
+            background: linear-gradient(135deg, #CC5200, #E65C00);
+            transform: translateY(-2px);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 12px;
+            color: #666666;
+            border-top: 1px solid #E6E6E6;
+            margin-top: 40px;
+        }
+
+        /* Responsivo */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 0;
+                padding: 0;
+                overflow: hidden;
+            }
+
+            .sidebar.open {
+                width: 250px;
+                padding: 20px;
+            }
+
+            .sidebar-toggle {
+                display: block;
+            }
+
+            .main-content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar (Navbar) -->
+    <nav class="sidebar">
+        <h2>Panel Jefe de Estudios</h2>
+        <ul>
+            <li><a href="#usuarios" class="active"><span class="icon">👥</span>Gestión de Usuarios</a></li>
+            <li><a href="#cursos"><span class="icon">📚</span>Gestión de Cursos</a></li>
+            <li><a href="#notificaciones"><span class="icon">🔔</span>Gestión de Notificaciones</a></li>
+            <li><a href="#educativa"><span class="icon">🎓</span>Gestión Educativa</a></li>
+        </ul>
+    </nav>
+
+    <!-- Toggle para sidebar en móvil -->
+    <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
+
+    <!-- Contenido principal: Gestión de Usuarios -->
+    <div class="main-content">
+        <header class="header">
+            <img src="logo-eaen.png" alt="Logo EAEN" class="logo"> <!-- Reemplaza con tu logo -->
+            <h1>Gestión de Usuarios - EAEN Avaroa</h1>
+            <div class="profile">
+                <img src="profile-placeholder.png" alt="Perfil"> <!-- Reemplaza con imagen de perfil -->
+                <span>Jefe de Estudios</span>
+                <button class="logout-btn" onclick="alert('Cerrando sesión...')">Logout</button>
+            </div>
+        </header>
+
+        <!-- Grid de cards para Gestión de Usuarios -->
+        <section class="users-grid">
+            <div class="card" onclick="alert('Abriendo formulario para añadir usuarios...')">
+                <div class="card-icon">➕</div>
+                <h3>Añadir Usuarios</h3>
+                <p>Registre nuevos usuarios: oficiales militares, personal civil o estudiantes de postgrado.</p>
+                <button class="card-btn">Añadir</button>
+            </div>
+            <div class="card" onclick="alert('Abriendo herramientas para modificar usuarios...')">
+                <div class="card-icon">✏️</div>
+                <h3>Modificar Usuarios</h3>
+                <p>Edite información de usuarios existentes, como roles, datos personales o permisos.</p>
+                <button class="card-btn">Modificar</button>
+            </div>
+            <div class="card" onclick="alert('Cargando lista de usuarios...')">
+                <div class="card-icon">📋</div>
+                <h3>Listar Usuarios</h3>
+                <p>Visualice y busque la lista completa de usuarios registrados en el sistema.</p>
+                <button class="card-btn">Listar</button>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <p>&copy; 2026 Escuela de Altos Estudios Nacionales. Todos los derechos reservados.</p>
+        </footer>
+    </div>
+
+    <script>
+        // Toggle sidebar para móvil
+        function toggleSidebar() {
+            document.querySelector('.sidebar').classList.toggle('open');
+        }
+
+        // Simulación de clics en navbar (puedes expandir para cambiar vistas)
+        document.querySelectorAll('.sidebar a').forEach(link => {
+            link.addEventListener('click', function(event) {
+                // event.preventDefault(); // Descomenta si usas anchors reales
+                alert(`Navegando a: ${this.textContent}`);
+                // Aquí podrías redirigir o cargar contenido dinámico
+            });
+        });
+    </script>
+</body>
+</html>

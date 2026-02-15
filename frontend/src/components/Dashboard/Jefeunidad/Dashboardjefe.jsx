@@ -50,7 +50,7 @@ export default function DashboardJefe() {
             icon="👥"
             title="Gestión de Usuarios"
             desc="Administre usuarios: oficiales, personal civil y estudiantes de postgrado."
-            onAccess={() => go("Gestión de Usuarios")}
+            onAccess={() => navigate("/gestion-usuarios")}
           />
           <Card
             icon="📚"
