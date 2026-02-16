@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./Addusers.css";
 
 const initialForm = {
@@ -22,6 +22,29 @@ export default function Addusers({ onBack }) {
   const [form, setForm] = useState(initialForm);
   const [submitting, setSubmitting] = useState(false);
 
+  // ✅ Modal state (SIEMPRE dentro del componente)
+  const [modal, setModal] = useState({
+    open: false,
+    type: "success", // "success" | "error"
+    title: "",
+    message: "",
+  });
+
+  const openModal = ({ type, title, message }) => {
+    setModal({ open: true, type, title, message });
+  };
+
+  const closeModal = () => setModal((p) => ({ ...p, open: false }));
+
+  // ✅ Cerrar modal con tecla ESC
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === "Escape" && modal.open) closeModal();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [modal.open]);
+
   const isValid = useMemo(() => {
     return Object.values(form).every((v) => String(v).trim().length > 0);
   }, [form]);
@@ -32,38 +55,56 @@ export default function Addusers({ onBack }) {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (!isValid) {
-    alert("Por favor, complete todos los campos requeridos.");
-    return;
-  }
-
-  try {
-    setSubmitting(true);
-
-    const resp = await fetch("http://localhost:5000/api/usuarios", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-
-    const data = await resp.json();
-
-    if (!resp.ok) {
-      alert(data?.message || "Error al guardar usuario.");
+    if (!isValid) {
+      openModal({
+        type: "error",
+        title: "Faltan datos",
+        message: "Por favor, complete todos los campos requeridos.",
+      });
       return;
     }
 
-    alert(`Usuario añadido exitosamente. ID: ${data.id}`);
-    setForm(initialForm);
-    // onBack?.(); // si quieres volver
-  } catch (err) {
-    alert("No se pudo conectar al servidor. Revisa que el backend esté corriendo.");
-  } finally {
-    setSubmitting(false);
-  }
-};
+    try {
+      setSubmitting(true);
+
+      const resp = await fetch("http://localhost:5000/api/usuarios", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+
+      const data = await resp.json().catch(() => ({}));
+
+      if (!resp.ok) {
+        openModal({
+          type: "error",
+          title: "No se pudo registrar",
+          message: data?.message || "Ocurrió un error al guardar el usuario.",
+        });
+        return;
+      }
+
+      openModal({
+        type: "success",
+        title: "Registro exitoso",
+        message: `Usuario creado correctamente. ID: ${data.id}`,
+      });
+
+      setForm(initialForm);
+      // onBack?.(); // si quieres volver luego de cerrar modal
+    } catch (err) {
+      openModal({
+        type: "error",
+        title: "Sin conexión",
+        message:
+          "No se pudo conectar al servidor. Verifica que el backend esté corriendo.",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <section className="eaen-addusers-wrap">
@@ -71,7 +112,7 @@ export default function Addusers({ onBack }) {
         <div>
           <h2 className="eaen-addusers-title">Añadir Nuevo Usuario</h2>
           <p className="eaen-addusers-subtitle">
-            Registro institucional de usuarios (solo frontend por ahora).
+            Registro institucional de usuarios.
           </p>
         </div>
 
@@ -109,10 +150,31 @@ export default function Addusers({ onBack }) {
               ]}
             />
 
-            <FieldInput label="Apellido Paterno" name="ap_paterno" value={form.ap_paterno} onChange={handleChange} />
-            <FieldInput label="Apellido Materno" name="ap_materno" value={form.ap_materno} onChange={handleChange} />
-            <FieldInput label="Nombre" name="nombre" value={form.nombre} onChange={handleChange} />
-            <FieldInput label="CI" name="ci" value={form.ci} onChange={handleChange} placeholder="Ej: 1234567" />
+            <FieldInput
+              label="Apellido Paterno"
+              name="ap_paterno"
+              value={form.ap_paterno}
+              onChange={handleChange}
+            />
+            <FieldInput
+              label="Apellido Materno"
+              name="ap_materno"
+              value={form.ap_materno}
+              onChange={handleChange}
+            />
+            <FieldInput
+              label="Nombre"
+              name="nombre"
+              value={form.nombre}
+              onChange={handleChange}
+            />
+            <FieldInput
+              label="CI"
+              name="ci"
+              value={form.ci}
+              onChange={handleChange}
+              placeholder="Ej: 1234567"
+            />
 
             <FieldSelect
               label="EX (Extensión)"
@@ -159,7 +221,7 @@ export default function Addusers({ onBack }) {
                 ["Armada", "Armada"],
                 ["Fuerza Aérea", "Fuerza Aérea"],
                 ["Civil", "Civil"],
-                 ["Policia", "Policia"],
+                ["Policia", "Policia"],
               ]}
             />
 
@@ -176,15 +238,48 @@ export default function Addusers({ onBack }) {
               ]}
             />
 
-            <FieldInput label="Teléfono" name="telefono" value={form.telefono} onChange={handleChange} type="tel" />
-            <FieldInput label="Fecha de Inscripción" name="fecha_inscripcion" value={form.fecha_inscripcion} onChange={handleChange} type="date" />
-            <FieldInput label="Lugar de Trabajo" name="lugar_trabajo" value={form.lugar_trabajo} onChange={handleChange} />
-            <FieldInput label="Correo Electrónico" name="correo" value={form.correo} onChange={handleChange} type="email" />
-            <FieldInput label="Fecha de Nacimiento" name="fecha_nacimiento" value={form.fecha_nacimiento} onChange={handleChange} type="date" />
+            <FieldInput
+              label="Teléfono"
+              name="telefono"
+              value={form.telefono}
+              onChange={handleChange}
+              type="tel"
+            />
+            <FieldInput
+              label="Fecha de Inscripción"
+              name="fecha_inscripcion"
+              value={form.fecha_inscripcion}
+              onChange={handleChange}
+              type="date"
+            />
+            <FieldInput
+              label="Lugar de Trabajo"
+              name="lugar_trabajo"
+              value={form.lugar_trabajo}
+              onChange={handleChange}
+            />
+            <FieldInput
+              label="Correo Electrónico"
+              name="correo"
+              value={form.correo}
+              onChange={handleChange}
+              type="email"
+            />
+            <FieldInput
+              label="Fecha de Nacimiento"
+              name="fecha_nacimiento"
+              value={form.fecha_nacimiento}
+              onChange={handleChange}
+              type="date"
+            />
           </div>
 
           <div className="eaen-form-footer">
-            <button className="eaen-submit-btn" type="submit" disabled={!isValid || submitting}>
+            <button
+              className="eaen-submit-btn"
+              type="submit"
+              disabled={!isValid || submitting}
+            >
               {submitting ? "Guardando..." : "Guardar Usuario"}
             </button>
 
@@ -199,10 +294,19 @@ export default function Addusers({ onBack }) {
           </div>
 
           <p className="eaen-hint">
-            * En el siguiente paso conectamos este formulario al backend Node + MySQL.
+            * Este formulario está conectado al backend Node + MySQL.
           </p>
         </form>
       </div>
+
+      {modal.open && (
+        <StatusModal
+          type={modal.type}
+          title={modal.title}
+          message={modal.message}
+          onClose={closeModal}
+        />
+      )}
     </section>
   );
 }
@@ -235,6 +339,27 @@ function FieldSelect({ label, name, value, onChange, options }) {
           </option>
         ))}
       </select>
+    </div>
+  );
+}
+
+function StatusModal({ type = "success", title, message, onClose }) {
+  const isSuccess = type === "success";
+
+  return (
+    <div className="eaen-modal-overlay">
+      <div className="eaen-modal-container">
+        <div className={`eaen-modal-icon ${isSuccess ? "success" : "error"}`}>
+          {isSuccess ? "✓" : "✕"}
+        </div>
+
+        <h3 className="eaen-modal-title">{title}</h3>
+        <p className="eaen-modal-message">{message}</p>
+
+        <button className="eaen-modal-btn" onClick={onClose}>
+          Aceptar
+        </button>
+      </div>
     </div>
   );
 }
