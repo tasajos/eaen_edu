@@ -1,1 +1,207 @@
-@import "../subview.css";
+/* Usa subview.css como base (ya lo importamos) */
+
+.eaen-crear-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 16px;
+}
+
+.eaen-crear-card {
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  padding: 18px;
+}
+
+.eaen-crear-title {
+  margin: 0 0 12px 0;
+  color: #003366;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.eaen-crear-form .eaen-form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 900;
+  color: #003366;
+  font-size: 13px;
+}
+
+.eaen-crear-form .eaen-form-group input,
+.eaen-crear-form .eaen-form-group select,
+.eaen-crear-form .eaen-form-group textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #003366;
+  border-radius: 12px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.eaen-crear-form .eaen-form-group input:focus,
+.eaen-crear-form .eaen-form-group select:focus,
+.eaen-crear-form .eaen-form-group textarea:focus {
+  border-color: #ff6600;
+  box-shadow: 0 0 0 4px rgba(255, 102, 0, 0.18);
+}
+
+.eaen-crear-row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.eaen-help {
+  display: inline-block;
+  margin-top: 6px;
+  color: #666;
+  font-size: 12px;
+}
+
+.eaen-error {
+  display: inline-block;
+  margin-top: 6px;
+  color: #b42318;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.eaen-crear-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.eaen-crear-meta {
+  font-size: 13px;
+  color: #003366;
+}
+
+/* Botón principal (mismo patrón) */
+.eaen-primary-btn {
+  background: linear-gradient(135deg, #ff6600, #ff8533);
+  color: #ffffff;
+  border: none;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.22s ease, opacity 0.2s ease;
+  box-shadow: 0 14px 26px rgba(255, 102, 0, 0.20);
+}
+
+.eaen-primary-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 32px rgba(255, 102, 0, 0.26);
+}
+
+.eaen-primary-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Selector participantes */
+.eaen-pick-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.eaen-pick-count {
+  color: #003366;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.eaen-pick-grid {
+  display: grid;
+  grid-template-columns: 1fr 160px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.eaen-pick-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.eaen-pick-label {
+  color: #003366;
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.eaen-pick-list {
+  width: 100%;
+  min-height: 320px;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 12px;
+  padding: 8px;
+  font-size: 13px;
+  outline: none;
+}
+
+.eaen-pick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 22px;
+}
+
+.eaen-pick-btn {
+  background: rgba(0, 51, 102, 0.08);
+  color: #003366;
+  border: none;
+  padding: 10px 10px;
+  border-radius: 12px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.2s ease;
+}
+
+.eaen-pick-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(0, 51, 102, 0.12);
+}
+
+.eaen-pick-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.eaen-pick-divider {
+  height: 1px;
+  background: rgba(0,0,0,0.10);
+  margin: 6px 0;
+}
+
+/* Responsive */
+@media (max-width: 980px) {
+  .eaen-crear-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .eaen-crear-row2 {
+    grid-template-columns: 1fr;
+  }
+
+  .eaen-pick-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .eaen-pick-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding-top: 0;
+  }
+}
