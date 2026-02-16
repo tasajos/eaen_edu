@@ -1,5 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./ListUsers.css";
+
+const API_BASE = "http://localhost:5000/api";
 
 const USER_TYPES = [
   "Cursante",
@@ -11,69 +13,48 @@ const USER_TYPES = [
   "Docente",
 ];
 
-const USERS = [
-  {
-    tipo: "Administrador",
-    grado: "Oficial Militar Superior",
-    ap_paterno: "Pérez",
-    ap_materno: "Gómez",
-    nombre: "Juan",
-    ci: "1234567",
-    ex: "LP",
-    filial: "Sede Central",
-    fuerza: "Ejército",
-    turno: "Mañana",
-    telefono: "70123456",
-    fecha_inscripcion: "2025-02-01",
-    lugar_trabajo: "EAEN - Sede Central",
-    correo: "juan.perez@eaen.bo",
-    fecha_nacimiento: "1980-05-20",
-  },
-  {
-    tipo: "Docente",
-    grado: "Profesor",
-    ap_paterno: "Rojas",
-    ap_materno: "Flores",
-    nombre: "María",
-    ci: "9876543",
-    ex: "CB",
-    filial: "Filial Norte",
-    fuerza: "Civil",
-    turno: "Tarde",
-    telefono: "76543210",
-    fecha_inscripcion: "2024-08-10",
-    lugar_trabajo: "UMSS",
-    correo: "maria.rojas@eaen.bo",
-    fecha_nacimiento: "1978-11-02",
-  },
-  {
-    tipo: "Cursante",
-    grado: "Estudiante Postgrado",
-    ap_paterno: "Quispe",
-    ap_materno: "Mamani",
-    nombre: "Luis",
-    ci: "5551112",
-    ex: "SC",
-    filial: "Filial Sur",
-    fuerza: "Civil",
-    turno: "Noche",
-    telefono: "72000001",
-    fecha_inscripcion: "2026-01-15",
-    lugar_trabajo: "Empresa Privada",
-    correo: "luis.quispe@correo.com",
-    fecha_nacimiento: "1992-03-14",
-  },
-];
-
 export default function ListUsers({ onBack }) {
   const [q, setQ] = useState("");
   const [tipo, setTipo] = useState("ALL");
 
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errMsg, setErrMsg] = useState("");
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      setErrMsg("");
+
+      const resp = await fetch(`${API_BASE}/usuarios`);
+      const data = await resp.json().catch(() => []);
+
+      if (!resp.ok) {
+        setErrMsg(data?.message || "No se pudo cargar el listado.");
+        setUsers([]);
+        return;
+      }
+
+      // data viene sin password (por backend)
+      setUsers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setErrMsg("Sin conexión con el servidor. Verifica que el backend esté corriendo.");
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
 
-    return USERS.filter((u) => {
-      const matchTipo = tipo === "ALL" ? true : u.tipo === tipo;
+    return users.filter((u) => {
+      const tipoUsuario = String(u.tipo_usuario ?? "").trim();
+      const matchTipo = tipo === "ALL" ? true : tipoUsuario === tipo;
       if (!matchTipo) return false;
 
       if (!query) return true;
@@ -81,24 +62,29 @@ export default function ListUsers({ onBack }) {
       const blob = [
         u.ci,
         u.nombre,
+        u.apellido,
         u.ap_paterno,
         u.ap_materno,
         u.correo,
+        u.email,
         u.grado,
         u.filial,
         u.fuerza,
         u.turno,
         u.telefono,
         u.ex,
-        u.tipo,
+        u.tipo_usuario,
         u.lugar_trabajo,
+        u.rol,
+        u.estado,
       ]
+        .filter(Boolean)
         .join(" ")
         .toLowerCase();
 
       return blob.includes(query);
     });
-  }, [q, tipo]);
+  }, [q, tipo, users]);
 
   const clearFilters = () => {
     setQ("");
@@ -111,7 +97,7 @@ export default function ListUsers({ onBack }) {
         <div>
           <h2 className="eaen-list-title">Listar Usuarios</h2>
           <p className="eaen-list-subtitle">
-            Tabla institucional de usuarios registrados (simulación). Incluye búsqueda y filtro.
+            Tabla institucional de usuarios (MySQL). No incluye campos sensibles como password.
           </p>
         </div>
 
@@ -150,64 +136,101 @@ export default function ListUsers({ onBack }) {
             </select>
           </div>
 
-          <div className="eaen-filter-buttons">
+          <div className="eaen-filter-buttons" style={{ gap: 10 }}>
             <button className="eaen-primary-btn" type="button" onClick={clearFilters}>
               Limpiar
             </button>
+
+            <button className="eaen-secondary-btn" type="button" onClick={fetchUsers}>
+              Recargar
+            </button>
           </div>
         </div>
+
+        {errMsg && (
+          <div className="eaen-alert" style={{ marginBottom: 12 }}>
+            {errMsg}
+          </div>
+        )}
 
         <div className="eaen-table-wrap" role="region" aria-label="Tabla de usuarios">
           <table className="eaen-table">
             <thead>
               <tr>
                 <th>Tipo</th>
+                <th>Rol</th>
+                <th>Estado</th>
+
                 <th>Grado/Profesión</th>
                 <th>Ap. Paterno</th>
                 <th>Ap. Materno</th>
+                <th>Apellido</th>
                 <th>Nombre</th>
+
                 <th>CI</th>
                 <th>EX</th>
                 <th>Filial</th>
                 <th>Fuerza</th>
                 <th>Turno</th>
+
                 <th>Teléfono</th>
                 <th>F. Inscripción</th>
                 <th>Lugar de Trabajo</th>
+
                 <th>Correo</th>
+                <th>Email</th>
+
                 <th>F. Nacimiento</th>
+                <th>Creado</th>
               </tr>
             </thead>
 
             <tbody>
-              {filtered.length === 0 ? (
+              {loading ? (
                 <tr>
-                  <td className="eaen-empty" colSpan={15}>
+                  <td className="eaen-empty" colSpan={20}>
+                    Cargando usuarios...
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td className="eaen-empty" colSpan={20}>
                     No hay resultados para los filtros actuales.
                   </td>
                 </tr>
               ) : (
                 filtered.map((u) => (
-                  <tr key={u.ci}>
+                  <tr key={u.id ?? u.ci}>
                     <td>
-                      <span className={`eaen-badge eaen-badge-${badgeKey(u.tipo)}`}>
-                        {u.tipo}
+                      <span className={`eaen-badge eaen-badge-${badgeKey(u.tipo_usuario || "")}`}>
+                        {u.tipo_usuario || "-"}
                       </span>
                     </td>
-                    <td>{u.grado}</td>
-                    <td>{u.ap_paterno}</td>
-                    <td>{u.ap_materno}</td>
-                    <td>{u.nombre}</td>
-                    <td className="mono">{u.ci}</td>
-                    <td className="mono">{u.ex}</td>
-                    <td>{u.filial}</td>
-                    <td>{u.fuerza}</td>
-                    <td>{u.turno}</td>
-                    <td className="mono">{u.telefono}</td>
-                    <td className="mono">{u.fecha_inscripcion}</td>
-                    <td>{u.lugar_trabajo}</td>
-                    <td>{u.correo}</td>
-                    <td className="mono">{u.fecha_nacimiento}</td>
+
+                    <td className="mono">{u.rol ?? "-"}</td>
+                    <td className="mono">{u.estado ?? "-"}</td>
+
+                    <td>{u.grado ?? "-"}</td>
+                    <td>{u.ap_paterno ?? "-"}</td>
+                    <td>{u.ap_materno ?? "-"}</td>
+                    <td>{u.apellido ?? "-"}</td>
+                    <td>{u.nombre ?? "-"}</td>
+
+                    <td className="mono">{u.ci ?? "-"}</td>
+                    <td className="mono">{u.ex ?? "-"}</td>
+                    <td>{u.filial ?? "-"}</td>
+                    <td>{u.fuerza ?? "-"}</td>
+                    <td>{u.turno ?? "-"}</td>
+
+                    <td className="mono">{u.telefono ?? "-"}</td>
+                    <td className="mono">{fmtDate(u.fecha_inscripcion)}</td>
+                    <td>{u.lugar_trabajo ?? "-"}</td>
+
+                    <td>{u.correo ?? "-"}</td>
+                    <td>{u.email ?? "-"}</td>
+
+                    <td className="mono">{fmtDate(u.fecha_nacimiento)}</td>
+                    <td className="mono">{fmtDateTime(u.creado_en)}</td>
                   </tr>
                 ))
               )}
@@ -217,11 +240,11 @@ export default function ListUsers({ onBack }) {
 
         <div className="eaen-list-footer">
           <span>
-            Mostrando <b>{filtered.length}</b> de <b>{USERS.length}</b> usuarios
+            Mostrando <b>{filtered.length}</b> de <b>{users.length}</b> usuarios
           </span>
 
           <span className="eaen-small">
-            * Luego conectamos esta tabla a MySQL (Node API) con paginación.
+            * Listado conectado a Node + MySQL (sin password).
           </span>
         </div>
       </div>
@@ -230,8 +253,7 @@ export default function ListUsers({ onBack }) {
 }
 
 function badgeKey(tipo) {
-  // para clases CSS limpias
-  return tipo
+  return String(tipo || "")
     .toLowerCase()
     .replaceAll(" ", "-")
     .replaceAll("ó", "o")
@@ -239,4 +261,18 @@ function badgeKey(tipo) {
     .replaceAll("í", "i")
     .replaceAll("á", "a")
     .replaceAll("ú", "u");
+}
+
+function fmtDate(v) {
+  if (!v) return "-";
+  // MySQL puede devolver Date o string
+  const s = String(v);
+  // si viene "YYYY-MM-DDT..." o "YYYY-MM-DD"
+  return s.slice(0, 10);
+}
+
+function fmtDateTime(v) {
+  if (!v) return "-";
+  const s = String(v).replace("T", " ");
+  return s.slice(0, 19);
 }

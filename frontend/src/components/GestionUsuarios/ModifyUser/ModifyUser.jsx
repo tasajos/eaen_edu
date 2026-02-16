@@ -1,6 +1,65 @@
 import { useEffect, useMemo, useState } from "react";
 import "./ModifyUser.css";
 
+const API_BASE = "http://localhost:5000/api";
+
+// ✅ Mismas opciones que Addusers.jsx
+const GRADO_OPTIONS = [
+  ["", "Seleccione..."],
+  ["My", "My"],
+  ["Tte.Cnl", "Tte.Cnl"],
+  ["Cnl", "Cnl"],
+  ["Lic. Administracion Empresas", "Lic. Administracion Empresas"],
+  ["Ing. Civil", "Ing. Civil"],
+  ["Ing. Sistemas", "Ing. Sistemas"],
+  ["Ing. Agronomo", "Ing. Agronomo"],
+  ["Lic. Derecho", "Lic. Derecho"],
+  ["Medico", "Medico"],
+  ["Profesion Libre", "Profesion Libre"],
+  ["Docente", "Docente"],
+  ["Sub.1ro", "Sub.1ro"],
+  ["Sub.My", "Sub.My"],
+  ["Sub.Master", "Sub.Master"],
+];
+
+const FILIAL_OPTIONS = [
+  ["", "Seleccione..."],
+  ["Cochabamba", "Cochabamba"],
+  ["La Paz", "La Paz"],
+  ["Santa Cruz", "Santa Cruz"],
+  ["Beni", "Beni"],
+];
+
+const FUERZA_OPTIONS = [
+  ["", "Seleccione..."],
+  ["Ejército", "Ejército"],
+  ["Armada", "Armada"],
+  ["Fuerza Aérea", "Fuerza Aérea"],
+  ["Civil", "Civil"],
+  ["Policia", "Policia"],
+];
+
+const EXT_OPTIONS = [
+  ["", "Seleccione..."],
+  ["LP", "LP (La Paz)"],
+  ["CB", "CB (Cochabamba)"],
+  ["SC", "SC (Santa Cruz)"],
+  ["OR", "OR (Oruro)"],
+  ["PT", "PT (Potosí)"],
+  ["TJ", "TJ (Tarija)"],
+  ["CH", "CH (Chuquisaca)"],
+  ["BN", "BN (Beni)"],
+  ["PD", "PD (Pando)"],
+  ["QR", "QR"],
+];
+
+const TURNO_OPTIONS = [
+  ["", "Seleccione..."],
+  ["Mañana", "Mañana"],
+  ["Tarde", "Tarde"],
+  ["Noche", "Noche"],
+];
+
 const USER_TYPES = [
   "Cursante",
   "Administrador",
@@ -11,73 +70,14 @@ const USER_TYPES = [
   "Docente",
 ];
 
-const GRADOS = [
-  "Oficial Militar Superior",
-  "Personal Civil",
-  "Estudiante Postgrado",
-  "Profesor",
-];
-
-const EXT = [
-  { v: "LP", t: "LP (La Paz)" },
-  { v: "CB", t: "CB (Cochabamba)" },
-  { v: "SC", t: "SC (Santa Cruz)" },
-  { v: "OR", t: "OR (Oruro)" },
-  { v: "PT", t: "PT (Potosí)" },
-  { v: "TJ", t: "TJ (Tarija)" },
-  { v: "CH", t: "CH (Chuquisaca)" },
-  { v: "BN", t: "BN (Beni)" },
-  { v: "PD", t: "PD (Pando)" },
-];
-
-const FILIALES = ["Sede Central", "Filial Norte", "Filial Sur"];
-const FUERZAS = ["Ejército", "Armada", "Fuerza Aérea", "Civil"];
-const TURNOS = ["Mañana", "Tarde", "Noche"];
-
-// ✅ Simulación: “base local” (luego esto será API)
-const DUMMY_USERS = [
-  {
-    ci: "1234567",
-    tipo: "Administrador",
-    grado: "Oficial Militar Superior",
-    ap_paterno: "Pérez",
-    ap_materno: "Gómez",
-    nombre: "Juan",
-    ex: "LP",
-    filial: "Sede Central",
-    fuerza: "Ejército",
-    turno: "Mañana",
-    telefono: "70123456",
-    fecha_inscripcion: "2025-02-01",
-    lugar_trabajo: "EAEN - Sede Central",
-    correo: "juan.perez@eaen.bo",
-    fecha_nacimiento: "1980-05-20",
-  },
-  {
-    ci: "9876543",
-    tipo: "Docente",
-    grado: "Profesor",
-    ap_paterno: "Rojas",
-    ap_materno: "Flores",
-    nombre: "María",
-    ex: "CB",
-    filial: "Filial Norte",
-    fuerza: "Civil",
-    turno: "Tarde",
-    telefono: "76543210",
-    fecha_inscripcion: "2024-08-10",
-    lugar_trabajo: "UMSS",
-    correo: "maria.rojas@eaen.bo",
-    fecha_nacimiento: "1978-11-02",
-  },
-];
-
 const blankUser = {
-  tipo: "",
+  id: "",
+  tipo_usuario: "",
   grado: "",
   ap_paterno: "",
   ap_materno: "",
   nombre: "",
+  apellido: "",
   ci: "",
   ex: "",
   filial: "",
@@ -87,6 +87,9 @@ const blankUser = {
   fecha_inscripcion: "",
   lugar_trabajo: "",
   correo: "",
+  email: "",
+  rol: "",
+  estado: "",
   fecha_nacimiento: "",
 };
 
@@ -99,14 +102,46 @@ export default function ModifyUser({ onBack }) {
   const [editUser, setEditUser] = useState(blankUser);
   const [saving, setSaving] = useState(false);
 
-  const canSearch = useMemo(() => ci.trim().length >= 4 && !searching, [ci, searching]);
+  // ✅ Modal de estado (✓ / ✕)
+  const [statusModal, setStatusModal] = useState({
+    open: false,
+    type: "success", // success | error
+    title: "",
+    message: "",
+  });
+
+  const openStatus = ({ type, title, message }) =>
+    setStatusModal({ open: true, type, title, message });
+
+  const closeStatus = () => setStatusModal((p) => ({ ...p, open: false }));
+
+  const canSearch = useMemo(
+    () => ci.trim().length >= 4 && !searching,
+    [ci, searching]
+  );
 
   const isEditValid = useMemo(() => {
     if (!openModal) return false;
-    return Object.values(editUser).every((v) => String(v).trim().length > 0);
+    const required = [
+      "tipo_usuario",
+      "grado",
+      "ap_paterno",
+      "ap_materno",
+      "nombre",
+      "ex",
+      "filial",
+      "fuerza",
+      "turno",
+      "telefono",
+      "fecha_inscripcion",
+      "lugar_trabajo",
+      "correo",
+      "fecha_nacimiento",
+    ];
+    return required.every((k) => String(editUser[k] ?? "").trim().length > 0);
   }, [editUser, openModal]);
 
-  // ESC para cerrar modal + bloqueo scroll
+  // ✅ ESC para cerrar modal edición + bloqueo scroll
   useEffect(() => {
     if (!openModal) return;
 
@@ -123,26 +158,15 @@ export default function ModifyUser({ onBack }) {
     };
   }, [openModal]);
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (!canSearch) return;
-
-    setSearching(true);
-    setNotFound(false);
-
-    setTimeout(() => {
-      const found = DUMMY_USERS.find((u) => u.ci === ci.trim());
-      setSearching(false);
-
-      if (!found) {
-        setNotFound(true);
-        return;
-      }
-
-      setEditUser(found);
-      setOpenModal(true);
-    }, 450);
-  };
+  // ✅ ESC para cerrar modal de estado
+  useEffect(() => {
+    if (!statusModal.open) return;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") closeStatus();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [statusModal.open]);
 
   const closeEditModal = () => {
     setOpenModal(false);
@@ -154,24 +178,145 @@ export default function ModifyUser({ onBack }) {
     setEditUser((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = (e) => {
+  // ✅ BUSCAR REAL: coincidencia exacta con CI
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (!canSearch) return;
+
+    const ciExacto = ci.trim();
+    setSearching(true);
+    setNotFound(false);
+
+    try {
+      const resp = await fetch(
+        `${API_BASE}/usuarios/ci/${encodeURIComponent(ciExacto)}`
+      );
+      const data = await resp.json().catch(() => ({}));
+
+      if (!resp.ok) {
+        if (resp.status === 404) {
+          setNotFound(true);
+          return;
+        }
+        openStatus({
+          type: "error",
+          title: "Error al buscar",
+          message: data?.message || "No se pudo buscar el usuario.",
+        });
+        return;
+      }
+
+      setEditUser({
+        ...blankUser,
+        id: data.id ?? "",
+        tipo_usuario: data.tipo_usuario ?? "",
+        rol: data.rol ?? "",
+        estado: data.estado ?? "",
+        grado: data.grado ?? "",
+        ap_paterno: data.ap_paterno ?? "",
+        ap_materno: data.ap_materno ?? "",
+        nombre: data.nombre ?? "",
+        apellido: data.apellido ?? "",
+        ci: data.ci ?? ciExacto,
+        ex: data.ex ?? "",
+        filial: data.filial ?? "",
+        fuerza: data.fuerza ?? "",
+        turno: data.turno ?? "",
+        telefono: data.telefono ?? "",
+        fecha_inscripcion: (data.fecha_inscripcion ?? "").slice(0, 10),
+        lugar_trabajo: data.lugar_trabajo ?? "",
+        correo: data.correo ?? "",
+        email: data.email ?? "",
+        fecha_nacimiento: (data.fecha_nacimiento ?? "").slice(0, 10),
+      });
+
+      setOpenModal(true);
+    } catch (err) {
+      openStatus({
+        type: "error",
+        title: "Sin conexión",
+        message: "No se pudo conectar al servidor. Verifica el backend.",
+      });
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  // ✅ GUARDAR REAL: PUT por CI exacto (no toca password)
+  const handleSave = async (e) => {
     e.preventDefault();
 
     if (!isEditValid) {
-      alert("Por favor, complete todos los campos requeridos.");
+      openStatus({
+        type: "error",
+        title: "Faltan datos",
+        message: "Complete todos los campos requeridos para guardar cambios.",
+      });
       return;
     }
 
     setSaving(true);
 
-    // ✅ simulación de guardado
-    setTimeout(() => {
-      setSaving(false);
-      alert("Cambios guardados exitosamente! (Simulación)");
+    try {
+      const ciExacto = String(editUser.ci || "").trim();
+
+      const payload = {
+        tipo_usuario: editUser.tipo_usuario,
+        grado: editUser.grado,
+        ap_paterno: editUser.ap_paterno,
+        ap_materno: editUser.ap_materno,
+        nombre: editUser.nombre,
+        ex: editUser.ex,
+        filial: editUser.filial,
+        fuerza: editUser.fuerza,
+        turno: editUser.turno,
+        telefono: editUser.telefono,
+        fecha_inscripcion: editUser.fecha_inscripcion,
+        lugar_trabajo: editUser.lugar_trabajo,
+        correo: editUser.correo,
+        fecha_nacimiento: editUser.fecha_nacimiento,
+        // opcionales si quieres editar (si no, puedes quitarlos)
+        email: editUser.email || null,
+        rol: editUser.rol || null,
+        estado: editUser.estado || null,
+      };
+
+      const resp = await fetch(
+        `${API_BASE}/usuarios/ci/${encodeURIComponent(ciExacto)}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await resp.json().catch(() => ({}));
+
+      if (!resp.ok) {
+        openStatus({
+          type: "error",
+          title: "No se pudo guardar",
+          message: data?.message || "Ocurrió un error al actualizar el usuario.",
+        });
+        return;
+      }
+
+      openStatus({
+        type: "success",
+        title: "Cambios guardados",
+        message: `Se actualizaron los datos del CI: ${ciExacto}.`,
+      });
+
       closeEditModal();
-      // Opcional: limpiar búsqueda o mantener
-      // setCi("");
-    }, 500);
+    } catch (err) {
+      openStatus({
+        type: "error",
+        title: "Sin conexión",
+        message: "No se pudo conectar al servidor. Verifica el backend.",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -180,7 +325,7 @@ export default function ModifyUser({ onBack }) {
         <div>
           <h2 className="eaen-modify-title">Modificar Usuario</h2>
           <p className="eaen-modify-subtitle">
-            Busque por Carnet de Identidad (CI). Al encontrar, se abrirá un formulario de edición.
+            Busque por Carnet de Identidad (CI) con coincidencia exacta.
           </p>
         </div>
 
@@ -203,53 +348,84 @@ export default function ModifyUser({ onBack }) {
             inputMode="numeric"
           />
 
-          <button className="eaen-primary-btn" type="submit" disabled={!canSearch}>
+          <button
+            className="eaen-primary-btn"
+            type="submit"
+            disabled={!canSearch}
+          >
             {searching ? "Buscando..." : "Buscar"}
           </button>
         </form>
 
         {notFound && (
           <div className="eaen-alert">
-            No se encontró un usuario con el CI <b>{ci.trim()}</b>. (Simulación)
+            No se encontró un usuario con el CI <b>{ci.trim()}</b>.
           </div>
         )}
-
-        <div className="eaen-note">
-          <b>Tip:</b> Prueba con CI: <code>1234567</code> o <code>9876543</code>
-        </div>
       </div>
 
       {/* ✅ Modal de edición */}
       {openModal && (
-        <div className="eaen-modal" onMouseDown={closeEditModal}>
-          <div className="eaen-modal-content" onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-            <button className="eaen-close-modal" onClick={closeEditModal} aria-label="Cerrar">
+        <div className="eaen-modal-overlay" onMouseDown={closeEditModal}>
+          <div
+            className="eaen-modal-container"
+            onMouseDown={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <button
+              className="eaen-modal-close"
+              onClick={closeEditModal}
+              type="button"
+              aria-label="Cerrar"
+            >
               ×
             </button>
 
-            <h2 className="eaen-modal-title">Editar Usuario (CI: {editUser.ci})</h2>
+            <h2 className="eaen-modal-title">
+              Editar Usuario (CI: {editUser.ci})
+            </h2>
 
             <form onSubmit={handleSave} className="eaen-form">
               <div className="eaen-form-grid">
                 <FieldSelect
                   label="Tipo de Usuario"
-                  name="tipo"
-                  value={editUser.tipo}
+                  name="tipo_usuario"
+                  value={editUser.tipo_usuario}
                   onChange={onEditChange}
-                  options={[["", "Seleccione..."], ...USER_TYPES.map((x) => [x, x])]}
+                  options={[
+                    ["", "Seleccione..."],
+                    ...USER_TYPES.map((x) => [x, x]),
+                  ]}
                 />
 
+                {/* ✅ Igual que Addusers */}
                 <FieldSelect
                   label="Grado o Profesión"
                   name="grado"
                   value={editUser.grado}
                   onChange={onEditChange}
-                  options={[["", "Seleccione..."], ...GRADOS.map((x) => [x, x])]}
+                  options={GRADO_OPTIONS}
                 />
 
-                <FieldInput label="Apellido Paterno" name="ap_paterno" value={editUser.ap_paterno} onChange={onEditChange} />
-                <FieldInput label="Apellido Materno" name="ap_materno" value={editUser.ap_materno} onChange={onEditChange} />
-                <FieldInput label="Nombre" name="nombre" value={editUser.nombre} onChange={onEditChange} />
+                <FieldInput
+                  label="Apellido Paterno"
+                  name="ap_paterno"
+                  value={editUser.ap_paterno}
+                  onChange={onEditChange}
+                />
+                <FieldInput
+                  label="Apellido Materno"
+                  name="ap_materno"
+                  value={editUser.ap_materno}
+                  onChange={onEditChange}
+                />
+                <FieldInput
+                  label="Nombre"
+                  name="nombre"
+                  value={editUser.nombre}
+                  onChange={onEditChange}
+                />
 
                 {/* CI readonly */}
                 <div className="eaen-form-group">
@@ -262,23 +438,25 @@ export default function ModifyUser({ onBack }) {
                   name="ex"
                   value={editUser.ex}
                   onChange={onEditChange}
-                  options={[["", "Seleccione..."], ...EXT.map((x) => [x.v, x.t])]}
+                  options={EXT_OPTIONS}
                 />
 
+                {/* ✅ Igual que Addusers */}
                 <FieldSelect
                   label="Filial"
                   name="filial"
                   value={editUser.filial}
                   onChange={onEditChange}
-                  options={[["", "Seleccione..."], ...FILIALES.map((x) => [x, x])]}
+                  options={FILIAL_OPTIONS}
                 />
 
+                {/* ✅ Igual que Addusers */}
                 <FieldSelect
                   label="Fuerza"
                   name="fuerza"
                   value={editUser.fuerza}
                   onChange={onEditChange}
-                  options={[["", "Seleccione..."], ...FUERZAS.map((x) => [x, x])]}
+                  options={FUERZA_OPTIONS}
                 />
 
                 <FieldSelect
@@ -286,32 +464,76 @@ export default function ModifyUser({ onBack }) {
                   name="turno"
                   value={editUser.turno}
                   onChange={onEditChange}
-                  options={[["", "Seleccione..."], ...TURNOS.map((x) => [x, x])]}
+                  options={TURNO_OPTIONS}
                 />
 
-                <FieldInput label="Teléfono" name="telefono" value={editUser.telefono} onChange={onEditChange} type="tel" />
-                <FieldInput label="Fecha de Inscripción" name="fecha_inscripcion" value={editUser.fecha_inscripcion} onChange={onEditChange} type="date" />
-                <FieldInput label="Lugar de Trabajo" name="lugar_trabajo" value={editUser.lugar_trabajo} onChange={onEditChange} />
-                <FieldInput label="Correo Electrónico" name="correo" value={editUser.correo} onChange={onEditChange} type="email" />
-                <FieldInput label="Fecha de Nacimiento" name="fecha_nacimiento" value={editUser.fecha_nacimiento} onChange={onEditChange} type="date" />
+                <FieldInput
+                  label="Teléfono"
+                  name="telefono"
+                  value={editUser.telefono}
+                  onChange={onEditChange}
+                  type="tel"
+                />
+                <FieldInput
+                  label="Fecha de Inscripción"
+                  name="fecha_inscripcion"
+                  value={editUser.fecha_inscripcion}
+                  onChange={onEditChange}
+                  type="date"
+                />
+                <FieldInput
+                  label="Lugar de Trabajo"
+                  name="lugar_trabajo"
+                  value={editUser.lugar_trabajo}
+                  onChange={onEditChange}
+                />
+                <FieldInput
+                  label="Correo Electrónico"
+                  name="correo"
+                  value={editUser.correo}
+                  onChange={onEditChange}
+                  type="email"
+                />
+                <FieldInput
+                  label="Fecha de Nacimiento"
+                  name="fecha_nacimiento"
+                  value={editUser.fecha_nacimiento}
+                  onChange={onEditChange}
+                  type="date"
+                />
               </div>
 
               <div className="eaen-modal-actions">
-                <button className="eaen-primary-btn" type="submit" disabled={!isEditValid || saving}>
+                <button
+                  className="eaen-primary-btn"
+                  type="submit"
+                  disabled={!isEditValid || saving}
+                >
                   {saving ? "Guardando..." : "Guardar Cambios"}
                 </button>
 
-                <button className="eaen-secondary-btn" type="button" onClick={closeEditModal} disabled={saving}>
+                <button
+                  className="eaen-secondary-btn"
+                  type="button"
+                  onClick={closeEditModal}
+                  disabled={saving}
+                >
                   Cancelar
                 </button>
               </div>
-
-              <p className="eaen-hint">
-                * Esto es simulación. Luego conectamos a Node + MySQL para traer/guardar por CI.
-              </p>
             </form>
           </div>
         </div>
+      )}
+
+      {/* ✅ Modal de estado (✓ / ✕) */}
+      {statusModal.open && (
+        <StatusModal
+          type={statusModal.type}
+          title={statusModal.title}
+          message={statusModal.message}
+          onClose={closeStatus}
+        />
       )}
     </section>
   );
@@ -345,6 +567,27 @@ function FieldSelect({ label, name, value, onChange, options }) {
           </option>
         ))}
       </select>
+    </div>
+  );
+}
+
+function StatusModal({ type = "success", title, message, onClose }) {
+  const isSuccess = type === "success";
+
+  return (
+    <div className="eaen-modal-overlay">
+      <div className="eaen-modal-container">
+        <div className={`eaen-modal-icon ${isSuccess ? "success" : "error"}`}>
+          {isSuccess ? "✓" : "✕"}
+        </div>
+
+        <h3 className="eaen-modal-title">{title}</h3>
+        <p className="eaen-modal-message">{message}</p>
+
+        <button className="eaen-modal-btn" onClick={onClose}>
+          Aceptar
+        </button>
+      </div>
     </div>
   );
 }
