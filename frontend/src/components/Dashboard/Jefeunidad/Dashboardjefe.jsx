@@ -56,7 +56,7 @@ export default function DashboardJefe() {
             icon="📚"
             title="Gestión de Cursos"
             desc="Cree y edite cursos para formación superior militar y civil."
-            onAccess={() => go("Gestión de Cursos")}
+           onAccess={() => navigate("/gestion-cursos")}
           />
           <Card
             icon="🔔"

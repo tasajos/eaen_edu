@@ -1,0 +1,57 @@
+.eaen-subview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.eaen-subview-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 20px;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+.eaen-subview-head h2 {
+  margin: 0 0 4px 0;
+  color: #003366;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.eaen-subview-head p {
+  margin: 0;
+  color: #666;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.eaen-subview-card {
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  padding: 22px;
+  color: #213547;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/* Botón volver (mismo estilo EAEN) */
+.eaen-secondary-btn {
+  background: rgba(0, 51, 102, 0.08);
+  color: #003366;
+  border: none;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.2s ease;
+}
+
+.eaen-secondary-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(0, 51, 102, 0.12);
+}
