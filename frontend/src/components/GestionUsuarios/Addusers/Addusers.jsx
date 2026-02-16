@@ -31,23 +31,39 @@ export default function Addusers({ onBack }) {
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    if (!isValid) {
-      alert("Por favor, complete todos los campos requeridos.");
+  if (!isValid) {
+    alert("Por favor, complete todos los campos requeridos.");
+    return;
+  }
+
+  try {
+    setSubmitting(true);
+
+    const resp = await fetch("http://localhost:5000/api/usuarios", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      alert(data?.message || "Error al guardar usuario.");
       return;
     }
 
-    setSubmitting(true);
-    setTimeout(() => {
-      setSubmitting(false);
-      alert("Usuario añadido exitosamente! (Simulación)");
-      setForm(initialForm);
-      // si quieres volver automáticamente:
-      // onBack?.();
-    }, 450);
-  };
+    alert(`Usuario añadido exitosamente. ID: ${data.id}`);
+    setForm(initialForm);
+    // onBack?.(); // si quieres volver
+  } catch (err) {
+    alert("No se pudo conectar al servidor. Revisa que el backend esté corriendo.");
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   return (
     <section className="eaen-addusers-wrap">
