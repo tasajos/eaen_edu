@@ -76,10 +76,20 @@ export default function Addusers({ onBack }) {
               onChange={handleChange}
               options={[
                 ["", "Seleccione..."],
-                ["Oficial Militar Superior", "Oficial Militar Superior"],
-                ["Personal Civil", "Personal Civil"],
-                ["Estudiante Postgrado", "Estudiante Postgrado"],
-                ["Profesor", "Profesor"],
+                ["My", "My"],
+                ["Tte.Cnl", "Tte.Cnl"],
+                ["Cnl", "Cnl"],
+                ["Lic. Administracion Empresas", "Lic. Administracion Empresas"],
+                ["Ing. Civil", "Ing. Civil"],
+                ["Ing. Sistemas", "Ing. Sistemas"],
+                ["Ing. Agronomo", "Ing. Agronomo"],
+                ["Lic. Derecho", "Lic. Derecho"],
+                ["Medico", "Medico"],
+                ["Profesion Libre", "Profesion Libre"],
+                ["Docente", "Docente"],
+                ["Sub.1ro", "Sub.1ro"],
+                ["Sub.My", "Sub.My"],
+                ["Sub.Master", "Sub.Master"],
               ]}
             />
 
@@ -104,6 +114,7 @@ export default function Addusers({ onBack }) {
                 ["CH", "CH (Chuquisaca)"],
                 ["BN", "BN (Beni)"],
                 ["PD", "PD (Pando)"],
+                ["QR", "QR"],
               ]}
             />
 
@@ -114,9 +125,10 @@ export default function Addusers({ onBack }) {
               onChange={handleChange}
               options={[
                 ["", "Seleccione..."],
-                ["Sede Central", "Sede Central"],
-                ["Filial Norte", "Filial Norte"],
-                ["Filial Sur", "Filial Sur"],
+                ["Cochabamba", "Cochabamba"],
+                ["La Paz", "La Paz"],
+                ["Santa Cruz", "Santa Cruz"],
+                ["Beni", "Beni"],
               ]}
             />
 
@@ -131,6 +143,7 @@ export default function Addusers({ onBack }) {
                 ["Armada", "Armada"],
                 ["Fuerza Aérea", "Fuerza Aérea"],
                 ["Civil", "Civil"],
+                 ["Policia", "Policia"],
               ]}
             />
 

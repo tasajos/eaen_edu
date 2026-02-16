@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Usuarios - Sistema Universitario EAEN</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Reset y tipografía */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #FFFFFF, #E6F0FF); /* Gradiente sutil para fondo elegante */
+            color: #003366;
+            display: flex;
+            height: 100vh;
+            overflow: hidden; /* Para layout full-screen */
+        }
+
+        /* Sidebar (Navbar) innovador */
+        .sidebar {
+            background-color: #003366; /* Azul principal */
+            color: #FFFFFF;
+            width: 250px;
+            padding: 20px;
+            transition: width 0.3s ease;
+            position: relative;
+            z-index: 10;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar h2 {
+            font-size: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .sidebar ul {
+            list-style: none;
+        }
+
+        .sidebar li {
+            margin: 15px 0;
+        }
+
+        .sidebar a {
+            color: #FFFFFF;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            border-radius: 8px;
+            transition: background 0.3s ease, transform 0.2s ease;
+        }
+
+        .sidebar a:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateX(5px); /* Animación de expansión al hover */
+        }
+
+        .sidebar a.active {
+            background: rgba(255, 102, 0, 0.3); /* Resaltado para ítem activo (naranja sutil) */
+        }
+
+        .sidebar .icon {
+            margin-right: 10px;
+            font-size: 20px;
+        }
+
+        /* Toggle para móvil */
+        .sidebar-toggle {
+            display: none; /* Oculto en desktop */
+            background: #FF6600;
+            color: #FFFFFF;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 20;
+        }
+
+        /* Contenido principal */
+        .main-content {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            background: #FFFFFF;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .header .logo {
+            width: 80px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #003366;
+        }
+
+        .profile {
+            display: flex;
+            align-items: center;
+        }
+
+        .profile img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .logout-btn {
+            background: #FF6600;
+            color: #FFFFFF;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            background: #CC5200;
+        }
+
+        /* Grid de cards para Gestión de Usuarios */
+        .users-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px; /* Más espacio para elegancia */
+        }
+
+        .card {
+            background: #FFFFFF;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+        }
+
+        .card:hover {
+            transform: scale(1.05); /* Animación de escala al hover para innovación */
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .card-icon {
+            font-size: 50px; /* Íconos más grandes para impacto */
+            color: #FF6600;
+            margin-bottom: 15px;
+        }
+
+        .card h3 {
+            color: #003366;
+            margin-bottom: 10px;
+            font-size: 20px;
+        }
+
+        .card p {
+            color: #666666;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .card-btn {
+            background: linear-gradient(135deg, #FF6600, #FF8533); /* Gradiente para botón elegante */
+            color: #FFFFFF;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s ease, height 0.6s ease;
+        }
+
+        .card-btn:active::before {
+            width: 300px;
+            height: 300px; /* Efecto ripple al clic para innovación */
+        }
+
+        .card-btn:hover {
+            background: linear-gradient(135deg, #CC5200, #E65C00);
+            transform: translateY(-2px);
+        }
+
+        /* Componente de Búsqueda (No Modal) */
+        .search-component {
+            display: none; /* Oculto por defecto */
+            background: #FFFFFF;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            max-width: 600px;
+            margin: 0 auto;
+            animation: slideIn 0.3s ease;
+        }
+
+        .search-component h3 {
+            color: #003366;
+            margin-bottom: 20px;
+        }
+
+        .search-component input {
+            width: calc(100% - 120px);
+            padding: 10px;
+            border: 1px solid #003366;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        .search-component button {
+            background: #FF6600;
+            color: #FFFFFF;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 10px;
+            transition: background 0.3s ease;
+        }
+
+        .search-component button:hover {
+            background: #CC5200;
+        }
+
+        /* Modal para formulario */
+        .modal {
+            display: none; /* Oculto por defecto */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5); /* Overlay semi-transparente */
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal-content {
+            background: #FFFFFF;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            padding: 30px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #003366;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 700;
+            color: #003366;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #003366;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            border-color: #FF6600;
+            outline: none;
+        }
+
+        .submit-btn {
+            background: #FF6600;
+            color: #FFFFFF;
+            border: none;
+            padding: 12px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.3s ease;
+        }
+
+        .submit-btn:hover {
+            background: #CC5200;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 12px;
+            color: #666666;
+            border-top: 1px solid #E6E6E6;
+            margin-top: 40px;
+        }
+
+        /* Responsivo */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 0;
+                padding: 0;
+                overflow: hidden;
+            }
+
+            .sidebar.open {
+                width: 250px;
+                padding: 20px;
+            }
+
+            .sidebar-toggle {
+                display: block;
+            }
+
+            .main-content {
+                padding: 20px;
+            }
+
+            .modal-content, .search-component {
+                width: 95%;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar (Navbar) -->
+    <nav class="sidebar">
+        <h2>Panel Jefe de Estudios</h2>
+        <ul>
+            <li><a href="#usuarios" class="active"><span class="icon">👥</span>Gestión de Usuarios</a></li>
+            <li><a href="#cursos"><span class="icon">📚</span>Gestión de Cursos</a></li>
+            <li><a href="#notificaciones"><span class="icon">🔔</span>Gestión de Notificaciones</a></li>
+            <li><a href="#educativa"><span class="icon">🎓</span>Gestión Educativa</a></li>
+        </ul>
+    </nav>
+
+    <!-- Toggle para sidebar en móvil -->
+    <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
+
+    <!-- Contenido principal: Gestión de Usuarios -->
+    <div class="main-content">
+        <header class="header">
+            <img src="logo-eaen.png" alt="Logo EAEN" class="logo"> <!-- Reemplaza con tu logo -->
+            <h1>Gestión de Usuarios - EAEN Avaroa</h1>
+            <div class="profile">
+                <img src="profile-placeholder.png" alt="Perfil"> <!-- Reemplaza con imagen de perfil -->
+                <span>Jefe de Estudios</span>
+                <button class="logout-btn" onclick="alert('Cerrando sesión...')">Logout</button>
+            </div>
+        </header>
+
+        <!-- Grid de cards para Gestión de Usuarios -->
+        <section class="users-grid" id="users-grid">
+            <div class="card" id="add-user-card">
+                <div class="card-icon">➕</div>
+                <h3>Añadir Usuarios</h3>
+                <p>Registre nuevos usuarios: oficiales militares, personal civil o estudiantes de postgrado.</p>
+                <button class="card-btn">Añadir</button>
+            </div>
+            <div class="card" id="modify-user-card">
+                <div class="card-icon">✏️</div>
+                <h3>Modificar Usuarios</h3>
+                <p>Edite información de usuarios existentes, como roles, datos personales o permisos.</p>
+                <button class="card-btn">Modificar</button>
+            </div>
+            <div class="card" onclick="alert('Cargando lista de usuarios...')">
+                <div class="card-icon">📋</div>
+                <h3>Listar Usuarios</h3>
+                <p>Visualice y busque la lista completa de usuarios registrados en el sistema.</p>
+                <button class="card-btn">Listar</button>
+            </div>
+        </section>
+
+        <!-- Componente de Búsqueda para Modificar (No Modal, se muestra inline) -->
+        <section id="search-component" class="search-component">
+            <h3>Buscar Usuario por Carnet de Identidad (CI)</h3>
+            <input type="text" id="search-ci" placeholder="Ingrese CI (ej. 123456)" required>
+            <button onclick="searchUser()">Buscar</button>
+        </section>
+
+        <!-- Modal con Formulario de Añadir Usuario (mantenido del anterior) -->
+        <div id="add-user-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal" onclick="closeModal('add-user-modal')">&times;</span>
+                <h2>Añadir Nuevo Usuario</h2>
+                <form id="add-user-form">
+                    <!-- Campos como en el anterior (omitidos por brevedad, pero están en el código completo) -->
+                    <div class="form-group">
+                        <label for="grado">Grado o Profesión:</label>
+                        <select id="grado" required>
+                            <option value="">Seleccione...</option>
+                            <option value="Oficial Militar Superior">Oficial Militar Superior</option>
+                            <option value="Personal Civil">Personal Civil</option>
+                            <option value="Estudiante Postgrado">Estudiante Postgrado</option>
+                            <option value="Profesor">Profesor</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="ap_paterno">Apellido Paterno:</label>
+                        <input type="text" id="ap_paterno" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ap_materno">Apellido Materno:</label>
+                        <input type="text" id="ap_materno" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="nombre">Nombre:</label>
+                        <input type="text" id="nombre" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ci">CI:</label>
+                        <input type="text" id="ci" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ex">EX (Extensión):</label>
+                        <select id="ex" required>
+                            <option value="">Seleccione...</option>
+                            <option value="LP">LP (La Paz)</option>
+                            <option value="CB">CB (Cochabamba)</option>
+                            <option value="SC">SC (Santa Cruz)</option>
+                            <option value="OR">OR (Oruro)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="filial">Filial:</label>
+                        <select id="filial" required>
+                            <option value="">Seleccione...</option>
+                            <option value="Sede Central">Sede Central</option>
+                            <option value="Filial Norte">Filial Norte</option>
+                            <option value="Filial Sur">Filial Sur</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="fuerza">Fuerza:</label>
+                        <select id="fuerza" required>
+                            <option value="">Seleccione...</option>
+                            <option value="Ejército">Ejército</option>
+                            <option value="Armada">Armada</option>
+                            <option value="Fuerza Aérea">Fuerza Aérea</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="turno">Turno:</label>
+                        <select id="turno" required>
+                            <option value="">Seleccione...</option>
+                            <option value="Mañana">Mañana</option>
+                            <option value="Tarde">Tarde</option>
+                            <option value="Noche">Noche</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="telefono">Teléfono:</label>
+                        <input type="tel" id="telefono" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="fecha_inscripcion">Fecha de Inscripción:</label>
+                        <input type="date" id="fecha_inscripcion" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="lugar_trabajo">Lugar de Trabajo:</label>
+                        <input type="text" id="lugar_trabajo" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="correo">Correo Electrónico:</label>
+                        <input type="email" id="correo" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="fecha_nacimiento">Fecha de Nacimiento:</label>
+                        <input type="date" id="fecha_nacimiento" required>
+                    </div>
+                    <button type="submit" class="submit-btn">Guardar Usuario</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal con Formulario de Modificar Usuario -->
+        <div id="modify-user-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal" onclick="closeModal('modify-user-modal')">&times;</span>
+                <h2>Modificar Usuario</h2>
+                <form id="modify-user-form">
+                    <div class="form-group">
+                        <label for="modify-tipo">Tipo de Usuario:</label>
+                        <select id="modify-tipo" required>
+                            <option value="">Seleccione...</option>
+                            <option value="Cursante">Cursante</option>
+                            <option value="Administrador">Administrador</option>
+                            <option value="Tecnico">Técnico</option>
+                            <option value="Jefe de Carrera">Jefe de Carrera</option>
+                            <option value="Jefe de Unidad o Director">Jefe de Unidad o Director</option>
+                            <option value="Personal de Apoyo">Personal de Apoyo</option>
+                            <option value="Docente">Docente</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="modify-grado">Grado o Profesión:</label>
+                        <select id="modify-grado" required>
+                            <option value="">Seleccione...</option>
+                            <option value="Oficial Militar Superior">Oficial Militar Superior</option>
+                            <option value="Personal Civil">Personal Civil</option>
+                            <option value="Estudiante Postgrado">Estudiante Postgrado</option>
+                            <option value="Profesor">Profesor</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="modify-ap_paterno">Apellido Paterno:</label>
+                        <input type="text" id="modify-ap_paterno" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="modify-ap_materno">Apellido Materno:</label>
+                        <input type="text" id="modify-ap_materno" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="modify-nombre">Nombre:</label>
+                        <input type="text" id="modify-nombre" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="modify-ci">CI:</label>
+                        <input type="text" id="modify-ci" required readonly> <!-- Readonly para no editar CI -->
+                    </div>
+                    <div class="form-group">
+                        <label for="modify-ex">EX (Extensión):</label>
+                        <select id="modify-ex" required>
+                            <option value="">Seleccione...</option>
+                            <option value="LP">LP (La Paz)</option>
+                            <option value="CB">CB (Cochabamba)</option>
+                            <option value="SC">SC (Santa Cruz)</option>
+                            <option value="OR">OR (Oruro)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="modify-filial">Filial:</label>
+                        <select id="modify-filial" required>
+                            <option value="">Seleccione...</option>
+                            <option value="Sede Central">Sede Central</option>
+                            <option value="Filial Norte">Filial Norte</option>
+                            <option value="Filial Sur">Filial Sur</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="modify-fuerza">Fuerza:</label>
+                        <select id="modify-fuerza" required>
+                            <option value="">Seleccione...</option>
+                            <option value="Ejército">Ejército</option>
+                            <option value="Armada">Armada</option>
+                            <option value="Fuerza Aérea">Fuerza Aérea</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="modify-turno">Turno:</label>
+                        <select id="modify-turno" required>
+                            <option value="">Seleccione...</option>
+                            <option value="Mañana">Mañana</option>
+                            <option value="Tarde">Tarde</option>
+                            <option value="Noche">Noche</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="modify-telefono">Teléfono:</label>
+                        <input type="tel" id="modify-telefono" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="modify-fecha_inscripcion">Fecha de Inscripción:</label>
+                        <input type="date" id="modify-fecha_inscripcion" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="modify-lugar_trabajo">Lugar de Trabajo:</label>
+                        <input type="text" id="modify-lugar_trabajo" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="modify-correo">Correo Electrónico:</label>
+                        <input type="email" id="modify-correo" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="modify-fecha_nacimiento">Fecha de Nacimiento:</label>
+                        <input type="date" id="modify-fecha_nacimiento" required>
+                    </div>
+                    <button type="submit" class="submit-btn">Guardar Cambios</button>
+                </form>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <p>&copy; 2026 Escuela de Altos Estudios Nacionales. Todos los derechos reservados.</p>
+        </footer>
+    </div>
+
+    <script>
+        // Toggle sidebar para móvil
+        function toggleSidebar() {
+            document.querySelector('.sidebar').classList.toggle('open');
+        }
+
+        // Simulación de clics en navbar
+        document.querySelectorAll('.sidebar a').forEach(link => {
+            link.addEventListener('click', function(event) {
+                alert(`Navegando a: ${this.textContent}`);
+            });
+        });
+
+        // Función para abrir/cerrar modales
+        function openModal(modalId) {
+            document.getElementById(modalId).style.display = 'flex';
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        // Cerrar modales al clic fuera
+        window.addEventListener('click', function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        });
+
+        // Abrir modal de Añadir al clic en card
+        document.getElementById('add-user-card').addEventListener('click', () => openModal('add-user-modal'));
+
+        // Validación y envío del formulario de Añadir
+        document.getElementById('add-user-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const inputs = this.querySelectorAll('[required]');
+            let isValid = true;
+            inputs.forEach(input => {
+                if (!input.value) isValid = false;
+            });
+            if (isValid) {
+                alert('Usuario añadido exitosamente! (Simulación)');
+                closeModal('add-user-modal');
+                this.reset();
+            } else {
+                alert('Por favor, complete todos los campos requeridos.');
+            }
+        });
+
+        // Mostrar componente de búsqueda al clic en card de Modificar
+        document.getElementById('modify-user-card').addEventListener('click', function() {
+            document.getElementById('users-grid').style.display = 'none';
+            document.getElementById('search-component').style.display = 'block';
+        });
+
+        // Simulación de búsqueda de usuario
+        function searchUser() {
+            const ci = document.getElementById('search-ci').value;
+            if (!ci) {
+                alert('Por favor, ingrese un CI válido.');
+                return;
+            }
+
+            // Datos dummy para simulación (en producción, fetch de API)
+            const userData = {
+                tipo: 'Administrador', // Ejemplo
+                grado: 'Oficial Militar Superior',
+                ap_paterno: 'Pérez',
+                ap_materno: 'Gómez',
+                nombre: 'Juan',
+                ci: ci,
+                ex: 'LP',
+                filial: 'Sede Central',
+                fuerza: 'Ejército',
+                turno: 'Mañana',
+                telefono: '123456789',
+                fecha_inscripcion: '2023-01-15',
+                lugar_trabajo: 'Base Militar Central',
+                correo: 'juan@example.com',
+                fecha_nacimiento: '1980-05-20'
+            };
+
+            // Prellenar el formulario de modificación
+            document.getElementById('modify-tipo').value = userData.tipo;
+            document.getElementById('modify-grado').value = userData.grado;
+            document.getElementById('modify-ap_paterno').value = userData.ap_paterno;
+            document.getElementById('modify-ap_materno').value = userData.ap_materno;
+            document.getElementById('modify-nombre').value = userData.nombre;
+            document.getElementById('modify-ci').value = userData.ci;
+            document.getElementById('modify-ex').value = userData.ex;
+            document.getElementById('modify-filial').value = userData.filial;
+            document.getElementById('modify-fuerza').value = userData.fuerza;
+            document.getElementById('modify-turno').value = userData.turno;
+            document.getElementById('modify-telefono').value = userData.telefono;
+            document.getElementById('modify-fecha_inscripcion').value = userData.fecha_inscripcion;
+            document.getElementById('modify-lugar_trabajo').value = userData.lugar_trabajo;
+            document.getElementById('modify-correo').value = userData.correo;
+            document.getElementById('modify-fecha_nacimiento').value = userData.fecha_nacimiento;
+
+            // Abrir el modal de modificación
+            openModal('modify-user-modal');
+        }
+
+        // Validación y envío del formulario de Modificar
+        document.getElementById('modify-user-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const inputs = this.querySelectorAll('[required]');
+            let isValid = true;
+            inputs.forEach(input => {
+                if (!input.value) isValid = false;
+            });
+            if (isValid) {
+                alert('Cambios guardados exitosamente! (Simulación)');
+                closeModal('modify-user-modal');
+                // Opcional: Volver al grid de cards
+                document.getElementById('search-component').style.display = 'none';
+                document.getElementById('users-grid').style.display = 'grid';
+            } else {
+                alert('Por favor, complete todos los campos requeridos.');
+            }
+        });
+    </script>
+</body>
+</html>

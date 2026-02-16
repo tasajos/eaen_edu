@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "./GestionUsuarios.css";
 import Addusers from "./Addusers/Addusers";
+import ModifyUser from "./ModifyUser/ModifyUser";
+import ListUsers from "./ListUsers/ListUsers";
+
 
 export default function GestionUsuarios() {
   const navigate = useNavigate();
@@ -101,7 +104,7 @@ export default function GestionUsuarios() {
               title="Modificar Usuarios"
               desc="Edite información de usuarios existentes, como roles, datos personales o permisos."
               buttonLabel="Modificar"
-              onClick={() => alert("Abriendo herramientas para modificar usuarios...")}
+              onClick={() => setView("edit")}
             />
 
             <ActionCard
@@ -109,12 +112,16 @@ export default function GestionUsuarios() {
               title="Listar Usuarios"
               desc="Visualice y busque la lista completa de usuarios registrados en el sistema."
               buttonLabel="Listar"
-              onClick={() => alert("Cargando lista de usuarios...")}
+              onClick={() => setView("list")}
             />
           </section>
-        ) : (
-          <Addusers onBack={() => setView("home")} />
-        )}
+                   ) : view === "add" ? (
+                    <Addusers onBack={() => setView("home")} />
+                    ) : view === "edit" ? (
+                    <ModifyUser onBack={() => setView("home")} />
+                    ) : (
+                    <ListUsers onBack={() => setView("home")} />
+                    )}
 
         <footer className="eaen-footer">
           <p>&copy; 2026 Escuela de Altos Estudios Nacionales. Todos los derechos reservados.</p>
