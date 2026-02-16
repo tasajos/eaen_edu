@@ -20,6 +20,18 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
 });
+function normEstado(v) {
+  const s = String(v || "").trim().toUpperCase();
+  // tu enum parece "ACTIVO"/"INACTIVO"
+  if (s === "ACTIVO") return "ACTIVO";
+  if (s === "INACTIVO") return "INACTIVO";
+  // compat por si en frontend llega "Activo"
+  if (s === "ACTIVO" || s === "ACTIVO ") return "ACTIVO";
+  if (s === "ACTIVO".toUpperCase()) return "ACTIVO";
+  return s || "ACTIVO";
+}
+
+
 
 // Health
 app.get("/api/health", async (req, res) => {
@@ -687,6 +699,111 @@ app.get("/api/cursos/:id", async (req, res) => {
     return res.status(500).json({ message: "Error interno", detail: err.message });
   }
 });
+
+app.post("/api/cursos/:id/participantes", async (req, res) => {
+  try {
+    const cursoId = Number(req.params.id);
+    const { participantes_ids } = req.body;
+
+    if (!cursoId) return res.status(400).json({ message: "ID de curso inválido" });
+    if (!Array.isArray(participantes_ids) || participantes_ids.length === 0) {
+      return res.status(400).json({ message: "Debe enviar participantes_ids (mínimo 1)" });
+    }
+
+    // validar curso
+    const [cRows] = await pool.execute(`SELECT id FROM cursos WHERE id = ? LIMIT 1`, [cursoId]);
+    if (!cRows.length) return res.status(404).json({ message: "Curso no encontrado" });
+
+    // normalizar ids
+    const ids = [...new Set(participantes_ids.map((x) => Number(x)).filter(Boolean))];
+    if (!ids.length) return res.status(400).json({ message: "participantes_ids inválido" });
+
+    // validar que existan y sean cursante activo
+    const placeholders = ids.map(() => "?").join(",");
+    const [uRows] = await pool.execute(
+      `
+      SELECT id, estado, tipo_usuario
+      FROM usuarios
+      WHERE id IN (${placeholders})
+      `,
+      ids
+    );
+
+    if (uRows.length !== ids.length) {
+      return res.status(400).json({ message: "Uno o más participantes no existen" });
+    }
+
+    const invalid = uRows.find(
+      (u) => String(u.estado).toUpperCase() !== "ACTIVO" || String(u.tipo_usuario) !== "Cursante"
+    );
+    if (invalid) {
+      return res.status(400).json({
+        message: "Todos los participantes deben ser ACTIVO y tipo_usuario = Cursante",
+      });
+    }
+
+    // insertar en tabla puente (usa UNIQUE uq_curso_usuario si la agregaste)
+    // si NO tienes el unique, esto igual inserta pero permitiría duplicados.
+    const values = ids.map(() => "(?, ?)").join(",");
+    const params = ids.flatMap((uid) => [cursoId, uid]);
+
+    // si tienes uq_curso_usuario, evita error usando ON DUPLICATE:
+    const sql = `
+      INSERT INTO curso_participantes (curso_id, usuario_id)
+      VALUES ${values}
+      ON DUPLICATE KEY UPDATE curso_id = curso_id
+    `;
+
+    const [result] = await pool.execute(sql, params);
+
+    return res.json({
+      message: "Participantes añadidos",
+      curso_id: cursoId,
+      recibidos: ids.length,
+      affectedRows: result.affectedRows,
+    });
+  } catch (err) {
+    if (err?.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({ message: "Participante duplicado en el curso." });
+    }
+    return res.status(500).json({ message: "Error interno", detail: err.message });
+  }
+});
+
+/**
+ * DELETE /api/cursos/:id/participantes
+ * Quita participantes de un curso existente.
+ * body: { participantes_ids: [1,2,3] }
+ */
+app.delete("/api/cursos/:id/participantes", async (req, res) => {
+  try {
+    const cursoId = Number(req.params.id);
+    const { participantes_ids } = req.body;
+
+    if (!cursoId) return res.status(400).json({ message: "ID de curso inválido" });
+    if (!Array.isArray(participantes_ids) || participantes_ids.length === 0) {
+      return res.status(400).json({ message: "Debe enviar participantes_ids (mínimo 1)" });
+    }
+
+    const ids = [...new Set(participantes_ids.map((x) => Number(x)).filter(Boolean))];
+    if (!ids.length) return res.status(400).json({ message: "participantes_ids inválido" });
+
+    const placeholders = ids.map(() => "?").join(",");
+    const sql = `DELETE FROM curso_participantes WHERE curso_id = ? AND usuario_id IN (${placeholders})`;
+
+    const [result] = await pool.execute(sql, [cursoId, ...ids]);
+
+    return res.json({
+      message: "Participantes eliminados",
+      curso_id: cursoId,
+      removed: result.affectedRows,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno", detail: err.message });
+  }
+});
+
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`API corriendo en http://localhost:${PORT}`));
