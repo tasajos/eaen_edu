@@ -47,7 +47,10 @@ export default function GestionUsuarios() {
           </li>
 
           <li>
-            <button className="eaen-navlink" onClick={() => alert("Más adelante: Gestión de Cursos")}>
+            <button
+             className={`eaen-navlink ${isActive("/gestion-cursos") ? "active" : ""}`}
+              onClick={() => go("/gestion-cursos", "Gestión de Cursos")}
+                 >
               <span className="icon">📚</span>Gestión de Cursos
             </button>
           </li>
