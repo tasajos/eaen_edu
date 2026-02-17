@@ -1,1 +1,433 @@
-@import "../subview.css";
+.eaen-lc-card {
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  padding: 18px;
+}
+
+.eaen-lc-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.eaen-lc-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 900;
+  color: #003366;
+  font-size: 13px;
+}
+
+.eaen-lc-group input {
+  width: 360px;
+  max-width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #003366;
+  border-radius: 12px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.eaen-lc-group input:focus {
+  border-color: #ff6600;
+  box-shadow: 0 0 0 4px rgba(255, 102, 0, 0.18);
+}
+
+.eaen-lc-stats {
+  display: flex;
+  align-items: center;
+}
+
+.eaen-lc-badge {
+  display: inline-block;
+  padding: 8px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  color: #003366;
+  background: rgba(0, 51, 102, 0.10);
+  white-space: nowrap;
+}
+
+.eaen-lc-tablewrap {
+  overflow: auto;
+  border: 1px solid rgba(0,0,0,0.10);
+  border-radius: 12px;
+}
+
+.eaen-lc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.eaen-lc-table thead th {
+  text-align: left;
+  padding: 12px;
+  background: rgba(0, 51, 102, 0.06);
+  color: #003366;
+  font-weight: 900;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  white-space: nowrap;
+}
+
+.eaen-lc-table thead th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.sort-ind {
+  margin-left: 6px;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.eaen-lc-table tbody td {
+  padding: 12px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  vertical-align: top;
+}
+
+.eaen-lc-table tbody tr:hover {
+  background: rgba(0, 51, 102, 0.03);
+}
+
+.eaen-lc-table tbody tr.active {
+  background: rgba(255, 102, 0, 0.08);
+}
+
+.eaen-lc-title {
+  font-weight: 900;
+  color: #003366;
+}
+
+.eaen-lc-sub {
+  margin-top: 4px;
+  color: #666;
+  font-size: 12px;
+}
+
+.eaen-lc-pill {
+  display: inline-block;
+  min-width: 44px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 102, 0, 0.12);
+  color: #a53b00;
+  font-weight: 900;
+}
+
+.eaen-lc-btn {
+  background: rgba(0, 51, 102, 0.10);
+  color: #003366;
+  border: none;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.2s ease;
+}
+
+.eaen-lc-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(0, 51, 102, 0.14);
+}
+
+.eaen-lc-btn.ghost {
+  background: transparent;
+  border: 1px solid rgba(0,0,0,0.12);
+}
+
+.eaen-lc-detail {
+  margin-top: 14px;
+  border: 1px solid rgba(0,0,0,0.10);
+  border-radius: 12px;
+  padding: 14px;
+  background: rgba(0, 51, 102, 0.03);
+}
+
+.eaen-lc-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.eaen-lc-detail-head h3 {
+  margin: 0;
+  color: #003366;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.eaen-lc-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.eaen-lc-kv {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.eaen-lc-kv span {
+  display: block;
+  color: #666;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.eaen-lc-kv b {
+  color: #003366;
+}
+
+@media (max-width: 980px) {
+  .eaen-lc-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .eaen-lc-group input {
+    width: 100%;
+  }
+
+  .eaen-lc-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+/* =========================
+   MODAL PARTICIPANTES (PM)
+   ========================= */
+
+.eaen-pm-modal {
+  width: min(920px, 92vw);
+  max-height: min(78vh, 720px);
+  border-radius: 16px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.eaen-pm-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 12px 16px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  background: #fff;
+}
+
+.eaen-pm-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.eaen-pm-sub {
+  margin-top: 4px;
+  font-size: 13px;
+  color: rgba(15, 23, 42, 0.7);
+}
+
+.eaen-pm-close {
+  white-space: nowrap;
+  padding: 8px 12px;
+  border-radius: 12px;
+}
+
+.eaen-pm-body {
+  padding: 12px 16px;
+  background: #fff;
+}
+
+.eaen-pm-empty {
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.04);
+  color: rgba(15, 23, 42, 0.75);
+  font-size: 14px;
+}
+
+.eaen-pm-tablewrap {
+  max-height: calc(78vh - 160px);
+  overflow: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.08);
+}
+
+/* tabla limpia y legible */
+.eaen-pm-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px; /* fuerza que no se rompa en columnas raras */
+  background: #fff;
+}
+
+.eaen-pm-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fafc;
+  color: rgba(15, 23, 42, 0.75);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 12px 12px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+
+.eaen-pm-table tbody td {
+  padding: 12px 12px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  font-size: 14px;
+  color: #0f172a;
+  vertical-align: middle;
+}
+
+.eaen-pm-table tbody tr:hover {
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.eaen-pm-name {
+  font-weight: 700;
+}
+
+.eaen-pm-ci {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: rgba(15, 23, 42, 0.85);
+}
+
+.eaen-pm-email {
+  color: rgba(15, 23, 42, 0.8);
+  word-break: break-word;
+}
+
+.eaen-pm-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid rgba(0,0,0,0.10);
+  background: rgba(15, 23, 42, 0.03);
+  color: rgba(15, 23, 42, 0.8);
+  white-space: nowrap;
+}
+
+.eaen-pm-status.ok {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.25);
+  color: rgba(16, 185, 129, 1);
+}
+
+.eaen-pm-status.off {
+  background: rgba(239, 68, 68, 0.10);
+  border-color: rgba(239, 68, 68, 0.22);
+  color: rgba(239, 68, 68, 1);
+}
+
+.eaen-pm-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 16px 16px 16px;
+  border-top: 1px solid rgba(0,0,0,0.08);
+  background: #fff;
+}
+
+/* Responsive: en móvil, quita min-width de tabla y deja scroll horizontal */
+@media (max-width: 760px) {
+  .eaen-pm-modal {
+    width: 94vw;
+    max-height: 82vh;
+  }
+  .eaen-pm-table {
+    min-width: 640px;
+  }
+}
+
+.eaen-modal-backdrop {
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(3px);
+}
+.eaen-modal-backdrop{
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;            /* evita que toque bordes en móvil */
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(3px);
+  z-index: 9999;
+}
+
+/* Este bloque asegura que NO herede padding/estilos raros del .eaen-modal base */
+.eaen-modal.eaen-pm-modal{
+  padding: 0 !important;       /* mata padding del modal genérico */
+  overflow: hidden !important; /* nada se sale */
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 16px;
+  width: min(920px, 92vw);
+  max-height: min(78vh, 720px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+}
+
+.eaen-pm-head{
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  background: #fff;
+}
+
+.eaen-pm-body{
+  flex: 1 1 auto;              /* ✅ ocupa el espacio disponible */
+  padding: 12px 16px;
+  overflow: hidden;            /* el scroll va dentro de tablewrap */
+  background: #fff;
+}
+
+.eaen-pm-foot{
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 16px 16px;
+  border-top: 1px solid rgba(0,0,0,0.08);
+  background: #fff;
+}
+
+.eaen-pm-tablewrap{
+  height: 100%;
+  max-height: calc(min(78vh, 720px) - 170px); /* header+foot */
+  overflow: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.08);
+}
+@media (max-width: 760px){
+  .eaen-modal.eaen-pm-modal{
+    width: 94vw;
+    max-height: 82vh;
+  }
+  .eaen-pm-table{
+    min-width: 640px;
+  }
+}

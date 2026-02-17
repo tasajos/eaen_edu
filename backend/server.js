@@ -684,33 +684,57 @@ app.post("/api/cursos", async (req, res) => {
 app.get("/api/cursos", async (req, res) => {
   try {
     const sql = `
-      SELECT
-        c.id,
-        c.programa_id,
-        c.nombre,
-        c.descripcion,
-        c.jefe_curso_id,
-        c.fecha_inicio,
-        c.fecha_fin,
-        c.modalidad,
-        c.horas_academicas,
-        c.estado,
-        c.creado_en,
-        u.nombre AS jefe_nombre,
-        u.ap_paterno AS jefe_ap_paterno,
-        u.ap_materno AS jefe_ap_materno,
-        u.ci AS jefe_ci,
-        u.ex AS jefe_ex,
-        u.tipo_usuario AS jefe_tipo_usuario,
-        (
-          SELECT COUNT(*)
-          FROM curso_participantes cp
-          WHERE cp.curso_id = c.id
-        ) AS participantes_total
-      FROM cursos c
-      LEFT JOIN usuarios u ON u.id = c.jefe_curso_id
-      ORDER BY c.creado_en DESC, c.id DESC
-    `;
+  SELECT
+    c.id,
+    c.programa_id,
+    c.nombre,
+    c.descripcion,
+    c.jefe_curso_id,
+    c.fecha_inicio,
+    c.fecha_fin,
+    c.modalidad,
+    c.horas_academicas,
+    c.estado,
+    c.creado_en,
+
+    -- JEFE DE CURSO (desde cursos.jefe_curso_id)
+    uj.nombre AS jefe_nombre,
+    uj.ap_paterno AS jefe_ap_paterno,
+    uj.ap_materno AS jefe_ap_materno,
+    uj.ci AS jefe_ci,
+    uj.ex AS jefe_ex,
+    uj.tipo_usuario AS jefe_tipo_usuario,
+
+    -- ENCARGADO DE CURSO (desde curso_responsabilidades rol=ENCARGADO_CURSO)
+    ue.id AS encargado_id,
+    ue.nombre AS encargado_nombre,
+    ue.ap_paterno AS encargado_ap_paterno,
+    ue.ap_materno AS encargado_ap_materno,
+    ue.ci AS encargado_ci,
+    ue.ex AS encargado_ex,
+    ue.tipo_usuario AS encargado_tipo_usuario,
+
+    -- CANTIDAD DE REGISTROS (participantes inscritos)
+    (
+      SELECT COUNT(*)
+      FROM curso_participantes cp
+      WHERE cp.curso_id = c.id
+    ) AS participantes_total
+
+  FROM cursos c
+
+  -- Join jefe
+  LEFT JOIN usuarios uj ON uj.id = c.jefe_curso_id
+
+  -- Traer encargado: como es SINGLE por curso, tomamos 1 registro
+  LEFT JOIN curso_responsabilidades cr_enc
+    ON cr_enc.curso_id = c.id
+   AND cr_enc.rol = 'ENCARGADO_CURSO'
+
+  LEFT JOIN usuarios ue ON ue.id = cr_enc.usuario_id
+
+  ORDER BY c.creado_en DESC, c.id DESC
+`;
     const [rows] = await pool.query(sql);
     return res.json(rows);
   } catch (err) {
