@@ -31,6 +31,93 @@ function normEstado(v) {
   return s || "ACTIVO";
 }
 
+const ROLES_RESP = new Set([
+  "ENCARGADO_CURSO",
+  "PERSONAL_APOYO",
+  "FACILITADOR",
+  "DOCENTE",
+  "JEFE_CURSO", // este rol se manejará actualizando cursos.jefe_curso_id
+]);
+
+const ROLES_SINGLE = new Set([
+  "ENCARGADO_CURSO",
+  "JEFE_CURSO", // único (columna en cursos)
+]);
+
+const isEncargadoCurso = (r) => String(r || "").trim() === "Encargado de Curso";
+
+
+function normRol(v) {
+  return String(v || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+}
+
+async function assertCursoExists(connOrPool, cursoId) {
+  const [rows] = await connOrPool.execute(
+    `SELECT id, jefe_curso_id FROM cursos WHERE id = ? LIMIT 1`,
+    [cursoId]
+  );
+  if (!rows.length) return null;
+  return rows[0];
+}
+
+async function assertNoCursanteActivo(connOrPool, usuarioId) {
+  const [uRows] = await connOrPool.execute(
+    `SELECT id, estado, tipo_usuario FROM usuarios WHERE id = ? LIMIT 1`,
+    [usuarioId]
+  );
+  if (!uRows.length) return { ok: false, code: 404, msg: "Usuario no existe" };
+
+  const u = uRows[0];
+  if (String(u.estado).toUpperCase() !== "ACTIVO") {
+    return { ok: false, code: 400, msg: "El usuario debe estar ACTIVO" };
+  }
+  if (String(u.tipo_usuario || "").trim() === "Cursante") {
+    return { ok: false, code: 400, msg: "El usuario no puede ser Cursante" };
+  }
+  return { ok: true };
+}
+
+
+async function assertUsuarioActivo(connOrPool, usuarioId) {
+  const [rows] = await connOrPool.execute(
+    `SELECT id, estado, tipo_usuario FROM usuarios WHERE id = ? LIMIT 1`,
+    [usuarioId]
+  );
+  if (!rows.length) return { ok: false, code: 404, msg: "Usuario no existe" };
+
+  const u = rows[0];
+  if (String(u.estado).toUpperCase() !== "ACTIVO") {
+    return { ok: false, code: 400, msg: "El usuario debe estar ACTIVO" };
+  }
+  return { ok: true, user: u };
+}
+
+async function assertCursanteInscritoEnCurso(connOrPool, cursoId, usuarioId) {
+  // 1) usuario ACTIVO y cursante
+  const uok = await assertUsuarioActivo(connOrPool, usuarioId);
+  if (!uok.ok) return uok;
+
+  if (String(uok.user.tipo_usuario || "").trim() !== "Cursante") {
+    return { ok: false, code: 400, msg: "El encargado debe ser un Cursante" };
+  }
+
+  // 2) debe estar inscrito en el curso
+  const [rows] = await connOrPool.execute(
+    `SELECT 1 AS ok FROM curso_participantes WHERE curso_id = ? AND usuario_id = ? LIMIT 1`,
+    [cursoId, usuarioId]
+  );
+
+  if (!rows.length) {
+    return { ok: false, code: 400, msg: "El encargado debe ser un cursante inscrito en este curso" };
+  }
+
+  return { ok: true };
+}
+
+
 
 
 // Health
@@ -803,6 +890,284 @@ app.delete("/api/cursos/:id/participantes", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/cursos/:id/responsabilidades
+ * Devuelve:
+ * - jefe_curso (desde cursos.jefe_curso_id)
+ * - otras responsabilidades (desde curso_responsabilidades)
+ */
+app.get("/api/cursos/:id/responsabilidades", async (req, res) => {
+  try {
+    const cursoId = Number(req.params.id);
+    if (!cursoId) return res.status(400).json({ message: "ID de curso inválido" });
+
+    const curso = await assertCursoExists(pool, cursoId);
+    if (!curso) return res.status(404).json({ message: "Curso no encontrado" });
+
+    // jefe de curso (columna cursos.jefe_curso_id)
+    const [jefeRows] = await pool.execute(
+      `
+      SELECT
+        u.id, u.nombre, u.ap_paterno, u.ap_materno, u.ci, u.ex, u.correo, u.email, u.tipo_usuario, u.estado
+      FROM usuarios u
+      WHERE u.id = ?
+      LIMIT 1
+      `,
+      [curso.jefe_curso_id]
+    );
+
+    // otras responsabilidades (tabla nueva)
+    const [rows] = await pool.execute(
+      `
+      SELECT
+        cr.id,
+        cr.rol,
+        cr.usuario_id,
+        cr.creado_en,
+        u.nombre, u.ap_paterno, u.ap_materno, u.ci, u.ex, u.correo, u.email, u.tipo_usuario, u.estado
+      FROM curso_responsabilidades cr
+      INNER JOIN usuarios u ON u.id = cr.usuario_id
+      WHERE cr.curso_id = ?
+      ORDER BY cr.rol ASC, u.ap_paterno ASC, u.ap_materno ASC, u.nombre ASC
+      `,
+      [cursoId]
+    );
+
+    return res.json({
+      curso_id: cursoId,
+      jefe_curso: jefeRows.length ? { rol: "JEFE_CURSO", ...jefeRows[0] } : null,
+      responsabilidades: rows,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno", detail: err.message });
+  }
+});
+
+/**
+ * POST /api/cursos/:id/responsabilidades
+ *
+ * body ejemplo (multi):
+ * { rol: "DOCENTE", usuarios_ids: [10,11] }
+ *
+ * body ejemplo (single):
+ * { rol: "ENCARGADO_CURSO", usuario_id: 12 }
+ *
+ * body ejemplo (jefe):
+ * { rol: "JEFE_CURSO", usuario_id: 9 }
+ */
+app.post("/api/cursos/:id/responsabilidades", async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    const cursoId = Number(req.params.id);
+    if (!cursoId) return res.status(400).json({ message: "ID de curso inválido" });
+
+    let { rol, usuario_id, usuarios_ids } = req.body;
+    rol = normRol(rol);
+
+    if (!ROLES_RESP.has(rol)) {
+      return res.status(400).json({ message: "Rol inválido" });
+    }
+
+    await conn.beginTransaction();
+
+    const curso = await assertCursoExists(conn, cursoId);
+    if (!curso) {
+      await conn.rollback();
+      return res.status(404).json({ message: "Curso no encontrado" });
+    }
+
+    // ===== JEFE_CURSO (se guarda en cursos.jefe_curso_id) =====
+    if (rol === "JEFE_CURSO") {
+      const uid = Number(usuario_id);
+      if (!uid) {
+        await conn.rollback();
+        return res.status(400).json({ message: "Campo requerido: usuario_id" });
+      }
+
+      const ok = await assertNoCursanteActivo(conn, uid);
+      if (!ok.ok) {
+        await conn.rollback();
+        return res.status(ok.code).json({ message: ok.msg });
+      }
+
+      await conn.execute(
+        `UPDATE cursos SET jefe_curso_id = ? WHERE id = ? LIMIT 1`,
+        [uid, cursoId]
+      );
+
+      await conn.commit();
+      return res.json({ message: "Jefe de curso asignado", curso_id: cursoId, rol });
+    }
+
+    // ===== ENCARGADO_CURSO (single en tabla curso_responsabilidades) =====
+    // ===== ROLES_SINGLE (ENCARGADO_CURSO) =====
+if (ROLES_SINGLE.has(rol)) {
+  const uid = Number(usuario_id);
+  if (!uid) {
+    await conn.rollback();
+    return res.status(400).json({ message: "Campo requerido: usuario_id" });
+  }
+
+  // ✅ CAMBIO: si es ENCARGADO_CURSO, permitir cursante INSCRITO en el curso
+  if (rol === "ENCARGADO_CURSO") {
+    const ok = await assertCursanteInscritoEnCurso(conn, cursoId, uid);
+    if (!ok.ok) {
+      await conn.rollback();
+      return res.status(ok.code).json({ message: ok.msg });
+    }
+  } else {
+    // (por si luego agregas otro single)
+    const ok = await assertNoCursanteActivo(conn, uid);
+    if (!ok.ok) {
+      await conn.rollback();
+      return res.status(ok.code).json({ message: ok.msg });
+    }
+  }
+
+  // Garantizar 1 encargado por curso: borramos el anterior del mismo rol
+  await conn.execute(
+    `DELETE FROM curso_responsabilidades WHERE curso_id = ? AND rol = ?`,
+    [cursoId, rol]
+  );
+
+  await conn.execute(
+    `INSERT INTO curso_responsabilidades (curso_id, usuario_id, rol) VALUES (?, ?, ?)`,
+    [cursoId, uid, rol]
+  );
+
+  await conn.commit();
+  return res.json({
+    message: "Responsabilidad asignada",
+    curso_id: cursoId,
+    rol,
+    usuario_id: uid,
+  });
+}
+
+
+    // ===== ROLES MULTI (DOCENTE/FACILITADOR/PERSONAL_APOYO) =====
+    if (!Array.isArray(usuarios_ids) || usuarios_ids.length === 0) {
+      await conn.rollback();
+      return res.status(400).json({ message: "Debe enviar usuarios_ids (mínimo 1)" });
+    }
+
+    const ids = [...new Set(usuarios_ids.map((x) => Number(x)).filter(Boolean))];
+    if (!ids.length) {
+      await conn.rollback();
+      return res.status(400).json({ message: "usuarios_ids inválido" });
+    }
+
+    // Validar todos: activo + no cursante
+    for (const uid of ids) {
+      const ok = await assertNoCursanteActivo(conn, uid);
+      if (!ok.ok) {
+        await conn.rollback();
+        return res.status(ok.code).json({ message: ok.msg, usuario_id: uid });
+      }
+    }
+
+    // Insert masivo evitando duplicados por UNIQUE uq_curso_usuario_rol
+    const values = ids.map(() => "(?, ?, ?)").join(",");
+    const params = ids.flatMap((uid) => [cursoId, uid, rol]);
+
+    const sql = `
+      INSERT INTO curso_responsabilidades (curso_id, usuario_id, rol)
+      VALUES ${values}
+      ON DUPLICATE KEY UPDATE rol = rol
+    `;
+
+    const [result] = await conn.execute(sql, params);
+
+    await conn.commit();
+    return res.json({
+      message: "Responsabilidades asignadas",
+      curso_id: cursoId,
+      rol,
+      recibidos: ids.length,
+      affectedRows: result.affectedRows,
+    });
+  } catch (err) {
+    try { await conn.rollback(); } catch {}
+    return res.status(500).json({ message: "Error interno", detail: err.message });
+  } finally {
+    conn.release();
+  }
+});
+
+/**
+ * DELETE /api/cursos/:id/responsabilidades
+ *
+ * body ejemplo (multi):
+ * { rol: "DOCENTE", usuarios_ids: [10,11] }
+ *
+ * body ejemplo (single):
+ * { rol: "ENCARGADO_CURSO", usuario_id: 12 }
+ *
+ * body ejemplo (quitar jefe):
+ * { rol: "JEFE_CURSO" }
+ */
+app.delete("/api/cursos/:id/responsabilidades", async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    const cursoId = Number(req.params.id);
+    if (!cursoId) return res.status(400).json({ message: "ID de curso inválido" });
+
+    let { rol, usuario_id, usuarios_ids } = req.body;
+    rol = normRol(rol);
+
+    if (!ROLES_RESP.has(rol)) {
+      return res.status(400).json({ message: "Rol inválido" });
+    }
+
+    await conn.beginTransaction();
+
+    const curso = await assertCursoExists(conn, cursoId);
+    if (!curso) {
+      await conn.rollback();
+      return res.status(404).json({ message: "Curso no encontrado" });
+    }
+
+    // JEFE_CURSO (columna)
+    if (rol === "JEFE_CURSO") {
+      await conn.execute(`UPDATE cursos SET jefe_curso_id = NULL WHERE id = ? LIMIT 1`, [cursoId]);
+      await conn.commit();
+      return res.json({ message: "Jefe de curso removido", curso_id: cursoId, rol });
+    }
+
+    // normalizar ids
+    let ids = [];
+    if (usuario_id) ids = [Number(usuario_id)];
+    else if (Array.isArray(usuarios_ids)) ids = usuarios_ids.map((x) => Number(x)).filter(Boolean);
+
+    ids = [...new Set(ids)].filter(Boolean);
+
+    if (!ids.length) {
+      await conn.rollback();
+      return res.status(400).json({ message: "Debe enviar usuario_id o usuarios_ids" });
+    }
+
+    const placeholders = ids.map(() => "?").join(",");
+    const sql = `
+      DELETE FROM curso_responsabilidades
+      WHERE curso_id = ? AND rol = ? AND usuario_id IN (${placeholders})
+    `;
+
+    const [result] = await conn.execute(sql, [cursoId, rol, ...ids]);
+
+    await conn.commit();
+    return res.json({
+      message: "Responsabilidades eliminadas",
+      curso_id: cursoId,
+      rol,
+      removed: result.affectedRows,
+    });
+  } catch (err) {
+    try { await conn.rollback(); } catch {}
+    return res.status(500).json({ message: "Error interno", detail: err.message });
+  } finally {
+    conn.release();
+  }
+});
 
 
 const PORT = process.env.PORT || 5000;
