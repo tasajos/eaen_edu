@@ -15,7 +15,7 @@ export default function DashboardJefe() {
           <li><button className="navlink" onClick={() => navigate("/gestion-usuarios")}>👥 Gestión de Usuarios</button></li>
           <li><button className="navlink" onClick={() => navigate("/gestion-cursos")}>📚 Gestión de Cursos</button></li>
           <li><button className="navlink" onClick={() => navigate("/gestion-notificaciones")}>🔔 Gestión de Notificaciones</button></li>
-          <li><button className="navlink" onClick={() => alert("Próximamente")}>🎓 Gestión Educativa</button></li>
+          <li><button className="navlink" onClick={() => navigate("/gestion-educativa")}>🎓 Gestión Educativa</button></li>
         </ul>
       </nav>
 
@@ -66,7 +66,7 @@ export default function DashboardJefe() {
             icon="🎓"
             title="Gestión Educativa"
             desc="Supervise evaluaciones, calificaciones y progreso académico."
-            onAccess={() => alert("Próximamente")}
+            onAccess={() => navigate("/gestion-educativa")}
           />
         </section>
 
