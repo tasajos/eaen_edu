@@ -1,0 +1,591 @@
+/* ================================================
+   GestionEducativa.css
+   Tema EAEN — azul #003366 + naranja #ff6600
+   ================================================ */
+
+/* ── Layout principal ────────────────────────── */
+.eaen-edu-page {
+  background: linear-gradient(135deg, #ffffff, #e6f0ff);
+  color: #003366;
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ─────────────────────────────────── */
+.eaen-sidebar {
+  background-color: #003366;
+  color: #fff;
+  width: 250px;
+  padding: 20px;
+  transition: width 0.3s ease, padding 0.3s ease;
+  position: relative;
+  z-index: 10;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+  flex-shrink: 0;
+}
+.eaen-sidebar h2 { font-size: 20px; margin-bottom: 30px; text-align: center; }
+.eaen-sidebar ul { list-style: none; padding: 0; margin: 0; }
+.eaen-sidebar li { margin: 12px 0; }
+
+.eaen-navlink {
+  width: 100%;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.25s, transform 0.2s;
+  text-align: left;
+  font-weight: 800;
+  font-size: 14px;
+}
+.eaen-navlink:hover  { background: rgba(255,255,255,0.18); transform: translateX(4px); }
+.eaen-navlink.active { background: rgba(255,102,0,0.28); }
+
+.eaen-sidebar-toggle {
+  display: none;
+  position: absolute;
+  top: 14px; left: 14px;
+  z-index: 20;
+  background: #ff6600;
+  color: #fff;
+  border: none;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+/* ── Main ────────────────────────────────────── */
+.eaen-main { flex: 1; padding: 40px; overflow-y: auto; }
+
+/* ── Header ──────────────────────────────────── */
+.eaen-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 26px;
+  padding: 18px 20px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  border-radius: 14px;
+}
+.eaen-header-logo { width: 74px; height: auto; }
+.eaen-header h1   { margin: 0; font-size: 22px; color: #003366; font-weight: 900; flex: 1; }
+.eaen-profile     { display: flex; align-items: center; gap: 10px; }
+.eaen-avatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: rgba(0,51,102,0.12);
+  display: grid; place-items: center;
+  font-weight: 900; color: #003366;
+}
+.eaen-logout {
+  background: #ff6600; color: #fff; border: none;
+  padding: 10px 14px; border-radius: 10px;
+  cursor: pointer; font-weight: 900;
+  transition: background 0.25s, transform 0.2s;
+}
+.eaen-logout:hover { background: #cc5200; transform: translateY(-1px); }
+
+/* ── Home grid de sub-módulos ─────────────────── */
+.edu-modules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 22px;
+  margin-bottom: 26px;
+}
+
+.edu-module-card {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  padding: 28px 24px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform 0.22s, box-shadow 0.22s, border-color 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.edu-module-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #003366, #ff6600);
+  border-radius: 14px 14px 0 0;
+}
+.edu-module-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.13);
+  border-color: rgba(0,51,102,0.15);
+}
+
+.edu-module-icon { font-size: 42px; margin-bottom: 14px; }
+.edu-module-card h3 { font-size: 17px; font-weight: 900; color: #003366; margin: 0 0 8px; }
+.edu-module-card p  { font-size: 13px; color: #666; line-height: 1.5; margin: 0 0 18px; }
+
+.edu-module-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+.edu-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: rgba(0,51,102,0.08);
+  color: #003366;
+  letter-spacing: 0.3px;
+}
+
+.edu-module-btn {
+  background: linear-gradient(135deg, #ff6600, #ff8533);
+  color: #fff;
+  border: none;
+  padding: 10px 22px;
+  border-radius: 10px;
+  font-weight: 900;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(255,102,0,0.2);
+  transition: transform 0.18s, box-shadow 0.22s;
+  width: 100%;
+}
+.edu-module-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(255,102,0,0.28); }
+
+/* ── Barra de navegación interna (breadcrumb) ── */
+.edu-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 22px;
+  font-size: 13px;
+  color: #888;
+}
+.edu-breadcrumb button {
+  background: none; border: none;
+  color: #003366; font-weight: 700;
+  cursor: pointer; font-size: 13px;
+  padding: 0;
+}
+.edu-breadcrumb button:hover { text-decoration: underline; }
+.edu-breadcrumb span { color: #bbb; }
+
+/* ── Panel contenedor de sub-módulo ──────────── */
+.edu-submodule {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+
+.edu-submodule-header {
+  padding: 20px 26px;
+  border-bottom: 2px solid #eef0f3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+}
+.edu-submodule-header h2 {
+  font-size: 18px; font-weight: 900;
+  color: #003366; margin: 0;
+  display: flex; align-items: center; gap: 10px;
+}
+
+.edu-submodule-body { padding: 26px; }
+
+/* ── Tabs internos ───────────────────────────── */
+.edu-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid #eef0f3;
+  margin-bottom: 24px;
+  background: #f8fafc;
+  padding: 0 26px;
+}
+.edu-tab {
+  padding: 12px 20px;
+  font-size: 13px; font-weight: 800;
+  color: #888;
+  background: transparent; border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.edu-tab:hover  { color: #003366; }
+.edu-tab.active { color: #ff6600; border-bottom-color: #ff6600; }
+
+/* ── Tabla EAEN ──────────────────────────────── */
+.edu-table-wrap { overflow-x: auto; }
+
+.edu-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.edu-table th {
+  background: #f5f7fa;
+  color: #003366;
+  font-weight: 900;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 2px solid #eef0f3;
+}
+.edu-table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid #f0f2f5;
+  color: #333;
+  vertical-align: middle;
+}
+.edu-table tr:last-child td { border-bottom: none; }
+.edu-table tr:hover td { background: #fafbff; }
+
+/* ── Badges de estado ────────────────────────── */
+.edu-badge {
+  display: inline-block;
+  font-size: 10px; font-weight: 800;
+  padding: 3px 9px; border-radius: 20px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.badge-presente  { background: rgba(67,160,71,0.12); color: #2e7d32; }
+.badge-ausente   { background: rgba(229,57,53,0.12); color: #c62828; }
+.badge-tardanza  { background: rgba(251,140,0,0.12); color: #e65100; }
+.badge-justif    { background: rgba(25,118,210,0.12); color: #1565c0; }
+.badge-aprobado  { background: rgba(67,160,71,0.12); color: #2e7d32; }
+.badge-reprobado { background: rgba(229,57,53,0.12); color: #c62828; }
+.badge-pendiente { background: rgba(251,140,0,0.12); color: #e65100; }
+.badge-entregado { background: rgba(67,160,71,0.12); color: #2e7d32; }
+
+/* ── Formularios internos ────────────────────── */
+.edu-form { max-width: 640px; }
+.edu-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
+.edu-form-row.single { grid-template-columns: 1fr; }
+
+.edu-form-group { display: flex; flex-direction: column; gap: 6px; }
+.edu-form-label {
+  font-size: 11px; font-weight: 800;
+  color: #003366; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.edu-form-label span { color: #e53935; margin-left: 2px; }
+
+.edu-form-input,
+.edu-form-select,
+.edu-form-textarea {
+  background: #f5f7fa;
+  border: 1px solid #dce3ed;
+  color: #003366;
+  padding: 10px 13px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.edu-form-textarea { min-height: 100px; resize: vertical; line-height: 1.5; }
+.edu-form-input:focus,
+.edu-form-select:focus,
+.edu-form-textarea:focus {
+  outline: none;
+  border-color: #003366;
+  box-shadow: 0 0 0 3px rgba(0,51,102,0.08);
+}
+.edu-form-input::placeholder,
+.edu-form-textarea::placeholder { color: #bbc; }
+
+/* ── Botones ─────────────────────────────────── */
+.btn-primary {
+  background: linear-gradient(135deg, #ff6600, #ff8533);
+  color: #fff; border: none;
+  padding: 11px 26px; border-radius: 10px;
+  font-weight: 900; font-size: 14px; cursor: pointer;
+  box-shadow: 0 6px 18px rgba(255,102,0,0.2);
+  transition: transform 0.18s, box-shadow 0.22s;
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(255,102,0,0.28); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.btn-secondary {
+  background: #fff; color: #003366;
+  border: 2px solid #dce3ed;
+  padding: 11px 20px; border-radius: 10px;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  transition: border-color 0.2s;
+}
+.btn-secondary:hover { border-color: #003366; }
+
+.btn-icon {
+  background: transparent; border: 1px solid #dce3ed;
+  color: #666; padding: 6px 10px; border-radius: 7px;
+  cursor: pointer; font-size: 13px;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-icon:hover { background: #f5f7fa; color: #003366; }
+
+.btn-actions { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+
+/* ── Calendario ──────────────────────────────── */
+.edu-calendar {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.cal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.cal-header h3 {
+  font-size: 16px; font-weight: 900;
+  color: #003366; margin: 0;
+}
+.cal-nav { display: flex; gap: 8px; }
+.cal-nav button {
+  background: #f5f7fa; border: 1px solid #dce3ed;
+  color: #003366; padding: 6px 12px;
+  border-radius: 8px; cursor: pointer; font-weight: 700;
+  transition: background 0.15s;
+}
+.cal-nav button:hover { background: #eef3fb; }
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.cal-day-name {
+  text-align: center;
+  font-size: 11px; font-weight: 800;
+  color: #888; text-transform: uppercase;
+  padding: 6px 0;
+}
+.cal-day {
+  aspect-ratio: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  border-radius: 8px;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s;
+  padding: 4px;
+  min-height: 36px;
+}
+.cal-day:hover    { background: #eef3fb; }
+.cal-day.today    { background: #003366; color: #fff; font-weight: 900; }
+.cal-day.has-event::after {
+  content: "";
+  width: 5px; height: 5px;
+  background: #ff6600;
+  border-radius: 50%;
+  position: absolute;
+  bottom: 3px;
+}
+.cal-day.other-month { color: #ccc; }
+.cal-day.selected { background: rgba(255,102,0,0.12); border: 2px solid #ff6600; }
+
+.cal-events {
+  margin-top: 18px;
+  border-top: 1px solid #eef0f3;
+  padding-top: 14px;
+}
+.cal-event-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  background: #f8fafc;
+  font-size: 13px;
+}
+.cal-event-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%; flex-shrink: 0;
+}
+.event-examen  { background: #e53935; }
+.event-tarea   { background: #fb8c00; }
+.event-festivo { background: #43a047; }
+.event-general { background: #1976d2; }
+
+.cal-event-title  { font-weight: 700; color: #003366; flex: 1; }
+.cal-event-time   { font-size: 11px; color: #888; }
+
+/* ── Asistencia: grid visual ─────────────────── */
+.asist-grid {
+  display: grid;
+  grid-template-columns: 200px repeat(auto-fill, minmax(38px, 1fr));
+  gap: 4px;
+  align-items: center;
+  font-size: 12px;
+}
+.asist-header-cell {
+  text-align: center;
+  font-size: 10px; font-weight: 800;
+  color: #888; text-transform: uppercase;
+  padding: 6px 2px;
+}
+.asist-name { font-weight: 700; color: #003366; padding: 4px 0; }
+.asist-cell {
+  width: 34px; height: 34px;
+  border-radius: 6px;
+  display: grid; place-items: center;
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform 0.15s;
+  border: 2px solid transparent;
+}
+.asist-cell:hover { transform: scale(1.15); }
+.asist-P { background: rgba(67,160,71,0.15); }
+.asist-A { background: rgba(229,57,53,0.15); }
+.asist-T { background: rgba(251,140,0,0.15); }
+.asist-J { background: rgba(25,118,210,0.15); }
+
+/* ── Calificaciones: celdas editables ────────── */
+.nota-cell {
+  display: inline-block;
+  width: 48px;
+  text-align: center;
+  background: #f5f7fa;
+  border: 1px solid #dce3ed;
+  border-radius: 6px;
+  padding: 5px 4px;
+  font-size: 13px; font-weight: 700;
+  color: #003366;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.nota-cell:focus { outline: none; border-color: #003366; background: #fff; }
+.nota-cell.aprobado { color: #2e7d32; }
+.nota-cell.reprobado { color: #c62828; }
+
+.promedio-cell {
+  font-weight: 900; font-size: 14px;
+}
+.promedio-cell.ap { color: #2e7d32; }
+.promedio-cell.rp { color: #c62828; }
+
+/* ── Stats mini ──────────────────────────────── */
+.edu-stats-row {
+  display: flex; gap: 14px; flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.edu-stat-mini {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.07);
+  padding: 14px 20px;
+  display: flex; align-items: center; gap: 12px;
+  flex: 1; min-width: 120px;
+  border-left: 4px solid #003366;
+}
+.edu-stat-mini.orange { border-left-color: #ff6600; }
+.edu-stat-mini.green  { border-left-color: #43a047; }
+.edu-stat-mini.red    { border-left-color: #e53935; }
+
+.edu-stat-mini .sn  { font-size: 24px; font-weight: 900; color: #003366; line-height: 1; }
+.edu-stat-mini.orange .sn { color: #ff6600; }
+.edu-stat-mini.green  .sn { color: #43a047; }
+.edu-stat-mini.red    .sn { color: #e53935; }
+.edu-stat-mini .sl  { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.4px; }
+
+/* ── Horarios ────────────────────────────────── */
+.horario-grid {
+  display: grid;
+  grid-template-columns: 80px repeat(5, 1fr);
+  gap: 3px;
+  font-size: 12px;
+}
+.hora-label {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #888;
+  padding: 8px 4px;
+}
+.dia-header {
+  text-align: center;
+  font-size: 11px; font-weight: 900;
+  color: #003366; text-transform: uppercase;
+  padding: 10px 4px;
+  background: #f5f7fa;
+  border-radius: 6px;
+}
+.horario-slot {
+  min-height: 52px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #eef0f3;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 4px;
+  text-align: center;
+  transition: background 0.15s;
+}
+.horario-slot.ocupado {
+  background: rgba(0,51,102,0.08);
+  border-color: rgba(0,51,102,0.2);
+  cursor: pointer;
+}
+.horario-slot.ocupado:hover { background: rgba(0,51,102,0.14); }
+.horario-slot.conflict {
+  background: rgba(229,57,53,0.1);
+  border-color: rgba(229,57,53,0.3);
+}
+.slot-materia { font-size: 11px; font-weight: 800; color: #003366; }
+.slot-docente { font-size: 10px; color: #888; }
+.slot-aula    { font-size: 10px; font-weight: 700; color: #ff6600; }
+
+/* ── Toast ───────────────────────────────────── */
+.edu-toast {
+  position: fixed; bottom: 28px; right: 28px;
+  background: #003366; color: #fff;
+  padding: 13px 22px; border-radius: 12px;
+  font-size: 14px; font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  z-index: 200; animation: slideUp 0.25s ease;
+  display: flex; align-items: center; gap: 10px;
+}
+.edu-toast.error { background: #c62828; }
+.edu-toast.warn  { background: #e65100; }
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Spinner ─────────────────────────────────── */
+.edu-spinner {
+  display: flex; align-items: center; justify-content: center;
+  padding: 48px; color: #999; font-size: 13px; gap: 10px;
+}
+.spin {
+  width: 20px; height: 20px;
+  border: 2px solid #dce3ed; border-top-color: #003366;
+  border-radius: 50%; animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Footer ──────────────────────────────────── */
+.eaen-footer {
+  margin-top: 26px; text-align: center;
+  padding: 16px 0; font-size: 12px; color: #666;
+  border-top: 1px solid rgba(0,0,0,0.08);
+}
+
+/* ── Responsive ──────────────────────────────── */
+@media (max-width: 768px) {
+  .eaen-sidebar { width: 0; padding: 0; overflow: hidden; }
+  .eaen-sidebar.open { width: 250px; padding: 20px; }
+  .eaen-sidebar-toggle { display: block; }
+  .eaen-main { padding: 20px; }
+  .eaen-header { flex-wrap: wrap; }
+  .edu-form-row { grid-template-columns: 1fr; }
+  .horario-grid { grid-template-columns: 60px repeat(5, 1fr); }
+  .asist-grid { grid-template-columns: 140px repeat(auto-fill, minmax(34px, 1fr)); }
+}
