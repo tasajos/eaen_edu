@@ -1193,6 +1193,190 @@ app.delete("/api/cursos/:id/responsabilidades", async (req, res) => {
   }
 });
 
+// =====================================================
+// NOTIFICACIONES — agregar al final de server.js
+// (antes de app.listen)
+// =====================================================
+//
+// Tabla SQL requerida:
+//
+// CREATE TABLE notificaciones (
+//   id            INT AUTO_INCREMENT PRIMARY KEY,
+//   titulo        VARCHAR(255) NOT NULL,
+//   mensaje       TEXT NOT NULL,
+//   tipo          ENUM('INFO','ALERTA','URGENTE') NOT NULL DEFAULT 'INFO',
+//   creado_por    INT NULL,                          -- usuario_id del emisor
+//   creado_en     DATETIME NOT NULL DEFAULT NOW(),
+//   activa        TINYINT(1) NOT NULL DEFAULT 1
+// );
+//
+// CREATE TABLE notificaciones_leidas (
+//   notificacion_id INT NOT NULL,
+//   usuario_id      INT NOT NULL,
+//   leida_en        DATETIME NOT NULL DEFAULT NOW(),
+//   PRIMARY KEY (notificacion_id, usuario_id),
+//   FOREIGN KEY (notificacion_id) REFERENCES notificaciones(id) ON DELETE CASCADE,
+//   FOREIGN KEY (usuario_id)      REFERENCES usuarios(id)        ON DELETE CASCADE
+// );
+
+// ─────────────────────────────────────────
+// GET /api/notificaciones
+// Lista todas las notificaciones activas
+// Query: ?usuario_id=X  → devuelve campo "leida" por usuario
+// ─────────────────────────────────────────
+app.get("/api/notificaciones", async (req, res) => {
+  try {
+    const usuarioId = req.query.usuario_id ? Number(req.query.usuario_id) : null;
+
+    let sql;
+    let params = [];
+
+    if (usuarioId) {
+      sql = `
+        SELECT
+          n.id,
+          n.titulo,
+          n.mensaje,
+          n.tipo,
+          n.creado_por,
+          n.creado_en,
+          n.activa,
+          u.nombre   AS emisor_nombre,
+          u.ap_paterno AS emisor_ap_paterno,
+          IF(nl.notificacion_id IS NOT NULL, 1, 0) AS leida
+        FROM notificaciones n
+        LEFT JOIN usuarios u ON u.id = n.creado_por
+        LEFT JOIN notificaciones_leidas nl
+          ON nl.notificacion_id = n.id AND nl.usuario_id = ?
+        WHERE n.activa = 1
+        ORDER BY n.creado_en DESC
+      `;
+      params = [usuarioId];
+    } else {
+      sql = `
+        SELECT
+          n.id,
+          n.titulo,
+          n.mensaje,
+          n.tipo,
+          n.creado_por,
+          n.creado_en,
+          n.activa,
+          u.nombre   AS emisor_nombre,
+          u.ap_paterno AS emisor_ap_paterno,
+          (
+            SELECT COUNT(*) FROM notificaciones_leidas nl WHERE nl.notificacion_id = n.id
+          ) AS total_leidas
+        FROM notificaciones n
+        LEFT JOIN usuarios u ON u.id = n.creado_por
+        ORDER BY n.creado_en DESC
+      `;
+    }
+
+    const [rows] = await pool.execute(sql, params);
+    return res.json(rows);
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno", detail: err.message });
+  }
+});
+
+// ─────────────────────────────────────────
+// POST /api/notificaciones
+// Crea una notificación (broadcast a todos los usuarios activos)
+// body: { titulo, mensaje, tipo, creado_por }
+// ─────────────────────────────────────────
+app.post("/api/notificaciones", async (req, res) => {
+  try {
+    const { titulo, mensaje, tipo, creado_por } = req.body;
+
+    if (!String(titulo ?? "").trim())   return res.status(400).json({ message: "Campo requerido: titulo" });
+    if (!String(mensaje ?? "").trim())  return res.status(400).json({ message: "Campo requerido: mensaje" });
+
+    const tiposValidos = ["INFO", "ALERTA", "URGENTE"];
+    const tipoFinal = String(tipo ?? "INFO").toUpperCase();
+    if (!tiposValidos.includes(tipoFinal)) {
+      return res.status(400).json({ message: "tipo debe ser INFO, ALERTA o URGENTE" });
+    }
+
+    const [result] = await pool.execute(
+      `INSERT INTO notificaciones (titulo, mensaje, tipo, creado_por) VALUES (?, ?, ?, ?)`,
+      [titulo.trim(), mensaje.trim(), tipoFinal, creado_por ?? null]
+    );
+
+    return res.status(201).json({ message: "Notificación creada", id: result.insertId });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno", detail: err.message });
+  }
+});
+
+// ─────────────────────────────────────────
+// DELETE /api/notificaciones/:id
+// Desactiva (soft-delete) una notificación
+// ─────────────────────────────────────────
+app.delete("/api/notificaciones/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ message: "ID inválido" });
+
+    const [result] = await pool.execute(
+      `UPDATE notificaciones SET activa = 0 WHERE id = ? LIMIT 1`,
+      [id]
+    );
+
+    if (result.affectedRows === 0) return res.status(404).json({ message: "Notificación no encontrada" });
+    return res.json({ message: "Notificación desactivada" });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno", detail: err.message });
+  }
+});
+
+// ─────────────────────────────────────────
+// POST /api/notificaciones/:id/leer
+// Marca una notificación como leída para un usuario
+// body: { usuario_id }
+// ─────────────────────────────────────────
+app.post("/api/notificaciones/:id/leer", async (req, res) => {
+  try {
+    const notifId  = Number(req.params.id);
+    const usuarioId = Number(req.body.usuario_id);
+
+    if (!notifId || !usuarioId) {
+      return res.status(400).json({ message: "Campos requeridos: id (param) y usuario_id (body)" });
+    }
+
+    await pool.execute(
+      `INSERT IGNORE INTO notificaciones_leidas (notificacion_id, usuario_id) VALUES (?, ?)`,
+      [notifId, usuarioId]
+    );
+
+    return res.json({ message: "Notificación marcada como leída" });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno", detail: err.message });
+  }
+});
+
+// ─────────────────────────────────────────
+// GET /api/notificaciones/stats
+// Estadísticas para el dashboard admin
+// ─────────────────────────────────────────
+app.get("/api/notificaciones/stats", async (req, res) => {
+  try {
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(*) AS total FROM notificaciones WHERE activa = 1`
+    );
+    const [[{ urgentes }]] = await pool.query(
+      `SELECT COUNT(*) AS urgentes FROM notificaciones WHERE activa = 1 AND tipo = 'URGENTE'`
+    );
+    const [[{ total_usuarios }]] = await pool.query(
+      `SELECT COUNT(*) AS total_usuarios FROM usuarios WHERE estado = 'ACTIVO'`
+    );
+
+    return res.json({ total, urgentes, total_usuarios });
+  } catch (err) {
+    return res.status(500).json({ message: "Error interno", detail: err.message });
+  }
+});
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`API corriendo en http://localhost:${PORT}`));

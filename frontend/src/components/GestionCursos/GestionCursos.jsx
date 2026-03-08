@@ -56,7 +56,7 @@ export default function GestionCursos() {
           </li>
 
           <li>
-            <button className="eaen-navlink" onClick={() => alert("Más adelante: Gestión de Notificaciones")}>
+            <button className="eaen-navlink" onClick={() => navigate("/gestion-notificaciones")}>
               <span className="icon">🔔</span>Gestión de Notificaciones
             </button>
           </li>

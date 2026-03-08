@@ -3,6 +3,7 @@ import LoginEAEN from "./components/LoginEAEN/LoginEAEN";
 import DashboardJefe from "./components/Dashboard/Jefeunidad/Dashboardjefe";
 import GestionUsuarios from "./components/GestionUsuarios/GestionUsuarios";
 import GestionCursos from "./components/GestionCursos/GestionCursos";
+import GestionNotificaciones from "./components/GestionNotificaciones/GestionNotificaciones";
 
 export default function App() {
   return (
@@ -12,6 +13,7 @@ export default function App() {
         <Route path="/dashboard-jefe" element={<DashboardJefe />} />
         <Route path="/gestion-usuarios" element={<GestionUsuarios />} />
          <Route path="/gestion-cursos" element={<GestionCursos />} />
+         <Route path="/gestion-notificaciones" element={<GestionNotificaciones />} />
 
         {/* fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

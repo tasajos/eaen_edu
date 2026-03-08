@@ -6,18 +6,16 @@ export default function DashboardJefe() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
 
-  const go = (label) => alert(`Navegando a: ${label}`);
-
   return (
     <div className="eaen-dash">
       {/* Sidebar */}
       <nav className={`sidebar ${open ? "open" : ""}`}>
         <h2>Panel Jefe de Estudios</h2>
         <ul>
-          <li><button className="navlink" onClick={() => go("Gestión de Usuarios")}>👥 Gestión de Usuarios</button></li>
-          <li><button className="navlink" onClick={() => go("Gestión de Cursos")}>📚 Gestión de Cursos</button></li>
-          <li><button className="navlink" onClick={() => go("Gestión de Notificaciones")}>🔔 Gestión de Notificaciones</button></li>
-          <li><button className="navlink" onClick={() => go("Gestión Educativa")}>🎓 Gestión Educativa</button></li>
+          <li><button className="navlink" onClick={() => navigate("/gestion-usuarios")}>👥 Gestión de Usuarios</button></li>
+          <li><button className="navlink" onClick={() => navigate("/gestion-cursos")}>📚 Gestión de Cursos</button></li>
+          <li><button className="navlink" onClick={() => navigate("/gestion-notificaciones")}>🔔 Gestión de Notificaciones</button></li>
+          <li><button className="navlink" onClick={() => alert("Próximamente")}>🎓 Gestión Educativa</button></li>
         </ul>
       </nav>
 
@@ -33,15 +31,15 @@ export default function DashboardJefe() {
           <div className="profile">
             <div className="avatar" aria-hidden="true">JE</div>
             <span>Jefe de Estudios</span>
-           <button
-                className="logout-btn"
-                onClick={() => {
-                    localStorage.removeItem("eaen_session");
-                    navigate("/");
-                }}
-                >
-                Logout
-                </button>
+            <button
+              className="logout-btn"
+              onClick={() => {
+                localStorage.removeItem("eaen_session");
+                navigate("/");
+              }}
+            >
+              Logout
+            </button>
           </div>
         </header>
 
@@ -56,19 +54,19 @@ export default function DashboardJefe() {
             icon="📚"
             title="Gestión de Cursos"
             desc="Cree y edite cursos para formación superior militar y civil."
-           onAccess={() => navigate("/gestion-cursos")}
+            onAccess={() => navigate("/gestion-cursos")}
           />
           <Card
             icon="🔔"
             title="Gestión de Notificaciones"
             desc="Envíe alertas y actualizaciones a usuarios."
-            onAccess={() => go("Gestión de Notificaciones")}
+            onAccess={() => navigate("/gestion-notificaciones")}
           />
           <Card
             icon="🎓"
             title="Gestión Educativa"
             desc="Supervise evaluaciones, calificaciones y progreso académico."
-            onAccess={() => go("Gestión Educativa")}
+            onAccess={() => alert("Próximamente")}
           />
         </section>
 
@@ -86,8 +84,6 @@ function Card({ icon, title, desc, onAccess }) {
       <div className="card-icon">{icon}</div>
       <h3>{title}</h3>
       <p>{desc}</p>
-
-      {/* ✅ Botón Acceder elegante */}
       <button className="card-btn" onClick={onAccess}>
         Acceder →
       </button>
