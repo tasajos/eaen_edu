@@ -62,7 +62,7 @@ export default function GestionUsuarios() {
           </li>
 
           <li>
-            <button className="eaen-navlink" onClick={() => alert("Más adelante: Gestión Educativa")}>
+            <button className="eaen-navlink" onClick={() => navigate("/gestion-educativa")}>
               <span className="icon">🎓</span>Gestión Educativa
             </button>
           </li>

@@ -6,11 +6,9 @@ import bcrypt from "bcryptjs";
 
 dotenv.config();
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
-// Pool MySQL
 const pool = mysql.createPool({
   host: process.env.DB_HOST || "localhost",
   user: process.env.DB_USER || "root",
@@ -20,1363 +18,952 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
 });
-function normEstado(v) {
-  const s = String(v || "").trim().toUpperCase();
-  // tu enum parece "ACTIVO"/"INACTIVO"
-  if (s === "ACTIVO") return "ACTIVO";
-  if (s === "INACTIVO") return "INACTIVO";
-  // compat por si en frontend llega "Activo"
-  if (s === "ACTIVO" || s === "ACTIVO ") return "ACTIVO";
-  if (s === "ACTIVO".toUpperCase()) return "ACTIVO";
-  return s || "ACTIVO";
+
+// ─── Helpers ────────────────────────────────────────────────
+const ROLES_RESP   = new Set(["ENCARGADO_CURSO","PERSONAL_APOYO","FACILITADOR","DOCENTE","JEFE_CURSO"]);
+const ROLES_SINGLE = new Set(["ENCARGADO_CURSO","JEFE_CURSO"]);
+
+function normRol(v) { return String(v||"").trim().toUpperCase().replace(/\s+/g,"_"); }
+
+async function assertCursoExists(c, id) {
+  const [r] = await c.execute(`SELECT id, jefe_curso_id FROM cursos WHERE id=? LIMIT 1`,[id]);
+  return r.length ? r[0] : null;
 }
-
-const ROLES_RESP = new Set([
-  "ENCARGADO_CURSO",
-  "PERSONAL_APOYO",
-  "FACILITADOR",
-  "DOCENTE",
-  "JEFE_CURSO", // este rol se manejará actualizando cursos.jefe_curso_id
-]);
-
-const ROLES_SINGLE = new Set([
-  "ENCARGADO_CURSO",
-  "JEFE_CURSO", // único (columna en cursos)
-]);
-
-const isEncargadoCurso = (r) => String(r || "").trim() === "Encargado de Curso";
-
-
-function normRol(v) {
-  return String(v || "")
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "_");
+async function assertMateriaExists(c, id) {
+  const [r] = await c.execute(`SELECT id, curso_id, nombre, docente_id FROM curso_materias WHERE id=? LIMIT 1`,[id]);
+  return r.length ? r[0] : null;
 }
-
-async function assertCursoExists(connOrPool, cursoId) {
-  const [rows] = await connOrPool.execute(
-    `SELECT id, jefe_curso_id FROM cursos WHERE id = ? LIMIT 1`,
-    [cursoId]
-  );
-  if (!rows.length) return null;
-  return rows[0];
+async function assertNoCursanteActivo(c, uid) {
+  const [r] = await c.execute(`SELECT id,estado,tipo_usuario FROM usuarios WHERE id=? LIMIT 1`,[uid]);
+  if (!r.length) return {ok:false,code:404,msg:"Usuario no existe"};
+  if (String(r[0].estado).toUpperCase()!=="ACTIVO") return {ok:false,code:400,msg:"El usuario debe estar ACTIVO"};
+  if (String(r[0].tipo_usuario||"").trim()==="Cursante") return {ok:false,code:400,msg:"El usuario no puede ser Cursante"};
+  return {ok:true};
 }
-
-async function assertNoCursanteActivo(connOrPool, usuarioId) {
-  const [uRows] = await connOrPool.execute(
-    `SELECT id, estado, tipo_usuario FROM usuarios WHERE id = ? LIMIT 1`,
-    [usuarioId]
-  );
-  if (!uRows.length) return { ok: false, code: 404, msg: "Usuario no existe" };
-
-  const u = uRows[0];
-  if (String(u.estado).toUpperCase() !== "ACTIVO") {
-    return { ok: false, code: 400, msg: "El usuario debe estar ACTIVO" };
-  }
-  if (String(u.tipo_usuario || "").trim() === "Cursante") {
-    return { ok: false, code: 400, msg: "El usuario no puede ser Cursante" };
-  }
-  return { ok: true };
+async function assertUsuarioActivo(c, uid) {
+  const [r] = await c.execute(`SELECT id,estado,tipo_usuario FROM usuarios WHERE id=? LIMIT 1`,[uid]);
+  if (!r.length) return {ok:false,code:404,msg:"Usuario no existe"};
+  if (String(r[0].estado).toUpperCase()!=="ACTIVO") return {ok:false,code:400,msg:"El usuario debe estar ACTIVO"};
+  return {ok:true,user:r[0]};
 }
-
-
-async function assertUsuarioActivo(connOrPool, usuarioId) {
-  const [rows] = await connOrPool.execute(
-    `SELECT id, estado, tipo_usuario FROM usuarios WHERE id = ? LIMIT 1`,
-    [usuarioId]
-  );
-  if (!rows.length) return { ok: false, code: 404, msg: "Usuario no existe" };
-
-  const u = rows[0];
-  if (String(u.estado).toUpperCase() !== "ACTIVO") {
-    return { ok: false, code: 400, msg: "El usuario debe estar ACTIVO" };
-  }
-  return { ok: true, user: u };
-}
-
-async function assertCursanteInscritoEnCurso(connOrPool, cursoId, usuarioId) {
-  // 1) usuario ACTIVO y cursante
-  const uok = await assertUsuarioActivo(connOrPool, usuarioId);
+async function assertCursanteInscrito(c, cursoId, uid) {
+  const uok = await assertUsuarioActivo(c, uid);
   if (!uok.ok) return uok;
-
-  if (String(uok.user.tipo_usuario || "").trim() !== "Cursante") {
-    return { ok: false, code: 400, msg: "El encargado debe ser un Cursante" };
-  }
-
-  // 2) debe estar inscrito en el curso
-  const [rows] = await connOrPool.execute(
-    `SELECT 1 AS ok FROM curso_participantes WHERE curso_id = ? AND usuario_id = ? LIMIT 1`,
-    [cursoId, usuarioId]
-  );
-
-  if (!rows.length) {
-    return { ok: false, code: 400, msg: "El encargado debe ser un cursante inscrito en este curso" };
-  }
-
-  return { ok: true };
+  if (String(uok.user.tipo_usuario||"").trim()!=="Cursante") return {ok:false,code:400,msg:"El encargado debe ser Cursante"};
+  const [r] = await c.execute(`SELECT 1 FROM curso_participantes WHERE curso_id=? AND usuario_id=? LIMIT 1`,[cursoId,uid]);
+  if (!r.length) return {ok:false,code:400,msg:"El encargado debe ser cursante inscrito en el curso"};
+  return {ok:true};
 }
 
-
-
-
-// Health
-app.get("/api/health", async (req, res) => {
-  try {
-    const [rows] = await pool.query("SELECT 1 AS ok");
-    res.json({ status: "ok", db: rows[0] });
-  } catch (err) {
-    res.status(500).json({ status: "error", message: err.message });
-  }
+// ════════════════════════════════════════════════════════════
+// HEALTH
+// ════════════════════════════════════════════════════════════
+app.get("/api/health", async (req,res) => {
+  try { const [r] = await pool.query("SELECT 1 AS ok"); res.json({status:"ok",db:r[0]}); }
+  catch(e) { res.status(500).json({status:"error",message:e.message}); }
 });
 
-/**
- * =========================
- * USUARIOS (SIN PASSWORD)
- * =========================
- */
-
-/**
- * GET /api/usuarios
- * Lista usuarios con todos los campos NO sensibles (SIN password)
- */
-app.get("/api/usuarios", async (req, res) => {
+// ════════════════════════════════════════════════════════════
+// USUARIOS
+// ════════════════════════════════════════════════════════════
+app.get("/api/usuarios", async (req,res) => {
   try {
-    const sql = `
-      SELECT
-        id,
-        nombre,
-        apellido,
-        grado,
-        ap_paterno,
-        ap_materno,
-        ci,
-        ex,
-        filial,
-        fuerza,
-        turno,
-        telefono,
-        fecha_inscripcion,
-        lugar_trabajo,
-        correo,
-        email,
-        rol,
-        estado,
-        tipo_usuario,
-        fecha_nacimiento,
-        creado_en
-      FROM usuarios
-      ORDER BY creado_en DESC, id DESC
-    `;
-    const [rows] = await pool.query(sql);
-    return res.json(rows);
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno", detail: err.message });
-  }
+    const [r] = await pool.query(`SELECT id,nombre,apellido,grado,ap_paterno,ap_materno,ci,ex,filial,fuerza,turno,
+      telefono,fecha_inscripcion,lugar_trabajo,correo,email,rol,estado,tipo_usuario,fecha_nacimiento,creado_en
+      FROM usuarios ORDER BY creado_en DESC,id DESC`);
+    res.json(r);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
 });
 
-/**
- * GET /api/usuarios/cursantes-activos
- * Lista SOLO usuarios ACTIVO + tipo_usuario = Cursante
- */
-app.get("/api/usuarios/cursantes-activos", async (req, res) => {
+app.get("/api/usuarios/cursantes-activos", async (req,res) => {
   try {
-    const sql = `
-      SELECT
-        id,
-        nombre,
-        apellido,
-        ap_paterno,
-        ap_materno,
-        ci,
-        ex,
-        correo,
-        email,
-        tipo_usuario,
-        estado
-      FROM usuarios
-      WHERE estado = 'ACTIVO'
-        AND tipo_usuario = 'Cursante'
-      ORDER BY ap_paterno ASC, ap_materno ASC, nombre ASC
-    `;
-    const [rows] = await pool.query(sql);
-    return res.json(rows);
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno", detail: err.message });
-  }
+    const [r] = await pool.query(`SELECT id,nombre,apellido,ap_paterno,ap_materno,ci,ex,correo,email,tipo_usuario,estado
+      FROM usuarios WHERE estado='ACTIVO' AND tipo_usuario='Cursante'
+      ORDER BY ap_paterno ASC,ap_materno ASC,nombre ASC`);
+    res.json(r);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
 });
 
-/**
- * GET /api/usuarios/jefes-curso
- * Lista usuarios ACTIVO + tipo_usuario <> Cursante
- */
-app.get("/api/usuarios/jefes-curso", async (req, res) => {
+app.get("/api/usuarios/jefes-curso", async (req,res) => {
   try {
-    const sql = `
-      SELECT
-        id,
-        nombre,
-        apellido,
-        ap_paterno,
-        ap_materno,
-        ci,
-        ex,
-        correo,
-        email,
-        tipo_usuario,
-        estado
-      FROM usuarios
-      WHERE estado = 'ACTIVO'
-        AND (tipo_usuario IS NULL OR tipo_usuario <> 'Cursante')
-      ORDER BY ap_paterno ASC, ap_materno ASC, nombre ASC
-    `;
-    const [rows] = await pool.query(sql);
-    return res.json(rows);
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno", detail: err.message });
-  }
+    const [r] = await pool.query(`SELECT id,nombre,apellido,ap_paterno,ap_materno,ci,ex,correo,email,tipo_usuario,estado
+      FROM usuarios WHERE estado='ACTIVO' AND (tipo_usuario IS NULL OR tipo_usuario<>'Cursante')
+      ORDER BY ap_paterno ASC,ap_materno ASC,nombre ASC`);
+    res.json(r);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
 });
 
-/**
- * POST /api/usuarios
- * Crea usuario con los campos del formulario.
- */
-app.post("/api/usuarios", async (req, res) => {
+// Docentes disponibles para asignar a materias (no cursantes, activos)
+app.get("/api/usuarios/docentes", async (req,res) => {
   try {
-    const {
-      grado,
-      ap_paterno,
-      ap_materno,
-      nombre,
-      ci,
-      ex,
-      filial,
-      fuerza,
-      turno,
-      telefono,
-      fecha_inscripcion,
-      lugar_trabajo,
-      correo,
-      fecha_nacimiento,
-      // opcionales:
-      rol,
-      estado,
-      password,
-      email,
-      tipo_usuario,
-    } = req.body;
+    const [r] = await pool.query(`SELECT id,nombre,ap_paterno,ap_materno,ci,ex,correo,email,tipo_usuario,estado
+      FROM usuarios WHERE estado='ACTIVO' AND (tipo_usuario IS NULL OR tipo_usuario<>'Cursante')
+      ORDER BY ap_paterno ASC,ap_materno ASC,nombre ASC`);
+    res.json(r);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
 
-    const required = {
-      grado,
-      ap_paterno,
-      ap_materno,
-      nombre,
-      ci,
-      ex,
-      filial,
-      fuerza,
-      turno,
-      telefono,
-      fecha_inscripcion,
-      lugar_trabajo,
-      correo,
-      fecha_nacimiento,
-    };
-
-    for (const [k, v] of Object.entries(required)) {
-      if (String(v ?? "").trim().length === 0) {
-        return res.status(400).json({ message: `Campo requerido: ${k}` });
-      }
+app.post("/api/usuarios", async (req,res) => {
+  try {
+    const {grado,ap_paterno,ap_materno,nombre,ci,ex,filial,fuerza,turno,telefono,
+           fecha_inscripcion,lugar_trabajo,correo,fecha_nacimiento,rol,estado,password,email,tipo_usuario} = req.body;
+    const required = {grado,ap_paterno,ap_materno,nombre,ci,ex,filial,fuerza,turno,telefono,fecha_inscripcion,lugar_trabajo,correo,fecha_nacimiento};
+    for(const [k,v] of Object.entries(required)){
+      if(String(v??"").trim().length===0) return res.status(400).json({message:`Campo requerido: ${k}`});
     }
-
     const apellido = `${ap_paterno} ${ap_materno}`.trim();
-
-    const plainPass = String(password ?? ci);
-    const passwordHash = await bcrypt.hash(plainPass, 10);
-
-    const finalEmail = String(email ?? correo).trim();
-
-    const sql = `
-      INSERT INTO usuarios
-      (nombre, apellido, grado, ap_paterno, ap_materno, ci, ex, filial, fuerza, turno, telefono, fecha_inscripcion, lugar_trabajo, correo, email, password, rol, estado, tipo_usuario, fecha_nacimiento)
-      VALUES
-      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    const params = [
-      nombre,
-      apellido,
-      grado,
-      ap_paterno,
-      ap_materno,
-      ci,
-      ex,
-      filial,
-      fuerza,
-      turno,
-      telefono,
-      fecha_inscripcion,
-      lugar_trabajo,
-      correo,
-      finalEmail,
-      passwordHash,
-      rol ?? "ADMIN",
-      estado ?? "ACTIVO",
-      tipo_usuario ?? null,
-      fecha_nacimiento,
-    ];
-
-    const [result] = await pool.execute(sql, params);
-
-    return res.status(201).json({
-      message: "Usuario creado",
-      id: result.insertId,
-    });
-  } catch (err) {
-    if (err?.code === "ER_DUP_ENTRY") {
-      return res.status(409).json({ message: "Ya existe un usuario con ese CI o correo/email." });
-    }
-    return res.status(500).json({ message: "Error interno", detail: err.message });
+    const passwordHash = await bcrypt.hash(String(password??ci),10);
+    const finalEmail = String(email??correo).trim();
+    const [result] = await pool.execute(
+      `INSERT INTO usuarios (nombre,apellido,grado,ap_paterno,ap_materno,ci,ex,filial,fuerza,turno,telefono,
+       fecha_inscripcion,lugar_trabajo,correo,email,password,rol,estado,tipo_usuario,fecha_nacimiento)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [nombre,apellido,grado,ap_paterno,ap_materno,ci,ex,filial,fuerza,turno,telefono,
+       fecha_inscripcion,lugar_trabajo,correo,finalEmail,passwordHash,rol??"ADMIN",estado??"ACTIVO",tipo_usuario??null,fecha_nacimiento]
+    );
+    res.status(201).json({message:"Usuario creado",id:result.insertId});
+  } catch(e){
+    if(e?.code==="ER_DUP_ENTRY") return res.status(409).json({message:"Ya existe un usuario con ese CI o correo."});
+    res.status(500).json({message:"Error interno",detail:e.message});
   }
 });
 
-/**
- * GET /api/usuarios/ci/:ci
- * Devuelve campos válidos de la tabla para edición (exact match).
- */
-app.get("/api/usuarios/ci/:ci", async (req, res) => {
+app.get("/api/usuarios/ci/:ci", async (req,res) => {
   try {
-    const ci = String(req.params.ci || "").trim();
-    if (!ci) return res.status(400).json({ message: "CI requerido" });
-
-    const sql = `
-      SELECT
-        id,
-        nombre,
-        apellido,
-        grado,
-        ap_paterno,
-        ap_materno,
-        ci,
-        ex,
-        filial,
-        fuerza,
-        turno,
-        telefono,
-        fecha_inscripcion,
-        lugar_trabajo,
-        correo,
-        email,
-        rol,
-        estado,
-        tipo_usuario,
-        fecha_nacimiento,
-        creado_en
-      FROM usuarios
-      WHERE ci = ?
-      LIMIT 1
-    `;
-
-    const [rows] = await pool.execute(sql, [ci]);
-
-    if (!rows.length) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
-    }
-
-    return res.json(rows[0]);
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno", detail: err.message });
-  }
+    const ci = String(req.params.ci||"").trim();
+    if(!ci) return res.status(400).json({message:"CI requerido"});
+    const [r] = await pool.execute(`SELECT id,nombre,apellido,grado,ap_paterno,ap_materno,ci,ex,filial,fuerza,turno,
+      telefono,fecha_inscripcion,lugar_trabajo,correo,email,rol,estado,tipo_usuario,fecha_nacimiento,creado_en
+      FROM usuarios WHERE ci=? LIMIT 1`,[ci]);
+    if(!r.length) return res.status(404).json({message:"Usuario no encontrado"});
+    res.json(r[0]);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
 });
 
-/**
- * PUT /api/usuarios/ci/:ci
- * Actualiza datos por CI (exact match). NO toca password.
- */
-app.put("/api/usuarios/ci/:ci", async (req, res) => {
+app.put("/api/usuarios/ci/:ci", async (req,res) => {
   try {
-    const ci = String(req.params.ci || "").trim();
-    if (!ci) return res.status(400).json({ message: "CI requerido" });
-
-    const {
-      tipo_usuario,
-      grado,
-      ap_paterno,
-      ap_materno,
-      nombre,
-      ex,
-      filial,
-      fuerza,
-      turno,
-      telefono,
-      fecha_inscripcion,
-      lugar_trabajo,
-      correo,
-      fecha_nacimiento,
-      email,
-      rol,
-      estado,
-    } = req.body;
-
-    const required = {
-      tipo_usuario,
-      grado,
-      ap_paterno,
-      ap_materno,
-      nombre,
-      ex,
-      filial,
-      fuerza,
-      turno,
-      telefono,
-      fecha_inscripcion,
-      lugar_trabajo,
-      correo,
-      fecha_nacimiento,
-    };
-
-    for (const [k, v] of Object.entries(required)) {
-      if (String(v ?? "").trim().length === 0) {
-        return res.status(400).json({ message: `Campo requerido: ${k}` });
-      }
+    const ci = String(req.params.ci||"").trim();
+    if(!ci) return res.status(400).json({message:"CI requerido"});
+    const {tipo_usuario,grado,ap_paterno,ap_materno,nombre,ex,filial,fuerza,turno,telefono,
+           fecha_inscripcion,lugar_trabajo,correo,fecha_nacimiento,email,rol,estado} = req.body;
+    const required = {tipo_usuario,grado,ap_paterno,ap_materno,nombre,ex,filial,fuerza,turno,telefono,fecha_inscripcion,lugar_trabajo,correo,fecha_nacimiento};
+    for(const [k,v] of Object.entries(required)){
+      if(String(v??"").trim().length===0) return res.status(400).json({message:`Campo requerido: ${k}`});
     }
-
     const apellido = `${ap_paterno} ${ap_materno}`.trim();
-
-    const sql = `
-      UPDATE usuarios
-      SET
-        tipo_usuario = ?,
-        grado = ?,
-        ap_paterno = ?,
-        ap_materno = ?,
-        nombre = ?,
-        apellido = ?,
-        ex = ?,
-        filial = ?,
-        fuerza = ?,
-        turno = ?,
-        telefono = ?,
-        fecha_inscripcion = ?,
-        lugar_trabajo = ?,
-        correo = ?,
-        fecha_nacimiento = ?,
-        email = COALESCE(?, email),
-        rol = COALESCE(?, rol),
-        estado = COALESCE(?, estado)
-      WHERE ci = ?
-      LIMIT 1
-    `;
-
-    const params = [
-      tipo_usuario,
-      grado,
-      ap_paterno,
-      ap_materno,
-      nombre,
-      apellido,
-      ex,
-      filial,
-      fuerza,
-      turno,
-      telefono,
-      fecha_inscripcion,
-      lugar_trabajo,
-      correo,
-      fecha_nacimiento,
-      email ?? null,
-      rol ?? null,
-      estado ?? null,
-      ci,
-    ];
-
-    const [result] = await pool.execute(sql, params);
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
-    }
-
-    return res.json({ message: "Usuario actualizado" });
-  } catch (err) {
-    if (err?.code === "ER_DUP_ENTRY") {
-      return res.status(409).json({ message: "Correo o email ya existe en otro usuario." });
-    }
-    return res.status(500).json({ message: "Error interno", detail: err.message });
+    const [result] = await pool.execute(
+      `UPDATE usuarios SET tipo_usuario=?,grado=?,ap_paterno=?,ap_materno=?,nombre=?,apellido=?,ex=?,filial=?,fuerza=?,
+       turno=?,telefono=?,fecha_inscripcion=?,lugar_trabajo=?,correo=?,fecha_nacimiento=?,
+       email=COALESCE(?,email),rol=COALESCE(?,rol),estado=COALESCE(?,estado) WHERE ci=? LIMIT 1`,
+      [tipo_usuario,grado,ap_paterno,ap_materno,nombre,apellido,ex,filial,fuerza,turno,telefono,
+       fecha_inscripcion,lugar_trabajo,correo,fecha_nacimiento,email??null,rol??null,estado??null,ci]
+    );
+    if(result.affectedRows===0) return res.status(404).json({message:"Usuario no encontrado"});
+    res.json({message:"Usuario actualizado"});
+  } catch(e){
+    if(e?.code==="ER_DUP_ENTRY") return res.status(409).json({message:"Correo o email ya existe en otro usuario."});
+    res.status(500).json({message:"Error interno",detail:e.message});
   }
 });
 
-/**
- * =========================
- * CURSOS
- * =========================
- */
-
-/**
- * POST /api/cursos
- * Crea un curso + asigna participantes (solo cursantes activos).
- *
- * body:
- * {
- *   programa_id: 1 (opcional),
- *   nombre: "Curso X",
- *   descripcion: "...",
- *   jefe_curso_id: 10,
- *   fecha_inicio: "2026-02-01",
- *   fecha_fin: "2026-02-10",
- *   modalidad: "Presencial",
- *   horas_academicas: 120,
- *   participantes_ids: [5,6,7]
- * }
- */
-app.post("/api/cursos", async (req, res) => {
+// ════════════════════════════════════════════════════════════
+// CURSOS
+// ════════════════════════════════════════════════════════════
+app.post("/api/cursos", async (req,res) => {
   const conn = await pool.getConnection();
   try {
-    const {
-      programa_id,
-      nombre,
-      descripcion,
-      jefe_curso_id,
-      fecha_inicio,
-      fecha_fin,
-      modalidad,
-      horas_academicas,
-      participantes_ids,
-    } = req.body;
-
-    // Validación mínima
-    if (!String(nombre ?? "").trim()) {
-      return res.status(400).json({ message: "Campo requerido: nombre" });
-    }
-    if (!jefe_curso_id) {
-      return res.status(400).json({ message: "Campo requerido: jefe_curso_id" });
-    }
-    if (!fecha_inicio || !fecha_fin) {
-      return res.status(400).json({ message: "Campos requeridos: fecha_inicio, fecha_fin" });
-    }
-    if (fecha_fin < fecha_inicio) {
-      return res.status(400).json({ message: "fecha_fin no puede ser menor a fecha_inicio" });
-    }
-    if (!Array.isArray(participantes_ids) || participantes_ids.length === 0) {
-      return res.status(400).json({ message: "Debe enviar participantes_ids (mínimo 1)" });
-    }
+    const {programa_id,nombre,descripcion,jefe_curso_id,fecha_inicio,fecha_fin,modalidad,horas_academicas,participantes_ids} = req.body;
+    if(!String(nombre??"").trim())                          return res.status(400).json({message:"Campo requerido: nombre"});
+    if(!jefe_curso_id)                                      return res.status(400).json({message:"Campo requerido: jefe_curso_id"});
+    if(!fecha_inicio||!fecha_fin)                           return res.status(400).json({message:"Campos requeridos: fecha_inicio, fecha_fin"});
+    if(fecha_fin<fecha_inicio)                              return res.status(400).json({message:"fecha_fin no puede ser menor a fecha_inicio"});
+    if(!Array.isArray(participantes_ids)||!participantes_ids.length) return res.status(400).json({message:"Debe enviar participantes_ids (mínimo 1)"});
 
     await conn.beginTransaction();
 
-    // 1) Validar jefe: ACTIVO y no cursante
-    {
-      const [jefeRows] = await conn.execute(
-        `
-        SELECT id, tipo_usuario, estado
-        FROM usuarios
-        WHERE id = ?
-        LIMIT 1
-        `,
-        [jefe_curso_id]
-      );
+    const [jefeR] = await conn.execute(`SELECT id,tipo_usuario,estado FROM usuarios WHERE id=? LIMIT 1`,[jefe_curso_id]);
+    if(!jefeR.length){await conn.rollback();return res.status(404).json({message:"Jefe de curso no existe"});}
+    if(String(jefeR[0].estado).toUpperCase()!=="ACTIVO"){await conn.rollback();return res.status(400).json({message:"El jefe de curso debe estar ACTIVO"});}
+    if(String(jefeR[0].tipo_usuario||"").trim()==="Cursante"){await conn.rollback();return res.status(400).json({message:"El jefe de curso no puede ser Cursante"});}
 
-      if (!jefeRows.length) {
-        await conn.rollback();
-        return res.status(404).json({ message: "Jefe de curso no existe" });
-      }
+    const ids = [...new Set(participantes_ids.map(x=>Number(x)).filter(Boolean))];
+    if(!ids.length){await conn.rollback();return res.status(400).json({message:"participantes_ids inválido"});}
+    const ph = ids.map(()=>"?").join(",");
+    const [pR] = await conn.execute(`SELECT id,estado,tipo_usuario FROM usuarios WHERE id IN (${ph})`,ids);
+    if(pR.length!==ids.length){await conn.rollback();return res.status(400).json({message:"Uno o más participantes no existen"});}
+    const inv = pR.find(u=>String(u.estado).toUpperCase()!=="ACTIVO"||String(u.tipo_usuario)!=="Cursante");
+    if(inv){await conn.rollback();return res.status(400).json({message:"Todos los participantes deben ser ACTIVO y Cursante"});}
 
-      const jefe = jefeRows[0];
-      if (String(jefe.estado).toUpperCase() !== "ACTIVO") {
-        await conn.rollback();
-        return res.status(400).json({ message: "El jefe de curso debe estar ACTIVO" });
-      }
-      if (String(jefe.tipo_usuario || "").trim() === "Cursante") {
-        await conn.rollback();
-        return res.status(400).json({ message: "El jefe de curso no puede ser Cursante" });
-      }
-    }
-
-    // 2) Validar participantes: deben existir, ACTIVO y tipo_usuario=Cursante
-    //    y que el set sea exacto (sin ids inválidos)
-    const ids = [...new Set(participantes_ids.map((x) => Number(x)).filter(Boolean))];
-    if (ids.length === 0) {
-      await conn.rollback();
-      return res.status(400).json({ message: "participantes_ids inválido" });
-    }
-
-    const placeholders = ids.map(() => "?").join(",");
-    const [partRows] = await conn.execute(
-      `
-      SELECT id, estado, tipo_usuario
-      FROM usuarios
-      WHERE id IN (${placeholders})
-      `,
-      ids
+    const [cR] = await conn.execute(
+      `INSERT INTO cursos (programa_id,nombre,descripcion,docente_id,jefe_curso_id,fecha_inicio,fecha_fin,modalidad,horas_academicas,estado)
+       VALUES (?,?,?,NULL,?,?,?,?,?,'ACTIVO')`,
+      [programa_id??null,String(nombre).trim(),String(descripcion??"")||null,jefe_curso_id,fecha_inicio,fecha_fin,String(modalidad??"")||null,Number.isFinite(Number(horas_academicas))?Number(horas_academicas):null]
     );
-
-    if (partRows.length !== ids.length) {
-      await conn.rollback();
-      return res.status(400).json({ message: "Uno o más participantes no existen" });
-    }
-
-    const invalid = partRows.find(
-      (u) => String(u.estado).toUpperCase() !== "ACTIVO" || String(u.tipo_usuario) !== "Cursante"
-    );
-    if (invalid) {
-      await conn.rollback();
-      return res.status(400).json({
-        message: "Todos los participantes deben ser ACTIVO y tipo_usuario = Cursante",
-      });
-    }
-
-    // 3) Insert curso
-    const insertCursoSql = `
-      INSERT INTO cursos
-        (programa_id, nombre, descripcion, docente_id, jefe_curso_id, fecha_inicio, fecha_fin, modalidad, horas_academicas, estado)
-      VALUES
-        (?, ?, ?, NULL, ?, ?, ?, ?, ?, 'ACTIVO')
-    `;
-
-    const [cursoResult] = await conn.execute(insertCursoSql, [
-      programa_id ?? null,
-      String(nombre).trim(),
-      String(descripcion ?? "").trim() || null,
-      jefe_curso_id,
-      fecha_inicio,
-      fecha_fin,
-      String(modalidad ?? "").trim() || null,
-      Number.isFinite(Number(horas_academicas)) ? Number(horas_academicas) : null,
-    ]);
-
-    const cursoId = cursoResult.insertId;
-
-    // 4) Insert tabla puente
-    const values = ids.map(() => "(?, ?)").join(",");
-    const params = ids.flatMap((uid) => [cursoId, uid]);
-
-    await conn.execute(
-      `
-      INSERT INTO curso_participantes (curso_id, usuario_id)
-      VALUES ${values}
-      `,
-      params
-    );
-
+    const cursoId = cR.insertId;
+    const vals = ids.map(()=>"(?,?)").join(",");
+    await conn.execute(`INSERT INTO curso_participantes (curso_id,usuario_id) VALUES ${vals}`,ids.flatMap(uid=>[cursoId,uid]));
     await conn.commit();
-
-    return res.status(201).json({
-      message: "Curso creado",
-      id: cursoId,
-      participantes: ids.length,
-    });
-  } catch (err) {
-    try {
-      await conn.rollback();
-    } catch {}
-    // duplicado uq_curso_usuario puede aparecer si reintentas
-    if (err?.code === "ER_DUP_ENTRY") {
-      return res.status(409).json({ message: "Participante duplicado en el curso (uq_curso_usuario)." });
-    }
-    return res.status(500).json({ message: "Error interno", detail: err.message });
-  } finally {
-    conn.release();
-  }
+    res.status(201).json({message:"Curso creado",id:cursoId,participantes:ids.length});
+  } catch(e){
+    try{await conn.rollback();}catch{}
+    if(e?.code==="ER_DUP_ENTRY") return res.status(409).json({message:"Participante duplicado."});
+    res.status(500).json({message:"Error interno",detail:e.message});
+  } finally{conn.release();}
 });
 
-/**
- * GET /api/cursos
- * Lista cursos (sin campos sensibles) + jefe + cantidad participantes
- */
-app.get("/api/cursos", async (req, res) => {
+app.get("/api/cursos", async (req,res) => {
   try {
-    const sql = `
-  SELECT
-    c.id,
-    c.programa_id,
-    c.nombre,
-    c.descripcion,
-    c.jefe_curso_id,
-    c.fecha_inicio,
-    c.fecha_fin,
-    c.modalidad,
-    c.horas_academicas,
-    c.estado,
-    c.creado_en,
-
-    -- JEFE DE CURSO (desde cursos.jefe_curso_id)
-    uj.nombre AS jefe_nombre,
-    uj.ap_paterno AS jefe_ap_paterno,
-    uj.ap_materno AS jefe_ap_materno,
-    uj.ci AS jefe_ci,
-    uj.ex AS jefe_ex,
-    uj.tipo_usuario AS jefe_tipo_usuario,
-
-    -- ENCARGADO DE CURSO (desde curso_responsabilidades rol=ENCARGADO_CURSO)
-    ue.id AS encargado_id,
-    ue.nombre AS encargado_nombre,
-    ue.ap_paterno AS encargado_ap_paterno,
-    ue.ap_materno AS encargado_ap_materno,
-    ue.ci AS encargado_ci,
-    ue.ex AS encargado_ex,
-    ue.tipo_usuario AS encargado_tipo_usuario,
-
-    -- CANTIDAD DE REGISTROS (participantes inscritos)
-    (
-      SELECT COUNT(*)
-      FROM curso_participantes cp
-      WHERE cp.curso_id = c.id
-    ) AS participantes_total
-
-  FROM cursos c
-
-  -- Join jefe
-  LEFT JOIN usuarios uj ON uj.id = c.jefe_curso_id
-
-  -- Traer encargado: como es SINGLE por curso, tomamos 1 registro
-  LEFT JOIN curso_responsabilidades cr_enc
-    ON cr_enc.curso_id = c.id
-   AND cr_enc.rol = 'ENCARGADO_CURSO'
-
-  LEFT JOIN usuarios ue ON ue.id = cr_enc.usuario_id
-
-  ORDER BY c.creado_en DESC, c.id DESC
-`;
-    const [rows] = await pool.query(sql);
-    return res.json(rows);
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno", detail: err.message });
-  }
-});
-
-/**
- * GET /api/cursos/:id
- * Detalle del curso + lista participantes (sin password)
- */
-app.get("/api/cursos/:id", async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ message: "ID inválido" });
-
-    const [cursoRows] = await pool.execute(
-      `
-      SELECT
-        c.id,
-        c.programa_id,
-        c.nombre,
-        c.descripcion,
-        c.jefe_curso_id,
-        c.fecha_inicio,
-        c.fecha_fin,
-        c.modalidad,
-        c.horas_academicas,
-        c.estado,
-        c.creado_en,
-        u.nombre AS jefe_nombre,
-        u.ap_paterno AS jefe_ap_paterno,
-        u.ap_materno AS jefe_ap_materno,
-        u.ci AS jefe_ci,
-        u.ex AS jefe_ex,
-        u.tipo_usuario AS jefe_tipo_usuario
+    const [r] = await pool.query(`
+      SELECT c.id,c.programa_id,c.nombre,c.descripcion,c.jefe_curso_id,c.fecha_inicio,c.fecha_fin,
+             c.modalidad,c.horas_academicas,c.estado,c.creado_en,
+             uj.nombre AS jefe_nombre,uj.ap_paterno AS jefe_ap_paterno,uj.ap_materno AS jefe_ap_materno,
+             uj.ci AS jefe_ci,uj.tipo_usuario AS jefe_tipo_usuario,
+             ue.id AS encargado_id,ue.nombre AS encargado_nombre,ue.ap_paterno AS encargado_ap_paterno,
+             ue.ap_materno AS encargado_ap_materno,ue.ci AS encargado_ci,
+             (SELECT COUNT(*) FROM curso_participantes cp WHERE cp.curso_id=c.id) AS participantes_total,
+             (SELECT COUNT(*) FROM curso_materias cm WHERE cm.curso_id=c.id) AS materias_total
       FROM cursos c
-      LEFT JOIN usuarios u ON u.id = c.jefe_curso_id
-      WHERE c.id = ?
-      LIMIT 1
-      `,
-      [id]
-    );
-
-    if (!cursoRows.length) return res.status(404).json({ message: "Curso no encontrado" });
-
-    const [partRows] = await pool.execute(
-      `
-      SELECT
-        u.id,
-        u.nombre,
-        u.ap_paterno,
-        u.ap_materno,
-        u.ci,
-        u.ex,
-        u.correo,
-        u.email,
-        u.tipo_usuario,
-        u.estado
-      FROM curso_participantes cp
-      INNER JOIN usuarios u ON u.id = cp.usuario_id
-      WHERE cp.curso_id = ?
-      ORDER BY u.ap_paterno ASC, u.ap_materno ASC, u.nombre ASC
-      `,
-      [id]
-    );
-
-    return res.json({
-      ...cursoRows[0],
-      participantes: partRows,
-    });
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno", detail: err.message });
-  }
+      LEFT JOIN usuarios uj ON uj.id=c.jefe_curso_id
+      LEFT JOIN curso_responsabilidades cr_enc ON cr_enc.curso_id=c.id AND cr_enc.rol='ENCARGADO_CURSO'
+      LEFT JOIN usuarios ue ON ue.id=cr_enc.usuario_id
+      ORDER BY c.creado_en DESC,c.id DESC`);
+    res.json(r);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
 });
 
-app.post("/api/cursos/:id/participantes", async (req, res) => {
-  try {
-    const cursoId = Number(req.params.id);
-    const { participantes_ids } = req.body;
-
-    if (!cursoId) return res.status(400).json({ message: "ID de curso inválido" });
-    if (!Array.isArray(participantes_ids) || participantes_ids.length === 0) {
-      return res.status(400).json({ message: "Debe enviar participantes_ids (mínimo 1)" });
-    }
-
-    // validar curso
-    const [cRows] = await pool.execute(`SELECT id FROM cursos WHERE id = ? LIMIT 1`, [cursoId]);
-    if (!cRows.length) return res.status(404).json({ message: "Curso no encontrado" });
-
-    // normalizar ids
-    const ids = [...new Set(participantes_ids.map((x) => Number(x)).filter(Boolean))];
-    if (!ids.length) return res.status(400).json({ message: "participantes_ids inválido" });
-
-    // validar que existan y sean cursante activo
-    const placeholders = ids.map(() => "?").join(",");
-    const [uRows] = await pool.execute(
-      `
-      SELECT id, estado, tipo_usuario
-      FROM usuarios
-      WHERE id IN (${placeholders})
-      `,
-      ids
-    );
-
-    if (uRows.length !== ids.length) {
-      return res.status(400).json({ message: "Uno o más participantes no existen" });
-    }
-
-    const invalid = uRows.find(
-      (u) => String(u.estado).toUpperCase() !== "ACTIVO" || String(u.tipo_usuario) !== "Cursante"
-    );
-    if (invalid) {
-      return res.status(400).json({
-        message: "Todos los participantes deben ser ACTIVO y tipo_usuario = Cursante",
-      });
-    }
-
-    // insertar en tabla puente (usa UNIQUE uq_curso_usuario si la agregaste)
-    // si NO tienes el unique, esto igual inserta pero permitiría duplicados.
-    const values = ids.map(() => "(?, ?)").join(",");
-    const params = ids.flatMap((uid) => [cursoId, uid]);
-
-    // si tienes uq_curso_usuario, evita error usando ON DUPLICATE:
-    const sql = `
-      INSERT INTO curso_participantes (curso_id, usuario_id)
-      VALUES ${values}
-      ON DUPLICATE KEY UPDATE curso_id = curso_id
-    `;
-
-    const [result] = await pool.execute(sql, params);
-
-    return res.json({
-      message: "Participantes añadidos",
-      curso_id: cursoId,
-      recibidos: ids.length,
-      affectedRows: result.affectedRows,
-    });
-  } catch (err) {
-    if (err?.code === "ER_DUP_ENTRY") {
-      return res.status(409).json({ message: "Participante duplicado en el curso." });
-    }
-    return res.status(500).json({ message: "Error interno", detail: err.message });
-  }
-});
-
-/**
- * DELETE /api/cursos/:id/participantes
- * Quita participantes de un curso existente.
- * body: { participantes_ids: [1,2,3] }
- */
-app.delete("/api/cursos/:id/participantes", async (req, res) => {
-  try {
-    const cursoId = Number(req.params.id);
-    const { participantes_ids } = req.body;
-
-    if (!cursoId) return res.status(400).json({ message: "ID de curso inválido" });
-    if (!Array.isArray(participantes_ids) || participantes_ids.length === 0) {
-      return res.status(400).json({ message: "Debe enviar participantes_ids (mínimo 1)" });
-    }
-
-    const ids = [...new Set(participantes_ids.map((x) => Number(x)).filter(Boolean))];
-    if (!ids.length) return res.status(400).json({ message: "participantes_ids inválido" });
-
-    const placeholders = ids.map(() => "?").join(",");
-    const sql = `DELETE FROM curso_participantes WHERE curso_id = ? AND usuario_id IN (${placeholders})`;
-
-    const [result] = await pool.execute(sql, [cursoId, ...ids]);
-
-    return res.json({
-      message: "Participantes eliminados",
-      curso_id: cursoId,
-      removed: result.affectedRows,
-    });
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno", detail: err.message });
-  }
-});
-
-/**
- * GET /api/cursos/:id/responsabilidades
- * Devuelve:
- * - jefe_curso (desde cursos.jefe_curso_id)
- * - otras responsabilidades (desde curso_responsabilidades)
- */
-app.get("/api/cursos/:id/responsabilidades", async (req, res) => {
-  try {
-    const cursoId = Number(req.params.id);
-    if (!cursoId) return res.status(400).json({ message: "ID de curso inválido" });
-
-    const curso = await assertCursoExists(pool, cursoId);
-    if (!curso) return res.status(404).json({ message: "Curso no encontrado" });
-
-    // jefe de curso (columna cursos.jefe_curso_id)
-    const [jefeRows] = await pool.execute(
-      `
-      SELECT
-        u.id, u.nombre, u.ap_paterno, u.ap_materno, u.ci, u.ex, u.correo, u.email, u.tipo_usuario, u.estado
-      FROM usuarios u
-      WHERE u.id = ?
-      LIMIT 1
-      `,
-      [curso.jefe_curso_id]
-    );
-
-    // otras responsabilidades (tabla nueva)
-    const [rows] = await pool.execute(
-      `
-      SELECT
-        cr.id,
-        cr.rol,
-        cr.usuario_id,
-        cr.creado_en,
-        u.nombre, u.ap_paterno, u.ap_materno, u.ci, u.ex, u.correo, u.email, u.tipo_usuario, u.estado
-      FROM curso_responsabilidades cr
-      INNER JOIN usuarios u ON u.id = cr.usuario_id
-      WHERE cr.curso_id = ?
-      ORDER BY cr.rol ASC, u.ap_paterno ASC, u.ap_materno ASC, u.nombre ASC
-      `,
-      [cursoId]
-    );
-
-    return res.json({
-      curso_id: cursoId,
-      jefe_curso: jefeRows.length ? { rol: "JEFE_CURSO", ...jefeRows[0] } : null,
-      responsabilidades: rows,
-    });
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno", detail: err.message });
-  }
-});
-
-/**
- * POST /api/cursos/:id/responsabilidades
- *
- * body ejemplo (multi):
- * { rol: "DOCENTE", usuarios_ids: [10,11] }
- *
- * body ejemplo (single):
- * { rol: "ENCARGADO_CURSO", usuario_id: 12 }
- *
- * body ejemplo (jefe):
- * { rol: "JEFE_CURSO", usuario_id: 9 }
- */
-app.post("/api/cursos/:id/responsabilidades", async (req, res) => {
-  const conn = await pool.getConnection();
-  try {
-    const cursoId = Number(req.params.id);
-    if (!cursoId) return res.status(400).json({ message: "ID de curso inválido" });
-
-    let { rol, usuario_id, usuarios_ids } = req.body;
-    rol = normRol(rol);
-
-    if (!ROLES_RESP.has(rol)) {
-      return res.status(400).json({ message: "Rol inválido" });
-    }
-
-    await conn.beginTransaction();
-
-    const curso = await assertCursoExists(conn, cursoId);
-    if (!curso) {
-      await conn.rollback();
-      return res.status(404).json({ message: "Curso no encontrado" });
-    }
-
-    // ===== JEFE_CURSO (se guarda en cursos.jefe_curso_id) =====
-    if (rol === "JEFE_CURSO") {
-      const uid = Number(usuario_id);
-      if (!uid) {
-        await conn.rollback();
-        return res.status(400).json({ message: "Campo requerido: usuario_id" });
-      }
-
-      const ok = await assertNoCursanteActivo(conn, uid);
-      if (!ok.ok) {
-        await conn.rollback();
-        return res.status(ok.code).json({ message: ok.msg });
-      }
-
-      await conn.execute(
-        `UPDATE cursos SET jefe_curso_id = ? WHERE id = ? LIMIT 1`,
-        [uid, cursoId]
-      );
-
-      await conn.commit();
-      return res.json({ message: "Jefe de curso asignado", curso_id: cursoId, rol });
-    }
-
-    // ===== ENCARGADO_CURSO (single en tabla curso_responsabilidades) =====
-    // ===== ROLES_SINGLE (ENCARGADO_CURSO) =====
-if (ROLES_SINGLE.has(rol)) {
-  const uid = Number(usuario_id);
-  if (!uid) {
-    await conn.rollback();
-    return res.status(400).json({ message: "Campo requerido: usuario_id" });
-  }
-
-  // ✅ CAMBIO: si es ENCARGADO_CURSO, permitir cursante INSCRITO en el curso
-  if (rol === "ENCARGADO_CURSO") {
-    const ok = await assertCursanteInscritoEnCurso(conn, cursoId, uid);
-    if (!ok.ok) {
-      await conn.rollback();
-      return res.status(ok.code).json({ message: ok.msg });
-    }
-  } else {
-    // (por si luego agregas otro single)
-    const ok = await assertNoCursanteActivo(conn, uid);
-    if (!ok.ok) {
-      await conn.rollback();
-      return res.status(ok.code).json({ message: ok.msg });
-    }
-  }
-
-  // Garantizar 1 encargado por curso: borramos el anterior del mismo rol
-  await conn.execute(
-    `DELETE FROM curso_responsabilidades WHERE curso_id = ? AND rol = ?`,
-    [cursoId, rol]
-  );
-
-  await conn.execute(
-    `INSERT INTO curso_responsabilidades (curso_id, usuario_id, rol) VALUES (?, ?, ?)`,
-    [cursoId, uid, rol]
-  );
-
-  await conn.commit();
-  return res.json({
-    message: "Responsabilidad asignada",
-    curso_id: cursoId,
-    rol,
-    usuario_id: uid,
-  });
-}
-
-
-    // ===== ROLES MULTI (DOCENTE/FACILITADOR/PERSONAL_APOYO) =====
-    if (!Array.isArray(usuarios_ids) || usuarios_ids.length === 0) {
-      await conn.rollback();
-      return res.status(400).json({ message: "Debe enviar usuarios_ids (mínimo 1)" });
-    }
-
-    const ids = [...new Set(usuarios_ids.map((x) => Number(x)).filter(Boolean))];
-    if (!ids.length) {
-      await conn.rollback();
-      return res.status(400).json({ message: "usuarios_ids inválido" });
-    }
-
-    // Validar todos: activo + no cursante
-    for (const uid of ids) {
-      const ok = await assertNoCursanteActivo(conn, uid);
-      if (!ok.ok) {
-        await conn.rollback();
-        return res.status(ok.code).json({ message: ok.msg, usuario_id: uid });
-      }
-    }
-
-    // Insert masivo evitando duplicados por UNIQUE uq_curso_usuario_rol
-    const values = ids.map(() => "(?, ?, ?)").join(",");
-    const params = ids.flatMap((uid) => [cursoId, uid, rol]);
-
-    const sql = `
-      INSERT INTO curso_responsabilidades (curso_id, usuario_id, rol)
-      VALUES ${values}
-      ON DUPLICATE KEY UPDATE rol = rol
-    `;
-
-    const [result] = await conn.execute(sql, params);
-
-    await conn.commit();
-    return res.json({
-      message: "Responsabilidades asignadas",
-      curso_id: cursoId,
-      rol,
-      recibidos: ids.length,
-      affectedRows: result.affectedRows,
-    });
-  } catch (err) {
-    try { await conn.rollback(); } catch {}
-    return res.status(500).json({ message: "Error interno", detail: err.message });
-  } finally {
-    conn.release();
-  }
-});
-
-/**
- * DELETE /api/cursos/:id/responsabilidades
- *
- * body ejemplo (multi):
- * { rol: "DOCENTE", usuarios_ids: [10,11] }
- *
- * body ejemplo (single):
- * { rol: "ENCARGADO_CURSO", usuario_id: 12 }
- *
- * body ejemplo (quitar jefe):
- * { rol: "JEFE_CURSO" }
- */
-app.delete("/api/cursos/:id/responsabilidades", async (req, res) => {
-  const conn = await pool.getConnection();
-  try {
-    const cursoId = Number(req.params.id);
-    if (!cursoId) return res.status(400).json({ message: "ID de curso inválido" });
-
-    let { rol, usuario_id, usuarios_ids } = req.body;
-    rol = normRol(rol);
-
-    if (!ROLES_RESP.has(rol)) {
-      return res.status(400).json({ message: "Rol inválido" });
-    }
-
-    await conn.beginTransaction();
-
-    const curso = await assertCursoExists(conn, cursoId);
-    if (!curso) {
-      await conn.rollback();
-      return res.status(404).json({ message: "Curso no encontrado" });
-    }
-
-    // JEFE_CURSO (columna)
-    if (rol === "JEFE_CURSO") {
-      await conn.execute(`UPDATE cursos SET jefe_curso_id = NULL WHERE id = ? LIMIT 1`, [cursoId]);
-      await conn.commit();
-      return res.json({ message: "Jefe de curso removido", curso_id: cursoId, rol });
-    }
-
-    // normalizar ids
-    let ids = [];
-    if (usuario_id) ids = [Number(usuario_id)];
-    else if (Array.isArray(usuarios_ids)) ids = usuarios_ids.map((x) => Number(x)).filter(Boolean);
-
-    ids = [...new Set(ids)].filter(Boolean);
-
-    if (!ids.length) {
-      await conn.rollback();
-      return res.status(400).json({ message: "Debe enviar usuario_id o usuarios_ids" });
-    }
-
-    const placeholders = ids.map(() => "?").join(",");
-    const sql = `
-      DELETE FROM curso_responsabilidades
-      WHERE curso_id = ? AND rol = ? AND usuario_id IN (${placeholders})
-    `;
-
-    const [result] = await conn.execute(sql, [cursoId, rol, ...ids]);
-
-    await conn.commit();
-    return res.json({
-      message: "Responsabilidades eliminadas",
-      curso_id: cursoId,
-      rol,
-      removed: result.affectedRows,
-    });
-  } catch (err) {
-    try { await conn.rollback(); } catch {}
-    return res.status(500).json({ message: "Error interno", detail: err.message });
-  } finally {
-    conn.release();
-  }
-});
-
-// =====================================================
-// NOTIFICACIONES — agregar al final de server.js
-// (antes de app.listen)
-// =====================================================
-//
-// Tabla SQL requerida:
-//
-// CREATE TABLE notificaciones (
-//   id            INT AUTO_INCREMENT PRIMARY KEY,
-//   titulo        VARCHAR(255) NOT NULL,
-//   mensaje       TEXT NOT NULL,
-//   tipo          ENUM('INFO','ALERTA','URGENTE') NOT NULL DEFAULT 'INFO',
-//   creado_por    INT NULL,                          -- usuario_id del emisor
-//   creado_en     DATETIME NOT NULL DEFAULT NOW(),
-//   activa        TINYINT(1) NOT NULL DEFAULT 1
-// );
-//
-// CREATE TABLE notificaciones_leidas (
-//   notificacion_id INT NOT NULL,
-//   usuario_id      INT NOT NULL,
-//   leida_en        DATETIME NOT NULL DEFAULT NOW(),
-//   PRIMARY KEY (notificacion_id, usuario_id),
-//   FOREIGN KEY (notificacion_id) REFERENCES notificaciones(id) ON DELETE CASCADE,
-//   FOREIGN KEY (usuario_id)      REFERENCES usuarios(id)        ON DELETE CASCADE
-// );
-
-// ─────────────────────────────────────────
-// GET /api/notificaciones
-// Lista todas las notificaciones activas
-// Query: ?usuario_id=X  → devuelve campo "leida" por usuario
-// ─────────────────────────────────────────
-app.get("/api/notificaciones", async (req, res) => {
-  try {
-    const usuarioId = req.query.usuario_id ? Number(req.query.usuario_id) : null;
-
-    let sql;
-    let params = [];
-
-    if (usuarioId) {
-      sql = `
-        SELECT
-          n.id,
-          n.titulo,
-          n.mensaje,
-          n.tipo,
-          n.creado_por,
-          n.creado_en,
-          n.activa,
-          u.nombre   AS emisor_nombre,
-          u.ap_paterno AS emisor_ap_paterno,
-          IF(nl.notificacion_id IS NOT NULL, 1, 0) AS leida
-        FROM notificaciones n
-        LEFT JOIN usuarios u ON u.id = n.creado_por
-        LEFT JOIN notificaciones_leidas nl
-          ON nl.notificacion_id = n.id AND nl.usuario_id = ?
-        WHERE n.activa = 1
-        ORDER BY n.creado_en DESC
-      `;
-      params = [usuarioId];
-    } else {
-      sql = `
-        SELECT
-          n.id,
-          n.titulo,
-          n.mensaje,
-          n.tipo,
-          n.creado_por,
-          n.creado_en,
-          n.activa,
-          u.nombre   AS emisor_nombre,
-          u.ap_paterno AS emisor_ap_paterno,
-          (
-            SELECT COUNT(*) FROM notificaciones_leidas nl WHERE nl.notificacion_id = n.id
-          ) AS total_leidas
-        FROM notificaciones n
-        LEFT JOIN usuarios u ON u.id = n.creado_por
-        ORDER BY n.creado_en DESC
-      `;
-    }
-
-    const [rows] = await pool.execute(sql, params);
-    return res.json(rows);
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno", detail: err.message });
-  }
-});
-
-// ─────────────────────────────────────────
-// POST /api/notificaciones
-// Crea una notificación (broadcast a todos los usuarios activos)
-// body: { titulo, mensaje, tipo, creado_por }
-// ─────────────────────────────────────────
-app.post("/api/notificaciones", async (req, res) => {
-  try {
-    const { titulo, mensaje, tipo, creado_por } = req.body;
-
-    if (!String(titulo ?? "").trim())   return res.status(400).json({ message: "Campo requerido: titulo" });
-    if (!String(mensaje ?? "").trim())  return res.status(400).json({ message: "Campo requerido: mensaje" });
-
-    const tiposValidos = ["INFO", "ALERTA", "URGENTE"];
-    const tipoFinal = String(tipo ?? "INFO").toUpperCase();
-    if (!tiposValidos.includes(tipoFinal)) {
-      return res.status(400).json({ message: "tipo debe ser INFO, ALERTA o URGENTE" });
-    }
-
-    const [result] = await pool.execute(
-      `INSERT INTO notificaciones (titulo, mensaje, tipo, creado_por) VALUES (?, ?, ?, ?)`,
-      [titulo.trim(), mensaje.trim(), tipoFinal, creado_por ?? null]
-    );
-
-    return res.status(201).json({ message: "Notificación creada", id: result.insertId });
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno", detail: err.message });
-  }
-});
-
-// ─────────────────────────────────────────
-// DELETE /api/notificaciones/:id
-// Desactiva (soft-delete) una notificación
-// ─────────────────────────────────────────
-app.delete("/api/notificaciones/:id", async (req, res) => {
+app.get("/api/cursos/:id", async (req,res) => {
   try {
     const id = Number(req.params.id);
-    if (!id) return res.status(400).json({ message: "ID inválido" });
+    if(!id) return res.status(400).json({message:"ID inválido"});
+    const [cR] = await pool.execute(
+      `SELECT c.id,c.programa_id,c.nombre,c.descripcion,c.jefe_curso_id,c.fecha_inicio,c.fecha_fin,
+              c.modalidad,c.horas_academicas,c.estado,c.creado_en,
+              u.nombre AS jefe_nombre,u.ap_paterno AS jefe_ap_paterno,u.ap_materno AS jefe_ap_materno,
+              u.ci AS jefe_ci,u.tipo_usuario AS jefe_tipo_usuario
+       FROM cursos c LEFT JOIN usuarios u ON u.id=c.jefe_curso_id WHERE c.id=? LIMIT 1`,[id]);
+    if(!cR.length) return res.status(404).json({message:"Curso no encontrado"});
+    const [pR] = await pool.execute(
+      `SELECT u.id,u.nombre,u.ap_paterno,u.ap_materno,u.ci,u.ex,u.correo,u.email,u.tipo_usuario,u.estado
+       FROM curso_participantes cp INNER JOIN usuarios u ON u.id=cp.usuario_id
+       WHERE cp.curso_id=? ORDER BY u.ap_paterno ASC,u.ap_materno ASC,u.nombre ASC`,[id]);
+    const [mR] = await pool.execute(
+      `SELECT cm.id,cm.nombre,cm.codigo,cm.descripcion,cm.horas,cm.docente_id,cm.creado_en,
+              u.nombre AS docente_nombre,u.ap_paterno AS docente_ap_paterno,u.ap_materno AS docente_ap_materno,u.ci AS docente_ci
+       FROM curso_materias cm LEFT JOIN usuarios u ON u.id=cm.docente_id
+       WHERE cm.curso_id=? ORDER BY cm.nombre ASC`,[id]);
+    res.json({...cR[0],participantes:pR,materias:mR});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+app.post("/api/cursos/:id/participantes", async (req,res) => {
+  try {
+    const cursoId = Number(req.params.id);
+    const {participantes_ids} = req.body;
+    if(!cursoId) return res.status(400).json({message:"ID de curso inválido"});
+    if(!Array.isArray(participantes_ids)||!participantes_ids.length) return res.status(400).json({message:"Debe enviar participantes_ids"});
+    const [cR] = await pool.execute(`SELECT id FROM cursos WHERE id=? LIMIT 1`,[cursoId]);
+    if(!cR.length) return res.status(404).json({message:"Curso no encontrado"});
+    const ids = [...new Set(participantes_ids.map(x=>Number(x)).filter(Boolean))];
+    const ph = ids.map(()=>"?").join(",");
+    const [uR] = await pool.execute(`SELECT id,estado,tipo_usuario FROM usuarios WHERE id IN (${ph})`,ids);
+    if(uR.length!==ids.length) return res.status(400).json({message:"Uno o más participantes no existen"});
+    const inv = uR.find(u=>String(u.estado).toUpperCase()!=="ACTIVO"||String(u.tipo_usuario)!=="Cursante");
+    if(inv) return res.status(400).json({message:"Todos deben ser ACTIVO y Cursante"});
+    const vals = ids.map(()=>"(?,?)").join(",");
+    const [result] = await pool.execute(
+      `INSERT INTO curso_participantes (curso_id,usuario_id) VALUES ${vals} ON DUPLICATE KEY UPDATE curso_id=curso_id`,
+      ids.flatMap(uid=>[cursoId,uid])
+    );
+    res.json({message:"Participantes añadidos",curso_id:cursoId,recibidos:ids.length,affectedRows:result.affectedRows});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+app.delete("/api/cursos/:id/participantes", async (req,res) => {
+  try {
+    const cursoId = Number(req.params.id);
+    const {participantes_ids} = req.body;
+    if(!cursoId||!Array.isArray(participantes_ids)||!participantes_ids.length) return res.status(400).json({message:"Datos inválidos"});
+    const ids = [...new Set(participantes_ids.map(x=>Number(x)).filter(Boolean))];
+    const ph = ids.map(()=>"?").join(",");
+    const [result] = await pool.execute(`DELETE FROM curso_participantes WHERE curso_id=? AND usuario_id IN (${ph})`,[cursoId,...ids]);
+    res.json({message:"Participantes eliminados",removed:result.affectedRows});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+app.get("/api/cursos/:id/responsabilidades", async (req,res) => {
+  try {
+    const cursoId = Number(req.params.id);
+    if(!cursoId) return res.status(400).json({message:"ID inválido"});
+    const curso = await assertCursoExists(pool,cursoId);
+    if(!curso) return res.status(404).json({message:"Curso no encontrado"});
+    const [jR] = await pool.execute(`SELECT u.id,u.nombre,u.ap_paterno,u.ap_materno,u.ci,u.tipo_usuario,u.estado FROM usuarios u WHERE u.id=? LIMIT 1`,[curso.jefe_curso_id]);
+    const [rR] = await pool.execute(`SELECT cr.id,cr.rol,cr.usuario_id,cr.creado_en,u.nombre,u.ap_paterno,u.ap_materno,u.ci,u.tipo_usuario,u.estado
+      FROM curso_responsabilidades cr INNER JOIN usuarios u ON u.id=cr.usuario_id WHERE cr.curso_id=? ORDER BY cr.rol ASC`,[cursoId]);
+    res.json({curso_id:cursoId,jefe_curso:jR.length?{rol:"JEFE_CURSO",...jR[0]}:null,responsabilidades:rR});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+app.post("/api/cursos/:id/responsabilidades", async (req,res) => {
+  const conn = await pool.getConnection();
+  try {
+    const cursoId = Number(req.params.id);
+    let {rol,usuario_id,usuarios_ids} = req.body;
+    rol = normRol(rol);
+    if(!ROLES_RESP.has(rol)) return res.status(400).json({message:"Rol inválido"});
+    await conn.beginTransaction();
+    const curso = await assertCursoExists(conn,cursoId);
+    if(!curso){await conn.rollback();return res.status(404).json({message:"Curso no encontrado"});}
+
+    if(rol==="JEFE_CURSO"){
+      const uid = Number(usuario_id);
+      const ok = await assertNoCursanteActivo(conn,uid);
+      if(!ok.ok){await conn.rollback();return res.status(ok.code).json({message:ok.msg});}
+      await conn.execute(`UPDATE cursos SET jefe_curso_id=? WHERE id=? LIMIT 1`,[uid,cursoId]);
+      await conn.commit();return res.json({message:"Jefe asignado",curso_id:cursoId,rol});
+    }
+    if(ROLES_SINGLE.has(rol)){
+      const uid = Number(usuario_id);
+      const ok = rol==="ENCARGADO_CURSO"?await assertCursanteInscrito(conn,cursoId,uid):await assertNoCursanteActivo(conn,uid);
+      if(!ok.ok){await conn.rollback();return res.status(ok.code).json({message:ok.msg});}
+      await conn.execute(`DELETE FROM curso_responsabilidades WHERE curso_id=? AND rol=?`,[cursoId,rol]);
+      await conn.execute(`INSERT INTO curso_responsabilidades (curso_id,usuario_id,rol) VALUES (?,?,?)`,[cursoId,uid,rol]);
+      await conn.commit();return res.json({message:"Responsabilidad asignada",curso_id:cursoId,rol,usuario_id:uid});
+    }
+    if(!Array.isArray(usuarios_ids)||!usuarios_ids.length){await conn.rollback();return res.status(400).json({message:"Debe enviar usuarios_ids"});}
+    const ids = [...new Set(usuarios_ids.map(x=>Number(x)).filter(Boolean))];
+    for(const uid of ids){const ok=await assertNoCursanteActivo(conn,uid);if(!ok.ok){await conn.rollback();return res.status(ok.code).json({message:ok.msg,usuario_id:uid});}}
+    const vals = ids.map(()=>"(?,?,?)").join(",");
+    const [result] = await conn.execute(
+      `INSERT INTO curso_responsabilidades (curso_id,usuario_id,rol) VALUES ${vals} ON DUPLICATE KEY UPDATE rol=rol`,
+      ids.flatMap(uid=>[cursoId,uid,rol])
+    );
+    await conn.commit();
+    res.json({message:"Responsabilidades asignadas",curso_id:cursoId,rol,affectedRows:result.affectedRows});
+  } catch(e){try{await conn.rollback();}catch{}res.status(500).json({message:"Error interno",detail:e.message});}
+  finally{conn.release();}
+});
+
+app.delete("/api/cursos/:id/responsabilidades", async (req,res) => {
+  const conn = await pool.getConnection();
+  try {
+    const cursoId = Number(req.params.id);
+    let {rol,usuario_id,usuarios_ids} = req.body;
+    rol = normRol(rol);
+    if(!ROLES_RESP.has(rol)) return res.status(400).json({message:"Rol inválido"});
+    await conn.beginTransaction();
+    const curso = await assertCursoExists(conn,cursoId);
+    if(!curso){await conn.rollback();return res.status(404).json({message:"Curso no encontrado"});}
+    if(rol==="JEFE_CURSO"){
+      await conn.execute(`UPDATE cursos SET jefe_curso_id=NULL WHERE id=? LIMIT 1`,[cursoId]);
+      await conn.commit();return res.json({message:"Jefe removido"});
+    }
+    let ids = usuario_id?[Number(usuario_id)]:Array.isArray(usuarios_ids)?usuarios_ids.map(x=>Number(x)).filter(Boolean):[];
+    ids = [...new Set(ids)].filter(Boolean);
+    if(!ids.length){await conn.rollback();return res.status(400).json({message:"Debe enviar usuario_id o usuarios_ids"});}
+    const ph = ids.map(()=>"?").join(",");
+    const [result] = await conn.execute(`DELETE FROM curso_responsabilidades WHERE curso_id=? AND rol=? AND usuario_id IN (${ph})`,[cursoId,rol,...ids]);
+    await conn.commit();
+    res.json({message:"Responsabilidades eliminadas",removed:result.affectedRows});
+  } catch(e){try{await conn.rollback();}catch{}res.status(500).json({message:"Error interno",detail:e.message});}
+  finally{conn.release();}
+});
+
+// ════════════════════════════════════════════════════════════
+// MATERIAS DEL CURSO
+// ════════════════════════════════════════════════════════════
+
+/** GET /api/cursos/:cursoId/materias — Lista materias del curso con docente */
+app.get("/api/cursos/:cursoId/materias", async (req,res) => {
+  try {
+    const cursoId = Number(req.params.cursoId);
+    if(!cursoId) return res.status(400).json({message:"ID de curso inválido"});
+    const [r] = await pool.execute(
+      `SELECT cm.id,cm.curso_id,cm.nombre,cm.codigo,cm.descripcion,cm.horas,cm.docente_id,cm.creado_en,
+              u.nombre AS docente_nombre,u.ap_paterno AS docente_ap_paterno,
+              u.ap_materno AS docente_ap_materno,u.ci AS docente_ci, u.tipo_usuario AS docente_tipo
+       FROM curso_materias cm
+       LEFT JOIN usuarios u ON u.id=cm.docente_id
+       WHERE cm.curso_id=? ORDER BY cm.nombre ASC`,[cursoId]);
+    res.json(r);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/** POST /api/cursos/:cursoId/materias — Crear materia en un curso */
+app.post("/api/cursos/:cursoId/materias", async (req,res) => {
+  try {
+    const cursoId = Number(req.params.cursoId);
+    if(!cursoId) return res.status(400).json({message:"ID de curso inválido"});
+    const {nombre,codigo,descripcion,horas,docente_id} = req.body;
+    if(!String(nombre??"").trim()) return res.status(400).json({message:"Campo requerido: nombre"});
+
+    const [cR] = await pool.execute(`SELECT id FROM cursos WHERE id=? LIMIT 1`,[cursoId]);
+    if(!cR.length) return res.status(404).json({message:"Curso no encontrado"});
+
+    // Si se asigna docente, validar que exista y sea no-cursante activo
+    if(docente_id){
+      const ok = await assertNoCursanteActivo(pool,Number(docente_id));
+      if(!ok.ok) return res.status(ok.code).json({message:ok.msg});
+    }
 
     const [result] = await pool.execute(
-      `UPDATE notificaciones SET activa = 0 WHERE id = ? LIMIT 1`,
-      [id]
+      `INSERT INTO curso_materias (curso_id,nombre,codigo,descripcion,horas,docente_id)
+       VALUES (?,?,?,?,?,?)`,
+      [cursoId,String(nombre).trim(),codigo??null,descripcion??null,horas?Number(horas):null,docente_id??null]
     );
-
-    if (result.affectedRows === 0) return res.status(404).json({ message: "Notificación no encontrada" });
-    return res.json({ message: "Notificación desactivada" });
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno", detail: err.message });
+    res.status(201).json({message:"Materia creada",id:result.insertId,curso_id:cursoId});
+  } catch(e){
+    if(e?.code==="ER_DUP_ENTRY") return res.status(409).json({message:"Ya existe una materia con ese nombre en este curso."});
+    res.status(500).json({message:"Error interno",detail:e.message});
   }
 });
 
-// ─────────────────────────────────────────
-// POST /api/notificaciones/:id/leer
-// Marca una notificación como leída para un usuario
-// body: { usuario_id }
-// ─────────────────────────────────────────
-app.post("/api/notificaciones/:id/leer", async (req, res) => {
+/** PUT /api/materias/:id — Actualizar nombre/docente/datos de una materia */
+app.put("/api/materias/:id", async (req,res) => {
   try {
-    const notifId  = Number(req.params.id);
-    const usuarioId = Number(req.body.usuario_id);
+    const id = Number(req.params.id);
+    if(!id) return res.status(400).json({message:"ID inválido"});
+    const {nombre,codigo,descripcion,horas,docente_id} = req.body;
+    if(!String(nombre??"").trim()) return res.status(400).json({message:"Campo requerido: nombre"});
 
-    if (!notifId || !usuarioId) {
-      return res.status(400).json({ message: "Campos requeridos: id (param) y usuario_id (body)" });
+    const [mR] = await pool.execute(`SELECT id FROM curso_materias WHERE id=? LIMIT 1`,[id]);
+    if(!mR.length) return res.status(404).json({message:"Materia no encontrada"});
+
+    if(docente_id){
+      const ok = await assertNoCursanteActivo(pool,Number(docente_id));
+      if(!ok.ok) return res.status(ok.code).json({message:ok.msg});
     }
 
     await pool.execute(
-      `INSERT IGNORE INTO notificaciones_leidas (notificacion_id, usuario_id) VALUES (?, ?)`,
-      [notifId, usuarioId]
+      `UPDATE curso_materias SET nombre=?,codigo=?,descripcion=?,horas=?,docente_id=? WHERE id=? LIMIT 1`,
+      [String(nombre).trim(),codigo??null,descripcion??null,horas?Number(horas):null,docente_id??null,id]
     );
-
-    return res.json({ message: "Notificación marcada como leída" });
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno", detail: err.message });
+    res.json({message:"Materia actualizada"});
+  } catch(e){
+    if(e?.code==="ER_DUP_ENTRY") return res.status(409).json({message:"Ya existe una materia con ese nombre en el curso."});
+    res.status(500).json({message:"Error interno",detail:e.message});
   }
 });
 
-// ─────────────────────────────────────────
-// GET /api/notificaciones/stats
-// Estadísticas para el dashboard admin
-// ─────────────────────────────────────────
-app.get("/api/notificaciones/stats", async (req, res) => {
+/** DELETE /api/materias/:id — Eliminar materia (cascade: asistencia, calificaciones, tareas) */
+app.delete("/api/materias/:id", async (req,res) => {
   try {
-    const [[{ total }]] = await pool.query(
-      `SELECT COUNT(*) AS total FROM notificaciones WHERE activa = 1`
-    );
-    const [[{ urgentes }]] = await pool.query(
-      `SELECT COUNT(*) AS urgentes FROM notificaciones WHERE activa = 1 AND tipo = 'URGENTE'`
-    );
-    const [[{ total_usuarios }]] = await pool.query(
-      `SELECT COUNT(*) AS total_usuarios FROM usuarios WHERE estado = 'ACTIVO'`
-    );
-
-    return res.json({ total, urgentes, total_usuarios });
-  } catch (err) {
-    return res.status(500).json({ message: "Error interno", detail: err.message });
-  }
+    const id = Number(req.params.id);
+    if(!id) return res.status(400).json({message:"ID inválido"});
+    const [result] = await pool.execute(`DELETE FROM curso_materias WHERE id=? LIMIT 1`,[id]);
+    if(result.affectedRows===0) return res.status(404).json({message:"Materia no encontrada"});
+    res.json({message:"Materia eliminada"});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
 });
 
+/** PATCH /api/materias/:id/docente — Asignar o cambiar docente de una materia */
+app.patch("/api/materias/:id/docente", async (req,res) => {
+  try {
+    const id = Number(req.params.id);
+    const {docente_id} = req.body;
+    if(!id) return res.status(400).json({message:"ID inválido"});
 
+    const [mR] = await pool.execute(`SELECT id FROM curso_materias WHERE id=? LIMIT 1`,[id]);
+    if(!mR.length) return res.status(404).json({message:"Materia no encontrada"});
+
+    if(docente_id){
+      const ok = await assertNoCursanteActivo(pool,Number(docente_id));
+      if(!ok.ok) return res.status(ok.code).json({message:ok.msg});
+    }
+
+    await pool.execute(`UPDATE curso_materias SET docente_id=? WHERE id=? LIMIT 1`,[docente_id??null,id]);
+    res.json({message: docente_id?"Docente asignado a la materia":"Docente removido de la materia"});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+// ════════════════════════════════════════════════════════════
+// ASISTENCIA (por materia)
+// ════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/asistencia
+ * body: { curso_id, materia_id, fecha, registros:[{usuario_id,estado,observacion}], registrado_por }
+ */
+app.post("/api/asistencia", async (req,res) => {
+  const conn = await pool.getConnection();
+  try {
+    const {curso_id,materia_id,fecha,registros,registrado_por} = req.body;
+    if(!curso_id)                                       return res.status(400).json({message:"Campo requerido: curso_id"});
+    if(!materia_id)                                     return res.status(400).json({message:"Campo requerido: materia_id"});
+    if(!fecha)                                          return res.status(400).json({message:"Campo requerido: fecha"});
+    if(!Array.isArray(registros)||!registros.length)    return res.status(400).json({message:"Campo requerido: registros"});
+
+    const materia = await assertMateriaExists(conn,materia_id);
+    if(!materia) return res.status(404).json({message:"Materia no encontrada"});
+    if(materia.curso_id!==curso_id) return res.status(400).json({message:"La materia no pertenece al curso indicado"});
+
+    const estadosValidos = new Set(["P","A","T","J"]);
+    for(const r of registros){
+      if(!r.usuario_id) return res.status(400).json({message:"Cada registro debe tener usuario_id"});
+      if(!estadosValidos.has(String(r.estado||"").toUpperCase())) return res.status(400).json({message:`Estado inválido: ${r.estado}. Use P,A,T,J`});
+    }
+
+    await conn.beginTransaction();
+    for(const r of registros){
+      await conn.execute(
+        `INSERT INTO asistencia (curso_id,materia_id,usuario_id,fecha,estado,observacion,registrado_por)
+         VALUES (?,?,?,?,?,?,?)
+         ON DUPLICATE KEY UPDATE estado=VALUES(estado),observacion=VALUES(observacion),registrado_por=VALUES(registrado_por)`,
+        [curso_id,materia_id,r.usuario_id,fecha,String(r.estado).toUpperCase(),r.observacion??null,registrado_por??null]
+      );
+    }
+    await conn.commit();
+    res.status(201).json({message:"Asistencia registrada",materia_id,fecha,total:registros.length});
+  } catch(e){try{await conn.rollback();}catch{}res.status(500).json({message:"Error interno",detail:e.message});}
+  finally{conn.release();}
+});
+
+/** GET /api/asistencia/materia/:materiaId — Historial de asistencia por materia */
+app.get("/api/asistencia/materia/:materiaId", async (req,res) => {
+  try {
+    const materiaId = Number(req.params.materiaId);
+    if(!materiaId) return res.status(400).json({message:"ID inválido"});
+    const {fecha,usuario_id} = req.query;
+    let sql = `SELECT a.id,a.curso_id,a.materia_id,a.usuario_id,a.fecha,a.estado,a.observacion,a.creado_en,
+                      u.nombre,u.ap_paterno,u.ap_materno,u.ci
+               FROM asistencia a INNER JOIN usuarios u ON u.id=a.usuario_id
+               WHERE a.materia_id=?`;
+    const params = [materiaId];
+    if(fecha){sql+=` AND a.fecha=?`;params.push(fecha);}
+    if(usuario_id){sql+=` AND a.usuario_id=?`;params.push(Number(usuario_id));}
+    sql+=` ORDER BY a.fecha DESC,u.ap_paterno ASC,u.nombre ASC`;
+    const [r] = await pool.execute(sql,params);
+    res.json(r);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/** GET /api/asistencia/materia/:materiaId/resumen — Resumen P/A/T/J por fecha */
+app.get("/api/asistencia/materia/:materiaId/resumen", async (req,res) => {
+  try {
+    const materiaId = Number(req.params.materiaId);
+    if(!materiaId) return res.status(400).json({message:"ID inválido"});
+    const [r] = await pool.execute(
+      `SELECT fecha,SUM(estado='P') AS P,SUM(estado='A') AS A,SUM(estado='T') AS T,SUM(estado='J') AS J,COUNT(*) AS total
+       FROM asistencia WHERE materia_id=? GROUP BY fecha ORDER BY fecha DESC`,[materiaId]);
+    res.json(r);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+// ════════════════════════════════════════════════════════════
+// CONFIGURACIÓN DE EVALUACIONES (por materia)
+// ════════════════════════════════════════════════════════════
+
+/** GET /api/eval-config/materia/:materiaId */
+app.get("/api/eval-config/materia/:materiaId", async (req,res) => {
+  try {
+    const materiaId = Number(req.params.materiaId);
+    if(!materiaId) return res.status(400).json({message:"ID inválido"});
+    const [r] = await pool.execute(
+      `SELECT id,nombre,peso,orden,nota_min_apro,nota_max FROM eval_config WHERE materia_id=? ORDER BY orden ASC`,[materiaId]);
+    if(!r.length){
+      return res.json([
+        {id:null,nombre:"Eval. 1",peso:20,orden:1,nota_min_apro:70,nota_max:100},
+        {id:null,nombre:"Eval. 2",peso:20,orden:2,nota_min_apro:70,nota_max:100},
+        {id:null,nombre:"Eval. 3",peso:20,orden:3,nota_min_apro:70,nota_max:100},
+        {id:null,nombre:"Trabajo",peso:20,orden:4,nota_min_apro:70,nota_max:100},
+        {id:null,nombre:"Final",  peso:20,orden:5,nota_min_apro:70,nota_max:100},
+      ]);
+    }
+    res.json(r);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/** POST /api/eval-config/materia/:materiaId — Reemplaza config de una materia */
+app.post("/api/eval-config/materia/:materiaId", async (req,res) => {
+  const conn = await pool.getConnection();
+  try {
+    const materiaId = Number(req.params.materiaId);
+    if(!materiaId) return res.status(400).json({message:"ID inválido"});
+    const {evaluaciones} = req.body;
+    if(!Array.isArray(evaluaciones)||!evaluaciones.length) return res.status(400).json({message:"Se requiere array evaluaciones"});
+    const suma = evaluaciones.reduce((s,e)=>s+Number(e.peso||0),0);
+    if(Math.abs(suma-100)>0.01) return res.status(400).json({message:`La suma de pesos debe ser 100. Actual: ${suma}`});
+
+    const materia = await assertMateriaExists(conn,materiaId);
+    if(!materia) return res.status(404).json({message:"Materia no encontrada"});
+
+    await conn.beginTransaction();
+    await conn.execute(`DELETE FROM eval_config WHERE materia_id=?`,[materiaId]);
+    for(const [i,ev] of evaluaciones.entries()){
+      await conn.execute(
+        `INSERT INTO eval_config (curso_id,materia_id,nombre,peso,orden,nota_min_apro,nota_max) VALUES (?,?,?,?,?,?,?)`,
+        [materia.curso_id,materiaId,String(ev.nombre).trim(),Number(ev.peso),Number(ev.orden??i+1),Number(ev.nota_min_apro??70),Number(ev.nota_max??100)]
+      );
+    }
+    await conn.commit();
+    res.json({message:"Configuración guardada",materia_id:materiaId});
+  } catch(e){try{await conn.rollback();}catch{}res.status(500).json({message:"Error interno",detail:e.message});}
+  finally{conn.release();}
+});
+
+// ════════════════════════════════════════════════════════════
+// CALIFICACIONES (por materia)
+// ════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/calificaciones
+ * body: { curso_id, materia_id, calificaciones:[{usuario_id, notas:{}}], registrado_por }
+ */
+app.post("/api/calificaciones", async (req,res) => {
+  const conn = await pool.getConnection();
+  try {
+    const {curso_id,materia_id,calificaciones,registrado_por} = req.body;
+    if(!curso_id)    return res.status(400).json({message:"Campo requerido: curso_id"});
+    if(!materia_id)  return res.status(400).json({message:"Campo requerido: materia_id"});
+    if(!Array.isArray(calificaciones)||!calificaciones.length) return res.status(400).json({message:"Campo requerido: calificaciones"});
+
+    const materia = await assertMateriaExists(conn,materia_id);
+    if(!materia) return res.status(404).json({message:"Materia no encontrada"});
+
+    await conn.beginTransaction();
+
+    // Obtener o crear eval_config para esta materia
+    let [evalRows] = await conn.execute(`SELECT id,nombre FROM eval_config WHERE materia_id=? ORDER BY orden ASC`,[materia_id]);
+    if(!evalRows.length){
+      const nombresEval = Object.keys(calificaciones[0]?.notas||{});
+      if(!nombresEval.length){await conn.rollback();return res.status(400).json({message:"No hay configuración de evaluaciones para esta materia"});}
+      const peso = (100/nombresEval.length).toFixed(2);
+      for(const [i,nombre] of nombresEval.entries()){
+        await conn.execute(`INSERT IGNORE INTO eval_config (curso_id,materia_id,nombre,peso,orden) VALUES (?,?,?,?,?)`,[curso_id,materia_id,nombre,peso,i+1]);
+      }
+      [evalRows] = await conn.execute(`SELECT id,nombre FROM eval_config WHERE materia_id=? ORDER BY orden ASC`,[materia_id]);
+    }
+
+    const evalMap = Object.fromEntries(evalRows.map(e=>[e.nombre,e.id]));
+    let total = 0;
+    for(const reg of calificaciones){
+      const {usuario_id,notas} = reg;
+      if(!usuario_id||!notas) continue;
+      for(const [evalNombre,nota] of Object.entries(notas)){
+        const evalId = evalMap[evalNombre];
+        if(!evalId) continue;
+        const notaNum = Math.min(100,Math.max(0,Number(nota)||0));
+        await conn.execute(
+          `INSERT INTO calificaciones (curso_id,materia_id,usuario_id,eval_config_id,nota,registrado_por)
+           VALUES (?,?,?,?,?,?)
+           ON DUPLICATE KEY UPDATE nota=VALUES(nota),registrado_por=VALUES(registrado_por),actualizado_en=NOW()`,
+          [curso_id,materia_id,usuario_id,evalId,notaNum,registrado_por??null]
+        );
+        total++;
+      }
+    }
+    await conn.commit();
+    res.status(201).json({message:"Calificaciones guardadas",materia_id,estudiantes:calificaciones.length,notas_guardadas:total});
+  } catch(e){try{await conn.rollback();}catch{}res.status(500).json({message:"Error interno",detail:e.message});}
+  finally{conn.release();}
+});
+
+/** GET /api/calificaciones/materia/:materiaId — Libro de calificaciones por materia */
+app.get("/api/calificaciones/materia/:materiaId", async (req,res) => {
+  try {
+    const materiaId = Number(req.params.materiaId);
+    if(!materiaId) return res.status(400).json({message:"ID inválido"});
+
+    const [evalRows] = await pool.execute(
+      `SELECT id,nombre,peso,orden,nota_min_apro,nota_max FROM eval_config WHERE materia_id=? ORDER BY orden ASC`,[materiaId]);
+    const materia = await assertMateriaExists(pool,materiaId);
+    if(!materia) return res.status(404).json({message:"Materia no encontrada"});
+
+    const [partRows] = await pool.execute(
+      `SELECT u.id,u.nombre,u.ap_paterno,u.ap_materno,u.ci
+       FROM curso_participantes cp INNER JOIN usuarios u ON u.id=cp.usuario_id
+       WHERE cp.curso_id=? ORDER BY u.ap_paterno ASC,u.ap_materno ASC,u.nombre ASC`,[materia.curso_id]);
+
+    const [notaRows] = await pool.execute(
+      `SELECT c.usuario_id,ec.nombre AS eval_nombre,c.nota
+       FROM calificaciones c INNER JOIN eval_config ec ON ec.id=c.eval_config_id
+       WHERE c.materia_id=?`,[materiaId]);
+
+    const notasMap = {};
+    for(const n of notaRows){
+      if(!notasMap[n.usuario_id]) notasMap[n.usuario_id]={};
+      notasMap[n.usuario_id][n.eval_nombre]=Number(n.nota);
+    }
+
+    const notaMinApro = evalRows.length?Number(evalRows[0].nota_min_apro):70;
+
+    const libro = partRows.map(p=>{
+      const notas = notasMap[p.id]||{};
+      let promedio = 0;
+      if(evalRows.length){
+        let sumaPeso=0,sumaNota=0;
+        for(const ev of evalRows){sumaNota+=(notas[ev.nombre]??0)*Number(ev.peso);sumaPeso+=Number(ev.peso);}
+        promedio = sumaPeso>0?sumaNota/sumaPeso:0;
+      } else {
+        const v=Object.values(notas);promedio=v.length?v.reduce((a,b)=>a+b,0)/v.length:0;
+      }
+      return {usuario_id:p.id,nombre:p.nombre,ap_paterno:p.ap_paterno,ap_materno:p.ap_materno,ci:p.ci,
+              notas,promedio:Number(promedio.toFixed(2)),estado:promedio>=notaMinApro?"aprobado":"reprobado"};
+    });
+
+    res.json({materia_id:materiaId,materia_nombre:materia.nombre,evaluaciones:evalRows,libro});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+// ════════════════════════════════════════════════════════════
+// PLANIFICACIÓN DOCENTE (por materia)
+// ════════════════════════════════════════════════════════════
+
+/** GET /api/planificacion/materia/:materiaId */
+app.get("/api/planificacion/materia/:materiaId", async (req,res) => {
+  try {
+    const materiaId = Number(req.params.materiaId);
+    if(!materiaId) return res.status(400).json({message:"ID inválido"});
+    const [r] = await pool.execute(
+      `SELECT p.id,p.curso_id,p.materia_id,p.docente_id,p.titulo,p.objetivos,p.archivo_url,
+              p.estado,p.observacion,p.creado_en,p.aprobado_en,
+              u.nombre AS docente_nombre,u.ap_paterno AS docente_ap_paterno,u.ci AS docente_ci,
+              ua.nombre AS aprobado_por_nombre,ua.ap_paterno AS aprobado_por_ap
+       FROM planificacion_docente p
+       LEFT JOIN usuarios u  ON u.id=p.docente_id
+       LEFT JOIN usuarios ua ON ua.id=p.aprobado_por
+       WHERE p.materia_id=? ORDER BY p.creado_en DESC`,[materiaId]);
+    res.json(r);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/** POST /api/planificacion — Crear planificación */
+app.post("/api/planificacion", async (req,res) => {
+  try {
+    const {curso_id,materia_id,docente_id,titulo,objetivos,archivo_url} = req.body;
+    if(!curso_id)   return res.status(400).json({message:"Campo requerido: curso_id"});
+    if(!materia_id) return res.status(400).json({message:"Campo requerido: materia_id"});
+    if(!String(titulo??"").trim()) return res.status(400).json({message:"Campo requerido: titulo"});
+    const materia = await assertMateriaExists(pool,materia_id);
+    if(!materia) return res.status(404).json({message:"Materia no encontrada"});
+    const [result] = await pool.execute(
+      `INSERT INTO planificacion_docente (curso_id,materia_id,docente_id,titulo,objetivos,archivo_url)
+       VALUES (?,?,?,?,?,?)`,
+      [curso_id,materia_id,docente_id??null,String(titulo).trim(),objetivos??null,archivo_url??null]
+    );
+    res.status(201).json({message:"Planificación creada",id:result.insertId});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/** PATCH /api/planificacion/:id/estado — Aprobar o rechazar */
+app.patch("/api/planificacion/:id/estado", async (req,res) => {
+  try {
+    const id = Number(req.params.id);
+    const {estado,observacion,aprobado_por} = req.body;
+    if(!id) return res.status(400).json({message:"ID inválido"});
+    const estadosValidos = ["PENDIENTE","APROBADO","RECHAZADO"];
+    if(!estadosValidos.includes(String(estado||"").toUpperCase())) return res.status(400).json({message:"Estado inválido"});
+    const estadoFinal = String(estado).toUpperCase();
+    const aprobado_en = estadoFinal==="APROBADO"?new Date():null;
+    const [result] = await pool.execute(
+      `UPDATE planificacion_docente SET estado=?,observacion=?,aprobado_por=?,aprobado_en=? WHERE id=? LIMIT 1`,
+      [estadoFinal,observacion??null,aprobado_por??null,aprobado_en,id]
+    );
+    if(result.affectedRows===0) return res.status(404).json({message:"Planificación no encontrada"});
+    res.json({message:`Planificación ${estadoFinal.toLowerCase()}`});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/** DELETE /api/planificacion/:id */
+app.delete("/api/planificacion/:id", async (req,res) => {
+  try {
+    const id = Number(req.params.id);
+    if(!id) return res.status(400).json({message:"ID inválido"});
+    const [result] = await pool.execute(`DELETE FROM planificacion_docente WHERE id=? LIMIT 1`,[id]);
+    if(result.affectedRows===0) return res.status(404).json({message:"Planificación no encontrada"});
+    res.json({message:"Planificación eliminada"});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+// ════════════════════════════════════════════════════════════
+// TAREAS (por materia)
+// ════════════════════════════════════════════════════════════
+
+/** GET /api/tareas/materia/:materiaId */
+app.get("/api/tareas/materia/:materiaId", async (req,res) => {
+  try {
+    const materiaId = Number(req.params.materiaId);
+    if(!materiaId) return res.status(400).json({message:"ID inválido"});
+    const [r] = await pool.execute(
+      `SELECT t.id,t.curso_id,t.materia_id,t.titulo,t.descripcion,t.fecha_limite,t.creado_en,
+              (SELECT COUNT(*) FROM tarea_entregas te WHERE te.tarea_id=t.id) AS total_entregas,
+              (SELECT COUNT(*) FROM tarea_entregas te WHERE te.tarea_id=t.id AND te.estado='ENTREGADO') AS entregadas,
+              u.nombre AS creado_por_nombre,u.ap_paterno AS creado_por_ap
+       FROM tareas t LEFT JOIN usuarios u ON u.id=t.creado_por
+       WHERE t.materia_id=? ORDER BY t.creado_en DESC`,[materiaId]);
+    res.json(r);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/**
+ * POST /api/tareas — Crear tarea y generar entregas pendientes para todos los participantes
+ * body: { curso_id, materia_id, titulo, descripcion, fecha_limite, creado_por }
+ */
+app.post("/api/tareas", async (req,res) => {
+  const conn = await pool.getConnection();
+  try {
+    const {curso_id,materia_id,titulo,descripcion,fecha_limite,creado_por} = req.body;
+    if(!curso_id)   return res.status(400).json({message:"Campo requerido: curso_id"});
+    if(!materia_id) return res.status(400).json({message:"Campo requerido: materia_id"});
+    if(!String(titulo??"").trim()) return res.status(400).json({message:"Campo requerido: titulo"});
+
+    const materia = await assertMateriaExists(conn,materia_id);
+    if(!materia) return res.status(404).json({message:"Materia no encontrada"});
+
+    await conn.beginTransaction();
+
+    const [result] = await conn.execute(
+      `INSERT INTO tareas (curso_id,materia_id,titulo,descripcion,fecha_limite,creado_por) VALUES (?,?,?,?,?,?)`,
+      [curso_id,materia_id,String(titulo).trim(),descripcion??null,fecha_limite??null,creado_por??null]
+    );
+    const tareaId = result.insertId;
+
+    // Crear entregas pendientes para todos los participantes del curso
+    const [partRows] = await conn.execute(
+      `SELECT usuario_id FROM curso_participantes WHERE curso_id=?`,[curso_id]);
+
+    if(partRows.length){
+      const vals = partRows.map(()=>"(?,?)").join(",");
+      await conn.execute(
+        `INSERT IGNORE INTO tarea_entregas (tarea_id,usuario_id) VALUES ${vals}`,
+        partRows.flatMap(p=>[tareaId,p.usuario_id])
+      );
+    }
+
+    await conn.commit();
+    res.status(201).json({message:"Tarea creada",id:tareaId,entregas_generadas:partRows.length});
+  } catch(e){try{await conn.rollback();}catch{}res.status(500).json({message:"Error interno",detail:e.message});}
+  finally{conn.release();}
+});
+
+/** GET /api/tareas/:tareaId/entregas — Entregas de una tarea con datos de alumno */
+app.get("/api/tareas/:tareaId/entregas", async (req,res) => {
+  try {
+    const tareaId = Number(req.params.tareaId);
+    if(!tareaId) return res.status(400).json({message:"ID inválido"});
+    const [r] = await pool.execute(
+      `SELECT te.id,te.tarea_id,te.usuario_id,te.estado,te.nota,te.feedback,te.entregado_en,te.actualizado_en,
+              u.nombre,u.ap_paterno,u.ap_materno,u.ci
+       FROM tarea_entregas te INNER JOIN usuarios u ON u.id=te.usuario_id
+       WHERE te.tarea_id=? ORDER BY u.ap_paterno ASC,u.nombre ASC`,[tareaId]);
+    res.json(r);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/**
+ * PATCH /api/tareas/:tareaId/entregas/:usuarioId — Actualizar entrega (estado, nota, feedback)
+ * body: { estado, nota, feedback, calificado_por }
+ */
+app.patch("/api/tareas/:tareaId/entregas/:usuarioId", async (req,res) => {
+  try {
+    const tareaId   = Number(req.params.tareaId);
+    const usuarioId = Number(req.params.usuarioId);
+    const {estado,nota,feedback,calificado_por} = req.body;
+    if(!tareaId||!usuarioId) return res.status(400).json({message:"IDs inválidos"});
+
+    const estadosValidos = new Set(["PENDIENTE","ENTREGADO"]);
+    if(estado && !estadosValidos.has(String(estado).toUpperCase())) return res.status(400).json({message:"Estado inválido"});
+
+    const estadoFinal  = estado?String(estado).toUpperCase():undefined;
+    const entregado_en = estadoFinal==="ENTREGADO"?"NOW()":null;
+
+    // Build dynamic SET
+    const sets = [];
+    const params = [];
+    if(estadoFinal){sets.push("estado=?");params.push(estadoFinal);}
+    if(estadoFinal==="ENTREGADO"){sets.push("entregado_en=NOW()");}
+    if(nota!==undefined){sets.push("nota=?");params.push(Math.min(100,Math.max(0,Number(nota)||0)));}
+    if(feedback!==undefined){sets.push("feedback=?");params.push(feedback);}
+    if(calificado_por!==undefined){sets.push("calificado_por=?");params.push(calificado_por??null);}
+    if(!sets.length) return res.status(400).json({message:"Nada que actualizar"});
+
+    params.push(tareaId,usuarioId);
+    const [result] = await pool.execute(
+      `UPDATE tarea_entregas SET ${sets.join(",")} WHERE tarea_id=? AND usuario_id=? LIMIT 1`,params);
+    if(result.affectedRows===0) return res.status(404).json({message:"Entrega no encontrada"});
+    res.json({message:"Entrega actualizada"});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/** DELETE /api/tareas/:id */
+app.delete("/api/tareas/:id", async (req,res) => {
+  try {
+    const id = Number(req.params.id);
+    if(!id) return res.status(400).json({message:"ID inválido"});
+    const [result] = await pool.execute(`DELETE FROM tareas WHERE id=? LIMIT 1`,[id]);
+    if(result.affectedRows===0) return res.status(404).json({message:"Tarea no encontrada"});
+    res.json({message:"Tarea eliminada"});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+// ════════════════════════════════════════════════════════════
+// NOTIFICACIONES
+// ════════════════════════════════════════════════════════════
+app.get("/api/notificaciones/stats", async (req,res) => {
+  try {
+    const [[{total}]]          = await pool.query(`SELECT COUNT(*) AS total FROM notificaciones WHERE activa=1`);
+    const [[{urgentes}]]       = await pool.query(`SELECT COUNT(*) AS urgentes FROM notificaciones WHERE activa=1 AND tipo='URGENTE'`);
+    const [[{total_usuarios}]] = await pool.query(`SELECT COUNT(*) AS total_usuarios FROM usuarios WHERE estado='ACTIVO'`);
+    res.json({total,urgentes,total_usuarios});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+app.get("/api/notificaciones", async (req,res) => {
+  try {
+    const uid = req.query.usuario_id?Number(req.query.usuario_id):null;
+    let sql,params=[];
+    if(uid){
+      sql=`SELECT n.id,n.titulo,n.mensaje,n.tipo,n.creado_por,n.creado_en,n.activa,
+                  u.nombre AS emisor_nombre,u.ap_paterno AS emisor_ap_paterno,
+                  IF(nl.notificacion_id IS NOT NULL,1,0) AS leida
+           FROM notificaciones n LEFT JOIN usuarios u ON u.id=n.creado_por
+           LEFT JOIN notificaciones_leidas nl ON nl.notificacion_id=n.id AND nl.usuario_id=?
+           WHERE n.activa=1 ORDER BY n.creado_en DESC`;
+      params=[uid];
+    } else {
+      sql=`SELECT n.id,n.titulo,n.mensaje,n.tipo,n.creado_por,n.creado_en,n.activa,
+                  u.nombre AS emisor_nombre,u.ap_paterno AS emisor_ap_paterno,
+                  (SELECT COUNT(*) FROM notificaciones_leidas nl WHERE nl.notificacion_id=n.id) AS total_leidas
+           FROM notificaciones n LEFT JOIN usuarios u ON u.id=n.creado_por
+           ORDER BY n.creado_en DESC`;
+    }
+    const [r] = await pool.execute(sql,params);
+    res.json(r);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+app.post("/api/notificaciones", async (req,res) => {
+  try {
+    const {titulo,mensaje,tipo,creado_por} = req.body;
+    if(!String(titulo??"").trim()) return res.status(400).json({message:"Campo requerido: titulo"});
+    if(!String(mensaje??"").trim()) return res.status(400).json({message:"Campo requerido: mensaje"});
+    const tipoFinal = String(tipo??"INFO").toUpperCase();
+    if(!["INFO","ALERTA","URGENTE"].includes(tipoFinal)) return res.status(400).json({message:"tipo debe ser INFO, ALERTA o URGENTE"});
+    const [result] = await pool.execute(`INSERT INTO notificaciones (titulo,mensaje,tipo,creado_por) VALUES (?,?,?,?)`,[titulo.trim(),mensaje.trim(),tipoFinal,creado_por??null]);
+    res.status(201).json({message:"Notificación creada",id:result.insertId});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+app.delete("/api/notificaciones/:id", async (req,res) => {
+  try {
+    const id = Number(req.params.id);
+    if(!id) return res.status(400).json({message:"ID inválido"});
+    const [result] = await pool.execute(`UPDATE notificaciones SET activa=0 WHERE id=? LIMIT 1`,[id]);
+    if(result.affectedRows===0) return res.status(404).json({message:"Notificación no encontrada"});
+    res.json({message:"Notificación desactivada"});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+app.post("/api/notificaciones/:id/leer", async (req,res) => {
+  try {
+    const notifId=Number(req.params.id), usuarioId=Number(req.body.usuario_id);
+    if(!notifId||!usuarioId) return res.status(400).json({message:"Campos requeridos: id y usuario_id"});
+    await pool.execute(`INSERT IGNORE INTO notificaciones_leidas (notificacion_id,usuario_id) VALUES (?,?)`,[notifId,usuarioId]);
+    res.json({message:"Notificación marcada como leída"});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+// ════════════════════════════════════════════════════════════
+// START
+// ════════════════════════════════════════════════════════════
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`API corriendo en http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`✅ API EAEN corriendo en http://localhost:${PORT}`));
