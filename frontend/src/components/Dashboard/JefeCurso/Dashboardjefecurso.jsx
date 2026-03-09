@@ -56,7 +56,17 @@ export default function DashboardJefeCurso() {
     <div className="jc-page">
       <aside className="jc-sidebar">
         <div className="sidebar-brand">
-          <img src="/eaen.png" alt="EAEN" className="sidebar-logo"/>
+          <div style={{
+            width:48, height:48, flexShrink:0,
+            backgroundImage:"url('/eaen.png')",
+            backgroundSize:"contain",
+            backgroundRepeat:"no-repeat",
+            backgroundPosition:"center",
+            backgroundColor:"#ffffff",
+            borderRadius:10,
+            padding:4,
+            boxShadow:"0 2px 8px rgba(0,0,0,0.35)"
+          }}/>
           <div><div className="sidebar-title">EAEN Avaroa</div><div className="sidebar-role">🪖 Jefe de Curso</div></div>
         </div>
         <div className="sidebar-user">

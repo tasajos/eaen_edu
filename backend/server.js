@@ -895,6 +895,121 @@ app.delete("/api/tareas/:id", async (req,res) => {
   } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
 });
 
+
+// ════════════════════════════════════════════════════════════
+// TAREAS — ENDPOINTS EXTENDIDOS
+// ════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/tareas/:tareaId/entregar
+ * Cursante envía su respuesta
+ * body: { usuario_id, respuesta }
+ */
+app.post("/api/tareas/:tareaId/entregar", async (req,res) => {
+  try {
+    const tareaId = Number(req.params.tareaId);
+    const { usuario_id, respuesta } = req.body;
+    if(!tareaId)    return res.status(400).json({message:"ID de tarea inválido"});
+    if(!usuario_id) return res.status(400).json({message:"Campo requerido: usuario_id"});
+    if(!String(respuesta??"").trim()) return res.status(400).json({message:"Campo requerido: respuesta"});
+    const [result] = await pool.execute(
+      `UPDATE tarea_entregas SET estado='ENTREGADO', respuesta=?, entregado_en=NOW()
+       WHERE tarea_id=? AND usuario_id=? LIMIT 1`,
+      [String(respuesta).trim(), tareaId, usuario_id]
+    );
+    if(result.affectedRows===0) return res.status(404).json({message:"Entrega no encontrada para este alumno"});
+    res.json({message:"Tarea entregada exitosamente"});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/**
+ * GET /api/tareas/:tareaId/mi-entrega/:usuarioId
+ * Cursante: ver estado y feedback de su propia entrega
+ */
+app.get("/api/tareas/:tareaId/mi-entrega/:usuarioId", async (req,res) => {
+  try {
+    const tareaId   = Number(req.params.tareaId);
+    const usuarioId = Number(req.params.usuarioId);
+    if(!tareaId||!usuarioId) return res.status(400).json({message:"IDs inválidos"});
+    const [r] = await pool.execute(
+      `SELECT te.id, te.estado, te.respuesta, te.nota, te.feedback, te.entregado_en,
+              t.titulo, t.descripcion, t.fecha_limite
+       FROM tarea_entregas te INNER JOIN tareas t ON t.id=te.tarea_id
+       WHERE te.tarea_id=? AND te.usuario_id=? LIMIT 1`,
+      [tareaId, usuarioId]);
+    if(!r.length) return res.status(404).json({message:"Entrega no encontrada"});
+    res.json(r[0]);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/**
+ * GET /api/tareas/materia/:materiaId/resumen
+ * Docente: resumen estadístico de todas las tareas de una materia
+ */
+app.get("/api/tareas/materia/:materiaId/resumen", async (req,res) => {
+  try {
+    const materiaId = Number(req.params.materiaId);
+    if(!materiaId) return res.status(400).json({message:"ID inválido"});
+    const [r] = await pool.execute(
+      `SELECT t.id, t.titulo, t.descripcion, t.fecha_limite, t.creado_en,
+              COUNT(te.id)                                            AS total,
+              SUM(te.estado='ENTREGADO')                              AS entregadas,
+              SUM(te.estado='PENDIENTE')                              AS pendientes,
+              SUM(te.estado='ENTREGADO' AND te.nota IS NOT NULL)      AS calificadas,
+              SUM(te.estado='ENTREGADO' AND te.nota IS NULL)          AS sin_calificar,
+              ROUND(AVG(CASE WHEN te.nota IS NOT NULL THEN te.nota END),1) AS promedio_nota
+       FROM tareas t LEFT JOIN tarea_entregas te ON te.tarea_id=t.id
+       WHERE t.materia_id=?
+       GROUP BY t.id ORDER BY t.creado_en DESC`,[materiaId]);
+    res.json(r);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/**
+ * GET /api/tareas/:tareaId/entregas/detalle
+ * Docente: todas las entregas de una tarea con respuesta y estado de calificación
+ */
+app.get("/api/tareas/:tareaId/entregas/detalle", async (req,res) => {
+  try {
+    const tareaId = Number(req.params.tareaId);
+    if(!tareaId) return res.status(400).json({message:"ID inválido"});
+    const [r] = await pool.execute(
+      `SELECT te.id, te.usuario_id, te.estado, te.respuesta, te.nota, te.feedback,
+              te.entregado_en, te.actualizado_en,
+              u.nombre, u.ap_paterno, u.ap_materno, u.ci,
+              t.titulo AS tarea_titulo, t.fecha_limite, t.descripcion AS tarea_desc
+       FROM tarea_entregas te
+       INNER JOIN usuarios u ON u.id=te.usuario_id
+       INNER JOIN tareas t ON t.id=te.tarea_id
+       WHERE te.tarea_id=?
+       ORDER BY te.estado DESC, te.entregado_en DESC, u.ap_paterno ASC`,[tareaId]);
+    res.json(r);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/**
+ * POST /api/tareas/:tareaId/entregas/:usuarioId/calificar
+ * Docente califica una entrega recibida
+ * body: { nota, feedback, calificado_por }
+ */
+app.post("/api/tareas/:tareaId/entregas/:usuarioId/calificar", async (req,res) => {
+  try {
+    const tareaId   = Number(req.params.tareaId);
+    const usuarioId = Number(req.params.usuarioId);
+    const { nota, feedback, calificado_por } = req.body;
+    if(!tareaId||!usuarioId) return res.status(400).json({message:"IDs inválidos"});
+    if(nota===undefined||nota===null) return res.status(400).json({message:"Campo requerido: nota"});
+    const notaNum = Math.min(100, Math.max(0, Number(nota)||0));
+    const [result] = await pool.execute(
+      `UPDATE tarea_entregas SET nota=?, feedback=?, calificado_por=?, actualizado_en=NOW()
+       WHERE tarea_id=? AND usuario_id=? LIMIT 1`,
+      [notaNum, feedback??null, calificado_por??null, tareaId, usuarioId]
+    );
+    if(result.affectedRows===0) return res.status(404).json({message:"Entrega no encontrada"});
+    res.json({message:"Tarea calificada", nota:notaNum});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
 // ════════════════════════════════════════════════════════════
 // NOTIFICACIONES
 // ════════════════════════════════════════════════════════════
@@ -963,28 +1078,26 @@ app.post("/api/notificaciones/:id/leer", async (req,res) => {
 });
 
 // ════════════════════════════════════════════════════════════
-// AUTH — Agregar este bloque en server.js ANTES de app.listen
+// AUTH
 // ════════════════════════════════════════════════════════════
 
 /**
  * POST /api/auth/login
  * body: { ci, password }
- * Responde con: { usuario: { id, nombre, ap_paterno, ap_materno, ci, rol, tipo_usuario, estado, ... } }
  *
- * El frontend usa tipo_usuario para determinar el dashboard:
- *   - "Cursante"       → dashboard-cursante
- *   - rol "JEFE_ESTUDIOS" / "ADMIN" → dashboard-jefe
- *   - rol "DOCENTE"    → dashboard-docente
- *   - rol "JEFE_CURSO" → dashboard-jefe-curso
+ * Redirige según:
+ *   tipo_usuario = "Cursante"          → dashboard-cursante
+ *   rol = "JEFE_ESTUDIOS" / "ADMIN"   → dashboard-jefe
+ *   rol = "DOCENTE"                    → dashboard-docente
+ *   rol = "JEFE_CURSO"                 → dashboard-jefe-curso
+ *   rol = "CURSANTE"                   → dashboard-cursante
  */
 app.post("/api/auth/login", async (req, res) => {
   try {
     const { ci, password } = req.body;
-
-    if (!String(ci   ?? "").trim()) return res.status(400).json({ message: "Campo requerido: ci" });
+    if (!String(ci    ?? "").trim()) return res.status(400).json({ message: "Campo requerido: ci" });
     if (!String(password ?? "").trim()) return res.status(400).json({ message: "Campo requerido: password" });
 
-    // Buscar usuario por CI
     const [rows] = await pool.execute(
       `SELECT id, nombre, ap_paterno, ap_materno, ci, correo, email,
               grado, tipo_usuario, rol, estado, password AS password_hash
@@ -998,31 +1111,39 @@ app.post("/api/auth/login", async (req, res) => {
 
     const usuario = rows[0];
 
-    // Verificar estado activo
     if (String(usuario.estado ?? "").toUpperCase() !== "ACTIVO") {
       return res.status(403).json({ message: "Su cuenta está inactiva. Contacte al administrador." });
     }
 
-    // Verificar contraseña con bcrypt
-    const valid = await bcrypt.compare(String(password), String(usuario.password_hash ?? ""));
+    const hash = String(usuario.password_hash ?? "");
+
+    let valid = false;
+    if (hash.startsWith("$2b$") || hash.startsWith("$2a$")) {
+      // Password hasheado con bcrypt
+      valid = await bcrypt.compare(String(password), hash);
+    } else {
+      // Password en texto plano (legado) — comparar directo y luego hashear
+      valid = hash === String(password);
+      if (valid) {
+        // Migrar a bcrypt automáticamente
+        const nuevoHash = await bcrypt.hash(String(password), 10);
+        await pool.execute(`UPDATE usuarios SET password=? WHERE id=? LIMIT 1`, [nuevoHash, usuario.id]);
+        console.log(`[auth] Password migrado a bcrypt para usuario id=${usuario.id}`);
+      }
+    }
+
     if (!valid) {
       return res.status(401).json({ message: "Carnet de identidad o contraseña incorrectos." });
     }
 
-    // Construir objeto de sesión (sin password)
     const { password_hash, ...sesion } = usuario;
-
-    return res.json({
-      message: "Login exitoso",
-      usuario: sesion,
-    });
+    return res.json({ message: "Login exitoso", usuario: sesion });
 
   } catch (e) {
     console.error("[auth/login]", e);
     return res.status(500).json({ message: "Error interno del servidor.", detail: e.message });
   }
 });
-
 
 // ════════════════════════════════════════════════════════════
 // START
