@@ -963,6 +963,68 @@ app.post("/api/notificaciones/:id/leer", async (req,res) => {
 });
 
 // ════════════════════════════════════════════════════════════
+// AUTH — Agregar este bloque en server.js ANTES de app.listen
+// ════════════════════════════════════════════════════════════
+
+/**
+ * POST /api/auth/login
+ * body: { ci, password }
+ * Responde con: { usuario: { id, nombre, ap_paterno, ap_materno, ci, rol, tipo_usuario, estado, ... } }
+ *
+ * El frontend usa tipo_usuario para determinar el dashboard:
+ *   - "Cursante"       → dashboard-cursante
+ *   - rol "JEFE_ESTUDIOS" / "ADMIN" → dashboard-jefe
+ *   - rol "DOCENTE"    → dashboard-docente
+ *   - rol "JEFE_CURSO" → dashboard-jefe-curso
+ */
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { ci, password } = req.body;
+
+    if (!String(ci   ?? "").trim()) return res.status(400).json({ message: "Campo requerido: ci" });
+    if (!String(password ?? "").trim()) return res.status(400).json({ message: "Campo requerido: password" });
+
+    // Buscar usuario por CI
+    const [rows] = await pool.execute(
+      `SELECT id, nombre, ap_paterno, ap_materno, ci, correo, email,
+              grado, tipo_usuario, rol, estado, password AS password_hash
+       FROM usuarios WHERE ci = ? LIMIT 1`,
+      [String(ci).trim()]
+    );
+
+    if (!rows.length) {
+      return res.status(401).json({ message: "Carnet de identidad o contraseña incorrectos." });
+    }
+
+    const usuario = rows[0];
+
+    // Verificar estado activo
+    if (String(usuario.estado ?? "").toUpperCase() !== "ACTIVO") {
+      return res.status(403).json({ message: "Su cuenta está inactiva. Contacte al administrador." });
+    }
+
+    // Verificar contraseña con bcrypt
+    const valid = await bcrypt.compare(String(password), String(usuario.password_hash ?? ""));
+    if (!valid) {
+      return res.status(401).json({ message: "Carnet de identidad o contraseña incorrectos." });
+    }
+
+    // Construir objeto de sesión (sin password)
+    const { password_hash, ...sesion } = usuario;
+
+    return res.json({
+      message: "Login exitoso",
+      usuario: sesion,
+    });
+
+  } catch (e) {
+    console.error("[auth/login]", e);
+    return res.status(500).json({ message: "Error interno del servidor.", detail: e.message });
+  }
+});
+
+
+// ════════════════════════════════════════════════════════════
 // START
 // ════════════════════════════════════════════════════════════
 const PORT = process.env.PORT || 5000;
