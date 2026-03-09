@@ -1,0 +1,165 @@
+/* ═══════════════════════════════════════
+   NotificacionesPanel.css — compartido
+   ═══════════════════════════════════════ */
+
+.np-loading {
+  display: flex; align-items: center; gap: 10px;
+  color: #8898aa; font-size: 14px; padding: 28px 0;
+}
+.np-spin {
+  width: 18px; height: 18px;
+  border: 2px solid #e8ecf2; border-top-color: #003366;
+  border-radius: 50%;
+  animation: np-spin 0.7s linear infinite; flex-shrink: 0;
+}
+@keyframes np-spin { to { transform: rotate(360deg); } }
+
+/* ── Vacío ─────────────────────────────── */
+.np-empty {
+  text-align: center; padding: 52px 20px; color: #8898aa;
+}
+.np-empty span { font-size: 42px; display: block; margin-bottom: 12px; opacity: 0.45; }
+.np-empty p    { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.np-empty small{ font-size: 13px; }
+
+/* ── Toolbar ──────────────────────────── */
+.np-toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px; padding-bottom: 14px;
+  border-bottom: 2px solid #eef2f7;
+}
+.np-count { font-size: 13px; font-weight: 700; color: #5a6a80; }
+
+.np-btn-all {
+  padding: 7px 16px;
+  border: 2px solid #003366; border-radius: 8px;
+  background: transparent; color: #003366;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+  transition: all 0.2s;
+}
+.np-btn-all:hover { background: #003366; color: #fff; }
+
+/* ── Lista ────────────────────────────── */
+.np-list { display: flex; flex-direction: column; gap: 10px; }
+
+/* ── Item ─────────────────────────────── */
+.np-item {
+  display: flex; border-radius: 12px;
+  border: 2px solid #e8ecf2; background: #fff;
+  overflow: hidden;
+  transition: box-shadow 0.2s, transform 0.15s;
+  animation: np-in 0.3s ease both;
+}
+.np-item:hover {
+  box-shadow: 0 4px 18px rgba(0,0,0,0.09);
+  transform: translateY(-1px);
+}
+.np-item.np-open { box-shadow: 0 6px 24px rgba(0,0,0,0.11); }
+
+@keyframes np-in {
+  from { opacity:0; transform: translateY(10px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+
+/* Colores de fondo por tipo */
+.np-info    { border-color: #90caf9; background: #f5f9ff; }
+.np-alerta  { border-color: #ffe082; background: #fffdf0; }
+.np-urgente { border-color: #ef9a9a; background: #fff5f5; }
+
+/* ── Franja izquierda ─────────────────── */
+.np-stripe { width: 5px; flex-shrink: 0; }
+.np-stripe-info    { background: #1976d2; }
+.np-stripe-alerta  { background: #f9a825; }
+.np-stripe-urgente { background: #e53935; }
+
+/* ── Cuerpo del item ──────────────────── */
+.np-body { flex: 1; padding: 0; }
+
+/* Header clickeable */
+.np-head {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 16px; cursor: pointer; user-select: none;
+}
+.np-icon  { font-size: 22px; flex-shrink: 0; margin-top: 1px; }
+.np-text  { flex: 1; min-width: 0; }
+.np-title {
+  font-weight: 700; font-size: 14.5px; color: #1a2535;
+  margin-bottom: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.np-preview { font-size: 12.5px; color: #5a6a80; line-height: 1.4; }
+
+.np-right {
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: 4px; flex-shrink: 0;
+}
+.np-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 8px;
+  border-radius: 10px; text-transform: uppercase; letter-spacing: 0.4px;
+}
+.np-badge-info    { background: #bbdefb; color: #0d47a1; }
+.np-badge-alerta  { background: #fff9c4; color: #e65100; }
+.np-badge-urgente { background: #ffcdd2; color: #b71c1c; }
+.np-date    { font-size: 11px; color: #aaa; }
+.np-chevron { font-size: 10px; color: #ccc; }
+
+/* ── Detalle expandido ────────────────── */
+.np-detail {
+  padding: 4px 16px 18px 52px;
+  animation: np-expand 0.22s ease;
+}
+@keyframes np-expand {
+  from { opacity:0; transform:scaleY(0.92); transform-origin:top; }
+  to   { opacity:1; transform:scaleY(1); }
+}
+.np-msg  {
+  font-size: 14px; color: #2d3748; line-height: 1.65;
+  margin-bottom: 10px; white-space: pre-wrap;
+}
+.np-from { font-size: 12px; color: #8898aa; margin-bottom: 14px; }
+
+/* ── Botón Leer ───────────────────────── */
+.np-btn-read {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 20px;
+  border: 2px solid #2e7d32; border-radius: 9px;
+  background: transparent; color: #2e7d32;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: all 0.2s;
+}
+.np-btn-read:hover {
+  background: #2e7d32; color: #fff;
+  box-shadow: 0 4px 14px rgba(46,125,50,0.28);
+  transform: translateY(-1px);
+}
+.np-btn-read:active { transform: none; }
+
+/* ── Campanita (header) ───────────────── */
+.np-bell {
+  position: relative; background: transparent; border: none;
+  cursor: pointer; font-size: 22px; padding: 7px;
+  border-radius: 9px; transition: background 0.2s; line-height: 1;
+}
+.np-bell:hover { background: rgba(0,0,0,0.06); }
+.np-bell-dot {
+  position: absolute; top: 0; right: -2px;
+  background: #e53935; color: #fff;
+  font-size: 10px; font-weight: 700;
+  min-width: 18px; height: 18px;
+  border-radius: 9px; padding: 0 4px;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid #fff;
+  animation: np-pulse 2.2s ease infinite;
+}
+@keyframes np-pulse {
+  0%,100% { transform: scale(1); }
+  50%     { transform: scale(1.2); }
+}
+
+/* ── Badge en sidebar ─────────────────── */
+.np-sidebar-badge {
+  margin-left: auto;
+  background: #e53935; color: #fff;
+  font-size: 10px; font-weight: 700;
+  padding: 2px 7px; border-radius: 10px;
+}
