@@ -4,6 +4,8 @@ import { useNotificaciones } from "../../../hooks/useNotificaciones";
 import { NotificacionesPanel, NotifBell } from "../../Shared/NotificacionesPanel";
 import "../../Shared/NotificacionesPanel.css";
 import "./DashboardCursante.css";
+import EvaluacionInstitucional from "../../EvaluacionInstitucional/EvaluacionInstitucional";
+import "../../EvaluacionInstitucional/EvaluacionInstitucional.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 function getSession() {
@@ -269,6 +271,7 @@ export default function DashboardCursante() {
   const LA = { P:"Presente", A:"Ausente", T:"Tardanza", J:"Justificado" };
 
   const VISTAS = [
+    { id:"evaluaciones",  icon:"📋", label:"Evaluaciones" },
     { id:"tareas",        icon:"📤", label:"Tareas" },
     { id:"notas",         icon:"📊", label:"Mis notas" },
     { id:"asistencia",    icon:"📋", label:"Asistencia" },
@@ -389,6 +392,11 @@ export default function DashboardCursante() {
                   </div>
 
                   <div className="panel-body">
+                    {/* EVALUACIONES */}
+                    {vista === "evaluaciones" && (
+                      <EvaluacionInstitucional usuarioId={session?.id}/>
+                    )}
+
                     {/* TAREAS */}
                     {vista === "tareas" && (
                       <VistaTareasCursante materia={materia} session={session} showToast={showToast}/>

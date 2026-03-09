@@ -1,0 +1,167 @@
+/* ═══════════════════════════════════════════════════════════
+   GestionEvaluaciones.css — EAEN Avaroa
+   ═══════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+
+.gev-page{min-height:100vh;background:#f0f4f8;font-family:'IBM Plex Sans',sans-serif;display:flex;flex-direction:column;}
+
+/* Header */
+.gev-header{background:#003366;color:#fff;padding:20px 32px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+.gev-back{background:rgba(255,255,255,0.12);border:1.5px solid rgba(255,255,255,0.25);color:#fff;padding:8px 16px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;white-space:nowrap;font-family:inherit;}
+.gev-back:hover{background:rgba(255,255,255,0.22);}
+.gev-header-center{flex:1;}
+.gev-header-center h1{font-size:22px;font-weight:700;letter-spacing:-0.3px;}
+.gev-header-center p{font-size:13px;opacity:.7;margin-top:3px;}
+.gev-btn-new{white-space:nowrap;}
+
+/* Main */
+.gev-main{padding:28px 32px;display:flex;flex-direction:column;gap:22px;}
+
+/* Stats */
+.gev-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+.gev-stat{border-radius:14px;padding:18px 20px;display:flex;align-items:center;gap:14px;color:#fff;box-shadow:0 2px 12px rgba(0,0,0,.10);}
+.gev-stat-icon{font-size:28px;line-height:1;}
+.gev-stat-val{font-size:28px;font-weight:700;font-family:'IBM Plex Mono',monospace;line-height:1;}
+.gev-stat-lbl{font-size:11px;opacity:.8;text-transform:uppercase;letter-spacing:.5px;margin-top:3px;}
+.s-blue  {background:linear-gradient(135deg,#003366,#0055aa);}
+.s-green {background:linear-gradient(135deg,#1b5e20,#2e7d32);}
+.s-orange{background:linear-gradient(135deg,#e65c00,#ff6600);}
+.s-purple{background:linear-gradient(135deg,#4a148c,#7b1fa2);}
+
+/* Card */
+.gev-card{background:#fff;border-radius:16px;box-shadow:0 2px 16px rgba(0,51,102,.07);overflow:hidden;}
+.gev-card-header{display:flex;align-items:center;gap:12px;padding:18px 24px;border-bottom:2px solid #f0f4f8;background:#fafbff;}
+.gev-card-header h2{font-size:15px;font-weight:700;color:#003366;flex:1;}
+.gev-count{background:#003366;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;}
+
+/* Tabla */
+.gev-tabla-wrap{overflow-x:auto;}
+.gev-tabla{width:100%;border-collapse:collapse;font-size:13.5px;}
+.gev-tabla th{padding:11px 14px;background:#f7f9fc;font-size:11px;font-weight:700;letter-spacing:.5px;color:#6b7a90;text-transform:uppercase;border-bottom:2px solid #eef2f7;text-align:left;white-space:nowrap;}
+.gev-tabla td{padding:13px 14px;border-bottom:1px solid #f0f4f8;vertical-align:middle;}
+.gev-tabla tr:last-child td{border-bottom:none;}
+.gev-tabla tr:hover td{background:#fafbff;}
+.gev-eval-titulo{font-weight:600;color:#1a2535;font-size:13.5px;}
+.gev-muted{color:#8898aa;font-size:12.5px;}
+
+/* Tipo badge */
+.gev-tipo-badge{display:inline-flex;align-items:center;padding:4px 11px;border-radius:20px;font-size:11.5px;font-weight:700;white-space:nowrap;}
+
+/* Barra de participación */
+.gev-pct-wrap{display:flex;align-items:center;gap:8px;justify-content:center;}
+.gev-pct-bar-bg{flex:1;min-width:80px;height:8px;background:#eef2f7;border-radius:4px;overflow:hidden;}
+.gev-pct-bar-fill{height:100%;border-radius:4px;transition:width .5s ease;}
+.gev-pct-txt{font-size:11.5px;font-weight:700;color:#5a6a80;white-space:nowrap;font-family:'IBM Plex Mono',monospace;}
+
+/* Toggle */
+.gev-toggle{padding:6px 14px;border-radius:20px;border:2px solid transparent;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;font-family:inherit;white-space:nowrap;}
+.gev-toggle.active{background:#e8f5e9;color:#2e7d32;border-color:#a5d6a7;}
+.gev-toggle.active:hover{background:#2e7d32;color:#fff;}
+.gev-toggle.inactive{background:#f3f4f6;color:#9e9e9e;border-color:#e0e0e0;}
+.gev-toggle.inactive:hover{background:#e3f2fd;color:#1565c0;border-color:#90caf9;}
+
+/* Buttons */
+.gev-btn-primary{padding:10px 22px;border-radius:9px;background:#ff6600;color:#fff;border:none;font-size:13.5px;font-weight:700;cursor:pointer;transition:all .18s;font-family:inherit;}
+.gev-btn-primary:hover{background:#e65c00;transform:translateY(-1px);box-shadow:0 4px 14px rgba(255,102,0,.3);}
+.gev-btn-primary:disabled{opacity:.55;cursor:not-allowed;transform:none;}
+.gev-btn-ghost{padding:10px 20px;border-radius:9px;background:transparent;color:#5a6a80;border:2px solid #e8ecf2;font-size:13.5px;font-weight:600;cursor:pointer;transition:all .18s;font-family:inherit;}
+.gev-btn-ghost:hover{border-color:#003366;color:#003366;}
+.gev-btn-sm{padding:6px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid transparent;transition:all .18s;white-space:nowrap;font-family:inherit;}
+.gev-btn-ver{background:#e3f2fd;color:#1565c0;border-color:#90caf9;}
+.gev-btn-ver:hover{background:#1565c0;color:#fff;}
+
+/* Empty */
+.gev-empty{text-align:center;padding:60px 20px;color:#8898aa;display:flex;flex-direction:column;align-items:center;gap:14px;}
+.gev-empty-icon{font-size:44px;opacity:.3;}
+.gev-empty p{font-size:14px;}
+.gev-spinner{display:flex;justify-content:center;align-items:center;padding:60px;}
+.gev-ring{width:34px;height:34px;border:3px solid #e8ecf2;border-top-color:#003366;border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── MODAL ──────────────────────────────────────────────── */
+.gev-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;backdrop-filter:blur(3px);}
+.gev-modal{background:#fff;border-radius:18px;width:100%;max-width:580px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);display:flex;flex-direction:column;}
+.gev-modal-wide{max-width:760px;}
+.gev-modal-header{display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:2px solid #f0f4f8;position:sticky;top:0;background:#fff;z-index:1;}
+.gev-modal-title{font-size:17px;font-weight:700;color:#003366;}
+.gev-modal-close{background:none;border:none;font-size:18px;cursor:pointer;color:#8898aa;line-height:1;padding:4px 8px;border-radius:6px;}
+.gev-modal-close:hover{background:#f0f4f8;color:#1a2535;}
+.gev-modal-body{padding:22px 24px;flex:1;}
+.gev-modal-footer{display:flex;gap:10px;padding:16px 24px;border-top:2px solid #f0f4f8;background:#fafbff;position:sticky;bottom:0;}
+
+/* Form en modal */
+.gev-form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+.gev-form-group label{font-size:11.5px;font-weight:700;color:#6b7a90;text-transform:uppercase;letter-spacing:.5px;}
+.gev-form-group input,.gev-form-group select{padding:10px 13px;border:2px solid #e8ecf2;border-radius:9px;font-size:13.5px;font-family:inherit;color:#1a2535;background:#fff;transition:border-color .2s;}
+.gev-form-group input:focus,.gev-form-group select:focus{outline:none;border-color:#003366;}
+.gev-form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+
+/* Tipo cards */
+.gev-tipo-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.gev-tipo-card{border:2.5px solid #e8ecf2;border-radius:12px;padding:16px;cursor:pointer;transition:all .2s;text-align:center;}
+.gev-tipo-card:hover{border-color:#003366;background:#f8f9ff;}
+.gev-tipo-card.selected{border-color:#ff6600;background:#fff8f4;box-shadow:0 0 0 3px rgba(255,102,0,.15);}
+.gev-tipo-icon{font-size:30px;margin-bottom:8px;}
+.gev-tipo-label{font-size:13px;font-weight:700;color:#1a2535;margin-bottom:4px;}
+.gev-tipo-desc{font-size:11.5px;color:#8898aa;}
+
+.gev-error{background:#fff0f0;border:1.5px solid #ef9a9a;color:#c62828;padding:10px 14px;border-radius:9px;font-size:13px;font-weight:600;margin-top:4px;}
+
+/* Resultados */
+.gev-res-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;gap:14px;flex-wrap:wrap;padding:16px 18px;background:#f7f9fc;border-radius:12px;border:1.5px solid #eef2f7;}
+.gev-res-titulo{font-size:16px;font-weight:700;color:#003366;}
+.gev-res-pills{display:flex;gap:8px;flex-wrap:wrap;}
+.gev-pill{display:inline-flex;align-items:center;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;}
+.gev-pill.green{background:#e8f5e9;color:#2e7d32;}
+.gev-pill.blue{background:#e3f2fd;color:#1565c0;}
+
+.gev-res-tabla{display:flex;flex-direction:column;gap:10px;}
+.gev-res-row{display:flex;align-items:center;gap:12px;padding:12px 14px;background:#fafbff;border-radius:10px;border:1.5px solid #eef2f7;}
+.gev-res-nro{width:24px;height:24px;border-radius:50%;background:#003366;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.gev-res-texto{flex:1;font-size:13px;color:#2d3748;line-height:1.4;}
+.gev-res-bar-wrap{width:120px;height:8px;background:#e8ecf2;border-radius:4px;overflow:hidden;flex-shrink:0;}
+.gev-res-bar{height:100%;border-radius:4px;transition:width .5s;}
+.gev-res-val{width:36px;font-size:15px;font-weight:900;font-family:'IBM Plex Mono',monospace;text-align:right;flex-shrink:0;}
+.gev-res-resp{font-size:11px;color:#aaa;white-space:nowrap;flex-shrink:0;}
+.gev-res-promedio-global{margin-top:16px;padding:14px 18px;background:#f0f4ff;border-radius:10px;font-size:14px;font-weight:600;color:#1a2535;text-align:center;border:2px solid #c5cae9;}
+.gev-res-promedio-global strong{font-size:22px;font-family:'IBM Plex Mono',monospace;}
+
+/* Toast */
+.gev-toast{position:fixed;bottom:28px;right:28px;background:#1b5e20;color:#fff;padding:13px 22px;border-radius:12px;font-weight:700;font-size:14px;box-shadow:0 8px 28px rgba(0,0,0,.18);z-index:9999;animation:tst .3s cubic-bezier(.34,1.2,.64,1);}
+.gev-toast-error{background:#b71c1c;}
+@keyframes tst{from{opacity:0;transform:translateY(16px) scale(.95)}to{opacity:1;transform:none}}
+
+/* ── Tabs de resultados ──────────────────────────────────── */
+.gev-res-tabs{display:flex;gap:8px;margin-bottom:18px;border-bottom:2px solid #f0f4f8;padding-bottom:12px;}
+.gev-res-tab{padding:8px 20px;border-radius:9px;border:2px solid #e8ecf2;background:#fff;font-size:13px;font-weight:700;cursor:pointer;color:#5a6a80;transition:all .18s;font-family:inherit;}
+.gev-res-tab:hover{border-color:#003366;color:#003366;}
+.gev-res-tab.active{background:#003366;color:#fff;border-color:#003366;}
+
+/* ── Lista por cursante ──────────────────────────────────── */
+.gev-cur-lista{display:flex;flex-direction:column;gap:8px;}
+.gev-cur-row{border-radius:12px;border:2px solid #e8ecf2;background:#fff;overflow:hidden;transition:box-shadow .2s;}
+.gev-cur-row.open{box-shadow:0 4px 18px rgba(0,51,102,.1);border-color:#c5cae9;}
+.gev-cur-row-header{display:flex;align-items:center;gap:10px;padding:13px 16px;cursor:pointer;user-select:none;transition:background .15s;}
+.gev-cur-row-header:hover{background:#fafbff;}
+.gev-cur-rank{width:22px;height:22px;border-radius:50%;background:#f0f4f8;color:#5a6a80;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.gev-cur-avatar{width:34px;height:34px;border-radius:50%;color:#fff;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.gev-cur-info{flex:1;min-width:0;}
+.gev-cur-nombre{font-size:13.5px;font-weight:700;color:#1a2535;}
+.gev-cur-meta{font-size:11px;color:#8898aa;margin-top:2px;}
+.gev-cur-nota-wrap{display:flex;align-items:baseline;gap:3px;flex-shrink:0;}
+.gev-cur-nota{font-size:26px;font-weight:900;font-family:'IBM Plex Mono',monospace;line-height:1;}
+.gev-cur-nota-lbl{font-size:12px;color:#aaa;}
+.gev-cur-sin-nota{font-size:12px;color:#bbb;font-style:italic;}
+.gev-cur-bar-mini{width:70px;height:6px;background:#eef2f7;border-radius:3px;overflow:hidden;flex-shrink:0;}
+.gev-cur-chevron{font-size:11px;color:#ccc;flex-shrink:0;margin-left:4px;}
+
+/* Detalle por indicador (expandido) */
+.gev-cur-detalle{padding:14px 16px 16px;border-top:1.5px solid #f0f4f8;background:#fafbff;display:flex;flex-direction:column;gap:9px;}
+.gev-ind-mini-row{display:flex;align-items:center;gap:10px;}
+.gev-ind-mini-num{width:20px;height:20px;border-radius:50%;background:#003366;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.gev-ind-mini-txt{flex:1;font-size:12.5px;color:#2d3748;line-height:1.35;}
+.gev-ind-mini-bar-bg{width:90px;height:6px;background:#e8ecf2;border-radius:3px;overflow:hidden;flex-shrink:0;}
+.gev-ind-mini-bar{height:100%;border-radius:3px;transition:width .4s;}
+.gev-ind-mini-val{width:30px;font-size:13px;font-weight:900;font-family:'IBM Plex Mono',monospace;text-align:right;flex-shrink:0;}
+.gev-cur-sin-resp{padding:14px 16px;font-size:13px;color:#aaa;font-style:italic;border-top:1.5px solid #f0f4f8;text-align:center;}

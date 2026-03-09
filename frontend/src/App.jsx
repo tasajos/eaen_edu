@@ -4,10 +4,11 @@ import DashboardJefe        from "./components/Dashboard/Jefeunidad/Dashboardjef
 import GestionUsuarios      from "./components/GestionUsuarios/GestionUsuarios";
 import GestionCursos        from "./components/GestionCursos/GestionCursos";
 import GestionNotificaciones from "./components/GestionNotificaciones/GestionNotificaciones";
+import GestionEvaluaciones from "./components/GestionEvaluaciones/GestionEvaluaciones";
 import GestionEducativa     from "./components/GestionEducativa/GestionEducativa";
-import DashboardDocente     from "./components/Dashboard/Docente/DashboardDocente";
-import DashboardCursante    from "./components/Dashboard/Cursante/DashboardCursante";
-import DashboardJefeCurso   from "./components/Dashboard/JefeCurso/DashboardJefeCurso";
+import DashboardDocente     from "./components/Dashboard/Docente/Dashboarddocente";
+import DashboardCursante    from "./components/Dashboard/Cursante/Dashboardcursante";
+import DashboardJefeCurso   from "./components/Dashboard/JefeCurso/Dashboardjefecurso";
 
 // ─── Helper: leer sesión ────────────────────────────────────
 function getSession() {
@@ -83,6 +84,11 @@ export default function App() {
         <Route path="/gestion-notificaciones" element={
           <PrivateRoute rolesPermitidos={["JEFE_ESTUDIOS","ADMIN"]}>
             <GestionNotificaciones />
+          </PrivateRoute>
+        }/>
+        <Route path="/gestion-evaluaciones" element={
+          <PrivateRoute rolesPermitidos={["ADMIN","JEFE_ESTUDIOS","JEFE_CURSO"]}>
+            <GestionEvaluaciones/>
           </PrivateRoute>
         }/>
         <Route path="/gestion-educativa" element={

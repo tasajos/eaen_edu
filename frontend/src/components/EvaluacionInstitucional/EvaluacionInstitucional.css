@@ -1,0 +1,108 @@
+/* ═══════════════════════════════════════════════════════════
+   EvaluacionInstitucional.css — EAEN Avaroa
+   ═══════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap');
+*,*::before,*::after{box-sizing:border-box;}
+
+/* ── Lista de evaluaciones pendientes ─────────────────── */
+.ev-lista{display:flex;flex-direction:column;gap:14px;}
+.ev-lista-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;}
+.ev-lista-header h3{font-size:15px;font-weight:700;color:#1a2535;}
+.ev-badge-count{background:#e53935;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;}
+
+.ev-periodo-card{background:#fff;border-radius:14px;border:2px solid #e8ecf2;overflow:hidden;transition:box-shadow .2s;}
+.ev-periodo-card:hover{box-shadow:0 4px 18px rgba(0,0,0,.08);}
+.ev-periodo-header{display:flex;align-items:flex-start;gap:12px;padding:16px 20px;border-bottom:1.5px solid #f0f4f8;background:#fafbff;}
+.ev-periodo-tipo{font-size:11.5px;font-weight:700;padding:4px 12px;border-radius:20px;white-space:nowrap;flex-shrink:0;}
+.tipo-par{background:#e3f2fd;color:#1565c0;}
+.tipo-doc{background:#f3e5f5;color:#6a1b9a;}
+.ev-periodo-titulo{font-size:14px;font-weight:700;color:#1a2535;margin-bottom:3px;}
+.ev-periodo-meta{font-size:12px;color:#8898aa;}
+
+/* Pares lista */
+.ev-pares-lista{display:flex;flex-direction:column;gap:0;}
+.ev-par-row{display:flex;align-items:center;gap:12px;padding:13px 20px;border-bottom:1px solid #f0f4f8;transition:background .15s;}
+.ev-par-row:last-child{border-bottom:none;}
+.ev-par-row:hover{background:#fafbff;}
+.ev-par-row.hecho{opacity:.6;}
+.ev-par-avatar{width:36px;height:36px;border-radius:50%;background:#003366;color:#fff;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ev-par-info{flex:1;}
+.ev-par-nombre{font-size:13.5px;font-weight:600;color:#1a2535;}
+.ev-par-ci{font-size:11.5px;color:#8898aa;margin-top:2px;}
+
+/* Docente CTA */
+.ev-docente-cta{display:flex;align-items:center;gap:14px;padding:18px 20px;}
+.ev-docente-icon{font-size:32px;flex-shrink:0;}
+.ev-docente-titulo{font-size:14px;font-weight:700;color:#1a2535;margin-bottom:2px;}
+.ev-docente-materia{font-size:12px;color:#8898aa;}
+
+/* Botones */
+.ev-btn-evaluar{padding:8px 18px;border-radius:9px;background:#003366;color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap;font-family:inherit;flex-shrink:0;}
+.ev-btn-evaluar:hover{background:#0055aa;transform:translateY(-1px);}
+.ev-btn-lg{padding:10px 22px;font-size:14px;}
+.ev-hecho-badge{padding:6px 12px;background:#e8f5e9;color:#2e7d32;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap;flex-shrink:0;}
+
+/* Sin pendientes */
+.ev-sin-pendientes{text-align:center;padding:50px 20px;color:#8898aa;}
+.ev-sp-icon{font-size:50px;margin-bottom:14px;}
+.ev-sin-pendientes h3{font-size:18px;font-weight:700;color:#2e7d32;margin-bottom:8px;}
+.ev-sin-pendientes p{font-size:14px;}
+
+/* Loading */
+.ev-loading{display:flex;flex-direction:column;align-items:center;gap:14px;padding:50px;color:#8898aa;}
+.ev-ring{width:32px;height:32px;border:3px solid #e8ecf2;border-top-color:#003366;border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── FORMULARIO de evaluación ────────────────────────── */
+.ev-form-page{display:flex;flex-direction:column;gap:20px;animation:fadeIn .3s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+.ev-form-header{display:flex;align-items:flex-start;gap:16px;padding:18px 20px;background:#f7f9fc;border-radius:14px;border:2px solid #eef2f7;flex-wrap:wrap;}
+.ev-back-btn{background:#003366;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit;flex-shrink:0;transition:background .2s;}
+.ev-back-btn:hover{background:#0055aa;}
+.ev-form-info{flex:1;min-width:200px;}
+.ev-form-tipo{font-size:11.5px;font-weight:700;color:#6a1b9a;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+.ev-form-titulo{font-size:17px;font-weight:700;color:#003366;margin-bottom:8px;}
+.ev-evaluado-chip{display:inline-flex;align-items:center;gap:8px;background:#e3f2fd;padding:7px 14px;border-radius:20px;font-size:13px;color:#1565c0;}
+.ev-eval-avatar{width:26px;height:26px;border-radius:50%;background:#1565c0;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ev-eval-grado{background:#bbdefb;padding:2px 8px;border-radius:10px;font-size:11px;}
+.ev-prom-badge{flex-shrink:0;width:72px;height:72px;border-radius:50%;border:3px solid;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:all .3s;}
+.ev-prom-num{font-size:22px;font-weight:900;font-family:'IBM Plex Mono',monospace;line-height:1;}
+.ev-prom-lbl{font-size:9.5px;font-weight:700;opacity:.7;text-transform:uppercase;letter-spacing:.5px;}
+
+/* Leyenda */
+.ev-leyenda{display:flex;gap:8px;flex-wrap:wrap;}
+.ev-ley-item{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;}
+.ev-ley-val{font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:13px;}
+
+/* Indicadores */
+.ev-indicadores{display:flex;flex-direction:column;gap:10px;}
+.ev-ind-row{background:#fff;border-radius:12px;border:2px solid #eef2f7;padding:14px 16px;transition:border-color .2s;}
+.ev-ind-row:hover{border-color:#c5cae9;}
+.ev-ind-nro-texto{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;}
+.ev-ind-nro{width:24px;height:24px;border-radius:50%;background:#003366;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-bottom:10px;}
+.ev-ind-texto{font-size:13.5px;color:#2d3748;line-height:1.5;flex:1;margin-bottom:10px;}
+.ev-ind-opciones{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.ev-opc-btn{padding:6px 12px;border-radius:8px;border:2px solid #e8ecf2;background:#fafbff;cursor:pointer;transition:all .18s;font-family:inherit;display:flex;flex-direction:column;align-items:center;min-width:72px;}
+.ev-opc-btn:hover{border-color:#90caf9;background:#e3f2fd;}
+.ev-opc-btn.selected{transform:translateY(-2px);box-shadow:0 3px 10px rgba(0,0,0,.12);}
+.ev-opc-val{font-size:14px;font-weight:900;font-family:'IBM Plex Mono',monospace;line-height:1;}
+.ev-opc-lbl{font-size:10px;font-weight:600;margin-top:2px;white-space:nowrap;}
+.ev-ind-bar-wrap{height:5px;background:#f0f4f8;border-radius:3px;overflow:hidden;}
+.ev-ind-bar{height:100%;border-radius:3px;transition:width .4s ease,background .4s;}
+
+/* Observaciones */
+.ev-obs-section{display:flex;flex-direction:column;gap:7px;}
+.ev-obs-label{font-size:12px;font-weight:700;color:#6b7a90;text-transform:uppercase;letter-spacing:.5px;}
+.ev-obs-input{padding:12px 14px;border:2px solid #e8ecf2;border-radius:10px;font-size:14px;font-family:inherit;resize:vertical;transition:border-color .2s;color:#1a2535;}
+.ev-obs-input:focus{outline:none;border-color:#003366;}
+
+/* Footer del formulario */
+.ev-footer{display:flex;align-items:center;gap:12px;padding:16px 18px;background:#f7f9fc;border-radius:12px;border:2px solid #eef2f7;flex-wrap:wrap;}
+.ev-footer-prom{flex:1;font-size:14px;font-weight:600;color:#5a6a80;}
+.ev-btn-enviar{padding:11px 26px;background:#1b4332;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;font-family:inherit;}
+.ev-btn-enviar:hover{background:#2e7d32;transform:translateY(-1px);box-shadow:0 4px 14px rgba(46,125,50,.3);}
+.ev-btn-enviar:disabled{opacity:.6;cursor:not-allowed;transform:none;}
+.ev-btn-cancel{padding:10px 18px;background:transparent;color:#8898aa;border:2px solid #e8ecf2;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s;}
+.ev-btn-cancel:hover{border-color:#003366;color:#003366;}
+.ev-error{background:#fff0f0;border:1.5px solid #ef9a9a;color:#c62828;padding:10px 14px;border-radius:9px;font-size:13px;font-weight:600;}

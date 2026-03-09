@@ -92,7 +92,7 @@ export default function LoginEAEN() {
 
         <header className="login-header">
           <img src="/eaen.png" alt="Logo EAEN" className="eaen-logo" />
-          <h1>Sistema Universitario EAEN</h1>
+          <h1>Sistema EAEN</h1>
           <p>Escuela de Altos Estudios Nacionales — Avaroa</p>
           <p className="login-subtitle">Formación de Oficiales Militares Superiores y Personal Civil · Nivel Postgrado</p>
         </header>
