@@ -657,6 +657,67 @@ app.post("/api/calificaciones", async (req,res) => {
   finally{conn.release();}
 });
 
+
+/**
+ * POST /api/calificaciones/usuario — Guardar y bloquear notas de UN cursante
+ * body: { curso_id, materia_id, usuario_id, notas:{evalNombre:nota}, bloquear:true }
+ */
+app.post("/api/calificaciones/usuario", async (req,res) => {
+  const conn = await pool.getConnection();
+  try {
+    const {curso_id,materia_id,usuario_id,notas,bloquear} = req.body;
+    if(!curso_id)    return res.status(400).json({message:"Campo requerido: curso_id"});
+    if(!materia_id)  return res.status(400).json({message:"Campo requerido: materia_id"});
+    if(!usuario_id)  return res.status(400).json({message:"Campo requerido: usuario_id"});
+    if(!notas)       return res.status(400).json({message:"Campo requerido: notas"});
+
+    const materia = await assertMateriaExists(conn, materia_id);
+    if(!materia) return res.status(404).json({message:"Materia no encontrada"});
+
+    // Verificar si ya está bloqueado
+    const [chk] = await conn.execute(
+      `SELECT bloqueado FROM calificaciones WHERE materia_id=? AND usuario_id=? LIMIT 1`,
+      [materia_id, usuario_id]);
+    if(chk.length && chk[0].bloqueado)
+      return res.status(409).json({message:"Las calificaciones de este cursante ya están bloqueadas."});
+
+    await conn.beginTransaction();
+
+    // Obtener eval_config
+    let [evalRows] = await conn.execute(
+      `SELECT id,nombre FROM eval_config WHERE materia_id=? ORDER BY orden ASC`,[materia_id]);
+    if(!evalRows.length){
+      const nombresEval = Object.keys(notas);
+      const peso = (100/nombresEval.length).toFixed(2);
+      for(const [i,nombre] of nombresEval.entries()){
+        await conn.execute(
+          `INSERT IGNORE INTO eval_config (curso_id,materia_id,nombre,peso,orden) VALUES (?,?,?,?,?)`,
+          [curso_id,materia_id,nombre,peso,i+1]);
+      }
+      [evalRows] = await conn.execute(
+        `SELECT id,nombre FROM eval_config WHERE materia_id=? ORDER BY orden ASC`,[materia_id]);
+    }
+
+    const evalMap = Object.fromEntries(evalRows.map(e=>[e.nombre,e.id]));
+    const bloqueadoVal = bloquear ? 1 : 0;
+
+    for(const [evalNombre,nota] of Object.entries(notas)){
+      const evalId = evalMap[evalNombre];
+      if(!evalId) continue;
+      const notaNum = Math.min(100,Math.max(0,Number(nota)||0));
+      await conn.execute(
+        `INSERT INTO calificaciones (curso_id,materia_id,usuario_id,eval_config_id,nota,bloqueado)
+         VALUES (?,?,?,?,?,?)
+         ON DUPLICATE KEY UPDATE nota=VALUES(nota),bloqueado=VALUES(bloqueado),actualizado_en=NOW()`,
+        [curso_id,materia_id,usuario_id,evalId,notaNum,bloqueadoVal]);
+    }
+
+    await conn.commit();
+    res.json({message:"Calificaciones guardadas", usuario_id, bloqueado:bloqueadoVal===1});
+  } catch(e){try{await conn.rollback();}catch{}res.status(500).json({message:"Error interno",detail:e.message});}
+  finally{conn.release();}
+});
+
 /** GET /api/calificaciones/materia/:materiaId — Libro de calificaciones por materia */
 app.get("/api/calificaciones/materia/:materiaId", async (req,res) => {
   try {
@@ -674,14 +735,16 @@ app.get("/api/calificaciones/materia/:materiaId", async (req,res) => {
        WHERE cp.curso_id=? ORDER BY u.ap_paterno ASC,u.ap_materno ASC,u.nombre ASC`,[materia.curso_id]);
 
     const [notaRows] = await pool.execute(
-      `SELECT c.usuario_id,ec.nombre AS eval_nombre,c.nota
+      `SELECT c.usuario_id,ec.nombre AS eval_nombre,c.nota,c.bloqueado
        FROM calificaciones c INNER JOIN eval_config ec ON ec.id=c.eval_config_id
        WHERE c.materia_id=?`,[materiaId]);
 
     const notasMap = {};
+    const bloqueadoMap = {}; // { usuario_id: true/false }
     for(const n of notaRows){
       if(!notasMap[n.usuario_id]) notasMap[n.usuario_id]={};
       notasMap[n.usuario_id][n.eval_nombre]=Number(n.nota);
+      if(n.bloqueado) bloqueadoMap[n.usuario_id] = true;
     }
 
     const notaMinApro = evalRows.length?Number(evalRows[0].nota_min_apro):70;
@@ -697,7 +760,8 @@ app.get("/api/calificaciones/materia/:materiaId", async (req,res) => {
         const v=Object.values(notas);promedio=v.length?v.reduce((a,b)=>a+b,0)/v.length:0;
       }
       return {usuario_id:p.id,nombre:p.nombre,ap_paterno:p.ap_paterno,ap_materno:p.ap_materno,ci:p.ci,
-              notas,promedio:Number(promedio.toFixed(2)),estado:promedio>=notaMinApro?"aprobado":"reprobado"};
+              notas,promedio:Number(promedio.toFixed(2)),estado:promedio>=notaMinApro?"aprobado":"reprobado",
+              bloqueado: bloqueadoMap[p.id] || false};
     });
 
     res.json({materia_id:materiaId,materia_nombre:materia.nombre,evaluaciones:evalRows,libro});

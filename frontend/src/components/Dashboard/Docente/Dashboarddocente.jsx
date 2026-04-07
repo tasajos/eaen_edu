@@ -117,22 +117,20 @@ function VistaAsistencia({ materia, participantes, showToast }) {
    VISTA CALIFICACIONES
 ══════════════════════════════════════════════════════════ */
 function VistaCalificaciones({ materia, participantes, showToast }) {
-  const [evals,      setEvals]      = useState([]);
-  const [notas,      setNotas]      = useState({});
-  const [notasTarea, setNotasTarea] = useState({}); // promedio de tareas por usuario
-  const [saving,     setSaving]     = useState(false);
+  const [evals,       setEvals]       = useState([]);
+  const [notas,       setNotas]       = useState({});
+  const [notasTarea,  setNotasTarea]  = useState({});
+  const [bloqueados,  setBloqueados]  = useState({}); // { usuario_id: true }
+  const [saving,      setSaving]      = useState({}); // { usuario_id: true }
+  const [confirmUid,  setConfirmUid]  = useState(null); // uid del modal abierto
 
-  // Palabras clave que identifican una columna calculada desde tareas
   const esTareaEval = nombre => /trabajo|tarea|practic/i.test(nombre);
 
-  // Calcular promedio de tareas para cada participante
   const calcularPromedioTareas = async (materiaId) => {
     try {
       const resumen = await fetch(`${API}/api/tareas/materia/${materiaId}/resumen`).then(r=>r.json());
       if (!Array.isArray(resumen) || !resumen.length) return {};
-
-      // Para cada tarea, obtener entregas con nota
-      const mapaNotas = {}; // { usuario_id: [nota1, nota2, ...] }
+      const mapaNotas = {};
       for (const tarea of resumen) {
         const entregas = await fetch(`${API}/api/tareas/${tarea.id}/entregas/detalle`).then(r=>r.json());
         if (!Array.isArray(entregas)) continue;
@@ -143,53 +141,50 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
           }
         });
       }
-      // Calcular promedio por usuario
-      const resultado = {};
-      Object.entries(mapaNotas).forEach(([uid, notas]) => {
-        resultado[Number(uid)] = Math.round(notas.reduce((a,b)=>a+b,0) / notas.length * 10) / 10;
+      const res = {};
+      Object.entries(mapaNotas).forEach(([uid, ns]) => {
+        res[Number(uid)] = Math.round(ns.reduce((a,b)=>a+b,0)/ns.length*10)/10;
       });
-      return resultado;
+      return res;
     } catch { return {}; }
   };
 
   useEffect(() => {
     if (!materia?.id) return;
-    // Cargar config de evaluaciones
     fetch(`${API}/api/eval-config/materia/${materia.id}`)
-      .then(r => r.json()).then(async d => {
+      .then(r=>r.json()).then(async d => {
         if (!Array.isArray(d)) return;
         setEvals(d);
-        // Si hay alguna eval tipo "Trabajo/Tarea/Práctica", calcular desde tareas
-        const tieneTarea = d.some(ev => esTareaEval(ev.nombre));
-        if (tieneTarea) {
-          const prom = await calcularPromedioTareas(materia.id);
-          setNotasTarea(prom);
+        if (d.some(ev => esTareaEval(ev.nombre))) {
+          const p = await calcularPromedioTareas(materia.id);
+          setNotasTarea(p);
         }
-      }).catch(() => {});
-    // Cargar calificaciones existentes
+      }).catch(()=>{});
     fetch(`${API}/api/calificaciones/materia/${materia.id}`)
-      .then(r => r.json()).then(d => {
-        if (d.libro) {
-          const m = {};
-          d.libro.forEach(p => { m[p.usuario_id] = p.notas || {}; });
-          setNotas(m);
-        }
-      }).catch(() => {});
+      .then(r=>r.json()).then(d => {
+        if (!d.libro) return;
+        const m = {}, bl = {};
+        d.libro.forEach(p => {
+          m[p.usuario_id] = p.notas || {};
+          if (p.bloqueado) bl[p.usuario_id] = true;
+        });
+        setNotas(m);
+        setBloqueados(bl);
+      }).catch(()=>{});
   }, [materia?.id]);
 
   useEffect(() => {
     if (participantes.length && evals.length) {
       setNotas(prev => {
-        const n = { ...prev };
+        const n = {...prev};
         participantes.forEach(p => {
-          if (!n[p.id]) n[p.id] = Object.fromEntries(evals.map(ev => [ev.nombre, 0]));
+          if (!n[p.id]) n[p.id] = Object.fromEntries(evals.map(ev=>[ev.nombre,0]));
         });
         return n;
       });
     }
   }, [participantes, evals]);
 
-  // Obtener nota de una eval para un usuario (usa promedio tareas si aplica)
   const getNotaEval = (uid, evNombre) => {
     if (esTareaEval(evNombre)) return notasTarea[uid] ?? 0;
     return notas[uid]?.[evNombre] ?? 0;
@@ -197,149 +192,281 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
 
   const prom = uid => {
     if (!evals.length) return 0;
-    let sp = 0, sn = 0;
-    evals.forEach(ev => {
-      sn += getNotaEval(uid, ev.nombre) * Number(ev.peso);
-      sp += Number(ev.peso);
-    });
-    return sp > 0 ? sn / sp : 0;
+    let sp=0, sn=0;
+    evals.forEach(ev => { sn += getNotaEval(uid, ev.nombre)*Number(ev.peso); sp += Number(ev.peso); });
+    return sp>0 ? sn/sp : 0;
   };
 
-  const guardar = async () => {
-    setSaving(true);
+  // Guardar y bloquear notas de UN cursante
+  const guardarUsuario = async (uid) => {
+    setSaving(p=>({...p,[uid]:true}));
     try {
-      // Combinar notas manuales + notas calculadas desde tareas
-      const calificaciones = participantes.map(p => {
-        const notasCompletas = { ...notas[p.id] };
-        evals.forEach(ev => {
-          if (esTareaEval(ev.nombre)) notasCompletas[ev.nombre] = getNotaEval(p.id, ev.nombre);
-        });
-        return { usuario_id: p.id, notas: notasCompletas };
+      const notasCompletas = {...notas[uid]};
+      evals.forEach(ev => {
+        if (esTareaEval(ev.nombre)) notasCompletas[ev.nombre] = getNotaEval(uid, ev.nombre);
       });
-      const r = await fetch(`${API}/api/calificaciones`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ curso_id: materia.curso_id, materia_id: materia.id, calificaciones })
+      const r = await fetch(`${API}/api/calificaciones/usuario`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          curso_id: materia.curso_id,
+          materia_id: materia.id,
+          usuario_id: uid,
+          notas: notasCompletas,
+          bloquear: true
+        })
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.message);
-      showToast("✅ Calificaciones guardadas correctamente");
+      setBloqueados(p=>({...p,[uid]:true}));
+      showToast("✅ Calificaciones registradas y bloqueadas");
     } catch(e) { showToast(`❌ ${e.message}`, "error"); }
-    finally { setSaving(false); }
+    finally { setSaving(p=>({...p,[uid]:false})); setConfirmUid(null); }
   };
 
   const min = evals.length ? Number(evals[0].nota_min_apro) : 70;
-  const totalTareas = Object.values(notasTarea).length;
+  const conTareas = Object.values(notasTarea).length;
+  const confirmParticipante = participantes.find(p=>p.id===confirmUid);
+  const totalBloqueados = Object.keys(bloqueados).length;
 
   return (
     <div>
+      {/* ── Modal confirmación por cursante ── */}
+      {confirmUid && confirmParticipante && (
+        <div style={{
+          position:"fixed", inset:0, background:"rgba(0,0,0,0.6)",
+          display:"flex", alignItems:"center", justifyContent:"center",
+          zIndex:2000, backdropFilter:"blur(4px)"
+        }}>
+          <div style={{
+            background:"#fff", borderRadius:20, padding:"36px 40px",
+            maxWidth:460, width:"92%", boxShadow:"0 24px 80px rgba(0,0,0,0.28)",
+            display:"flex", flexDirection:"column", alignItems:"center", gap:18, textAlign:"center"
+          }}>
+            <div style={{fontSize:52}}>🔒</div>
+            <div>
+              <div style={{fontSize:19, fontWeight:800, color:"#003366", marginBottom:6}}>
+                ¿Registrar calificaciones?
+              </div>
+              <div style={{
+                display:"inline-flex", alignItems:"center", gap:8,
+                background:"#e3f2fd", padding:"8px 16px", borderRadius:20,
+                fontSize:14, color:"#1565c0", fontWeight:600, marginTop:4
+              }}>
+                <span style={{
+                  width:32, height:32, borderRadius:"50%", background:"#1565c0",
+                  color:"#fff", display:"flex", alignItems:"center", justifyContent:"center",
+                  fontWeight:800, fontSize:14, flexShrink:0
+                }}>{confirmParticipante.ap_paterno?.[0]||"?"}</span>
+                {confirmParticipante.ap_paterno} {confirmParticipante.ap_materno}, {confirmParticipante.nombre}
+              </div>
+            </div>
+
+            {/* Resumen del cursante */}
+            <div style={{
+              width:"100%", background:"#f7f9fc", borderRadius:12,
+              padding:"14px 18px", textAlign:"left", border:"1.5px solid #eef2f7"
+            }}>
+              {evals.map(ev => {
+                const nota = getNotaEval(confirmUid, ev.nombre);
+                const esAuto = esTareaEval(ev.nombre);
+                return (
+                  <div key={ev.nombre} style={{
+                    display:"flex", justifyContent:"space-between",
+                    padding:"5px 0", borderBottom:"1px solid #f0f4f8", fontSize:13
+                  }}>
+                    <span style={{color:"#5a6a80"}}>
+                      {ev.nombre} <span style={{fontSize:11, color:"#aaa"}}>({ev.peso}%)</span>
+                      {esAuto && <span style={{marginLeft:4}}>🔄</span>}
+                    </span>
+                    <span style={{
+                      fontFamily:"'IBM Plex Mono',monospace", fontWeight:800,
+                      color: nota >= min ? "#2e7d32" : "#c62828"
+                    }}>{nota.toFixed(1)}</span>
+                  </div>
+                );
+              })}
+              <div style={{
+                display:"flex", justifyContent:"space-between",
+                paddingTop:10, marginTop:4, fontSize:14, fontWeight:700
+              }}>
+                <span style={{color:"#003366"}}>Promedio final</span>
+                <span style={{
+                  fontFamily:"'IBM Plex Mono',monospace", fontSize:18,
+                  color: prom(confirmUid) >= min ? "#2e7d32" : "#c62828"
+                }}>{prom(confirmUid).toFixed(1)}</span>
+              </div>
+            </div>
+
+            {/* Advertencia */}
+            <div style={{
+              background:"#fff8e1", border:"2px solid #ffe082", borderRadius:10,
+              padding:"12px 16px", fontSize:13, color:"#b45309",
+              lineHeight:1.6, width:"100%", textAlign:"left"
+            }}>
+              ⚠️ <strong>Esta acción es permanente.</strong> Las notas quedarán
+              bloqueadas en el sistema. Para modificarlas deberá contactar al Jefe de Estudios.
+            </div>
+
+            <div style={{display:"flex", gap:10, width:"100%"}}>
+              <button onClick={()=>guardarUsuario(confirmUid)} disabled={saving[confirmUid]} style={{
+                flex:1, padding:"12px 0", background:"#003366", color:"#fff",
+                border:"none", borderRadius:10, fontSize:14, fontWeight:700,
+                cursor:saving[confirmUid]?"not-allowed":"pointer",
+                opacity:saving[confirmUid]?.65:1, fontFamily:"inherit"
+              }}>
+                {saving[confirmUid] ? "⏳ Guardando..." : "✅ Confirmar y bloquear"}
+              </button>
+              <button onClick={()=>setConfirmUid(null)} style={{
+                flex:1, padding:"12px 0", background:"transparent", color:"#5a6a80",
+                border:"2px solid #e8ecf2", borderRadius:10, fontSize:13.5,
+                fontWeight:600, cursor:"pointer", fontFamily:"inherit"
+              }}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {!evals.length ? (
         <div className="empty-msg">
           <p>No hay evaluaciones configuradas para esta materia.</p>
           <p style={{fontSize:12,marginTop:6}}>Configure las evaluaciones en Gestión Educativa → Calificaciones.</p>
         </div>
-      ) : (
-        <>
-          {/* Info sobre cálculo automático */}
-          {evals.some(ev => esTareaEval(ev.nombre)) && (
-            <div style={{
-              display:"flex", alignItems:"center", gap:10,
-              background:"#e3f2fd", border:"1.5px solid #90caf9",
-              borderRadius:10, padding:"10px 16px", marginBottom:16,
-              fontSize:13, color:"#1565c0"
-            }}>
-              <span style={{fontSize:18}}>📊</span>
-              <span>
-                Las columnas <strong>Trabajo / Tarea / Práctica</strong> se calculan automáticamente
-                como promedio de las tareas calificadas ({totalTareas > 0
-                  ? `${totalTareas} cursante${totalTareas>1?"s":""} con tareas calificadas`
-                  : "sin tareas calificadas aún"}).
-              </span>
-            </div>
-          )}
-          <div className="doc-table-wrap" style={{overflowX:"auto"}}>
-            <table className="doc-table">
-              <thead>
-                <tr>
-                  <th>Participante</th><th>CI</th>
-                  {evals.map(ev => (
-                    <th key={ev.nombre} style={{textAlign:"center"}}>
-                      {ev.nombre}
-                      {esTareaEval(ev.nombre) && (
-                        <span title="Calculado desde tareas" style={{marginLeft:4,fontSize:12}}>🔄</span>
-                      )}
-                      <br/>
-                      <span style={{fontSize:10,color:"#aaa",fontWeight:400}}>{ev.peso}%</span>
-                    </th>
-                  ))}
-                  <th style={{textAlign:"center"}}>Promedio</th>
-                  <th style={{textAlign:"center"}}>Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {participantes.map(p => {
-                  const pr = prom(p.id);
-                  const ap = pr >= min;
-                  return (
-                    <tr key={p.id}>
-                      <td className="bold">{p.ap_paterno} {p.ap_materno}, {p.nombre}</td>
-                      <td className="muted">{p.ci}</td>
-                      {evals.map(ev => {
-                        const nota = getNotaEval(p.id, ev.nombre);
-                        const esAuto = esTareaEval(ev.nombre);
-                        return (
-                          <td key={ev.nombre} style={{textAlign:"center"}}>
-                            {esAuto ? (
-                              // Columna calculada automáticamente — solo lectura
-                              <div style={{
-                                display:"inline-flex", alignItems:"center", justifyContent:"center",
-                                minWidth:60, padding:"6px 10px",
-                                background: nota >= min ? "#e8f5e9" : "#fff3e0",
-                                border: `2px solid ${nota >= min ? "#a5d6a7" : "#ffcc80"}`,
-                                borderRadius:8, fontWeight:700,
-                                fontFamily:"'IBM Plex Mono',monospace",
-                                color: nota >= min ? "#2e7d32" : "#e65100",
-                                fontSize:14, gap:4
-                              }}>
-                                🔄 {nota.toFixed(1)}
-                              </div>
-                            ) : (
-                              // Columna editable manualmente
-                              <input
-                                type="number" min="0" max="100"
-                                className={`nota-input ${nota >= min ? "nota-ap" : "nota-rp"}`}
-                                value={nota}
-                                onChange={e => setNotas(prev => ({
-                                  ...prev,
-                                  [p.id]: { ...prev[p.id], [ev.nombre]: Math.min(100, Math.max(0, Number(e.target.value) || 0)) }
-                                }))}
-                              />
-                            )}
-                          </td>
-                        );
-                      })}
-                      <td style={{textAlign:"center"}}>
-                        <strong style={{color: ap ? "#2e7d32" : "#c62828", fontFamily:"'IBM Plex Mono',monospace"}}>
-                          {pr.toFixed(1)}
-                        </strong>
-                      </td>
-                      <td style={{textAlign:"center"}}>
-                        <span className={`badge ${ap ? "badge-pres" : "badge-aus"}`}>
-                          {ap ? "Aprobado" : "Reprobado"}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      ) : (<>
+        {/* Info tareas automáticas */}
+        {evals.some(ev => esTareaEval(ev.nombre)) && (
+          <div style={{
+            display:"flex", alignItems:"center", gap:10,
+            background:"#e3f2fd", border:"1.5px solid #90caf9",
+            borderRadius:10, padding:"10px 16px", marginBottom:14,
+            fontSize:13, color:"#1565c0"
+          }}>
+            <span style={{fontSize:18}}>📊</span>
+            <span>
+              Las columnas <strong>Trabajo / Tarea / Práctica</strong> se calculan automáticamente
+              como promedio de tareas calificadas
+              ({conTareas>0 ? `${conTareas} cursante${conTareas>1?"s":""} con tareas calificadas` : "sin tareas calificadas aún"}).
+            </span>
           </div>
-        </>
-      )}
-      <div className="vista-footer">
-        <button className="btn-primary" onClick={guardar} disabled={saving}>
-          {saving ? "Guardando..." : "💾 Guardar calificaciones"}
-        </button>
-      </div>
+        )}
+
+        {/* Resumen bloqueados */}
+        {totalBloqueados > 0 && (
+          <div style={{
+            display:"flex", alignItems:"center", gap:8,
+            background:"#f3e5f5", border:"1.5px solid #ce93d8",
+            borderRadius:10, padding:"9px 16px", marginBottom:14,
+            fontSize:13, color:"#6a1b9a"
+          }}>
+            🔒 <strong>{totalBloqueados}</strong> de {participantes.length} cursantes con calificaciones bloqueadas.
+          </div>
+        )}
+
+        <div className="doc-table-wrap" style={{overflowX:"auto"}}>
+          <table className="doc-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Participante</th>
+                <th>CI</th>
+                {evals.map(ev => (
+                  <th key={ev.nombre} style={{textAlign:"center"}}>
+                    {ev.nombre}
+                    {esTareaEval(ev.nombre) && <span title="Auto" style={{marginLeft:3}}>🔄</span>}
+                    <br/>
+                    <span style={{fontSize:10,color:"#aaa",fontWeight:400}}>{ev.peso}%</span>
+                  </th>
+                ))}
+                <th style={{textAlign:"center"}}>Promedio</th>
+                <th style={{textAlign:"center"}}>Estado</th>
+                <th style={{textAlign:"center"}}>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {participantes.map((p, i) => {
+                const pr      = prom(p.id);
+                const ap      = pr >= min;
+                const locked  = bloqueados[p.id] || false;
+                const isSaving = saving[p.id] || false;
+                return (
+                  <tr key={p.id} style={{background: locked ? "#fafffe" : undefined}}>
+                    <td className="muted">{i+1}</td>
+                    <td className="bold">{p.ap_paterno} {p.ap_materno}, {p.nombre}</td>
+                    <td className="muted">{p.ci}</td>
+                    {evals.map(ev => {
+                      const nota   = getNotaEval(p.id, ev.nombre);
+                      const esAuto = esTareaEval(ev.nombre);
+                      return (
+                        <td key={ev.nombre} style={{textAlign:"center"}}>
+                          {esAuto ? (
+                            <div style={{
+                              display:"inline-flex", alignItems:"center", justifyContent:"center",
+                              minWidth:60, padding:"6px 10px",
+                              background: nota>=min ? "#e8f5e9" : "#fff3e0",
+                              border:`2px solid ${nota>=min ? "#a5d6a7" : "#ffcc80"}`,
+                              borderRadius:8, fontWeight:700,
+                              fontFamily:"'IBM Plex Mono',monospace",
+                              color: nota>=min ? "#2e7d32" : "#e65100",
+                              fontSize:14
+                            }}>🔄 {nota.toFixed(1)}</div>
+                          ) : locked ? (
+                            <div style={{
+                              display:"inline-flex", alignItems:"center", justifyContent:"center",
+                              minWidth:60, padding:"6px 10px",
+                              background:"#f5f5f5", border:"2px solid #e0e0e0",
+                              borderRadius:8, fontWeight:700,
+                              fontFamily:"'IBM Plex Mono',monospace",
+                              color: nota>=min ? "#2e7d32" : "#c62828",
+                              fontSize:14
+                            }}>🔒 {nota.toFixed(1)}</div>
+                          ) : (
+                            <input
+                              type="number" min="0" max="100"
+                              className={`nota-input ${nota>=min?"nota-ap":"nota-rp"}`}
+                              value={nota}
+                              onChange={e => setNotas(prev=>({
+                                ...prev,
+                                [p.id]:{...prev[p.id],[ev.nombre]:Math.min(100,Math.max(0,Number(e.target.value)||0))}
+                              }))}
+                            />
+                          )}
+                        </td>
+                      );
+                    })}
+                    <td style={{textAlign:"center"}}>
+                      <strong style={{
+                        color: ap?"#2e7d32":"#c62828",
+                        fontFamily:"'IBM Plex Mono',monospace", fontSize:15
+                      }}>{pr.toFixed(1)}</strong>
+                    </td>
+                    <td style={{textAlign:"center"}}>
+                      <span className={`badge ${ap?"badge-pres":"badge-aus"}`}>
+                        {ap?"Aprobado":"Reprobado"}
+                      </span>
+                    </td>
+                    <td style={{textAlign:"center"}}>
+                      {locked ? (
+                        <span style={{
+                          fontSize:12, color:"#9c27b0", fontWeight:700,
+                          display:"inline-flex", alignItems:"center", gap:4
+                        }}>🔒 Bloqueado</span>
+                      ) : (
+                        <button
+                          className="btn-sm btn-cal"
+                          disabled={isSaving}
+                          onClick={() => setConfirmUid(p.id)}
+                          style={{whiteSpace:"nowrap"}}
+                        >
+                          {isSaving ? "⏳..." : "💾 Guardar"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </>)}
     </div>
   );
 }
