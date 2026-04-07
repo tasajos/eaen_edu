@@ -117,14 +117,56 @@ function VistaAsistencia({ materia, participantes, showToast }) {
    VISTA CALIFICACIONES
 ══════════════════════════════════════════════════════════ */
 function VistaCalificaciones({ materia, participantes, showToast }) {
-  const [evals,  setEvals]  = useState([]);
-  const [notas,  setNotas]  = useState({});
-  const [saving, setSaving] = useState(false);
+  const [evals,      setEvals]      = useState([]);
+  const [notas,      setNotas]      = useState({});
+  const [notasTarea, setNotasTarea] = useState({}); // promedio de tareas por usuario
+  const [saving,     setSaving]     = useState(false);
+
+  // Palabras clave que identifican una columna calculada desde tareas
+  const esTareaEval = nombre => /trabajo|tarea|practic/i.test(nombre);
+
+  // Calcular promedio de tareas para cada participante
+  const calcularPromedioTareas = async (materiaId) => {
+    try {
+      const resumen = await fetch(`${API}/api/tareas/materia/${materiaId}/resumen`).then(r=>r.json());
+      if (!Array.isArray(resumen) || !resumen.length) return {};
+
+      // Para cada tarea, obtener entregas con nota
+      const mapaNotas = {}; // { usuario_id: [nota1, nota2, ...] }
+      for (const tarea of resumen) {
+        const entregas = await fetch(`${API}/api/tareas/${tarea.id}/entregas/detalle`).then(r=>r.json());
+        if (!Array.isArray(entregas)) continue;
+        entregas.forEach(e => {
+          if (e.nota !== null && e.nota !== undefined) {
+            if (!mapaNotas[e.usuario_id]) mapaNotas[e.usuario_id] = [];
+            mapaNotas[e.usuario_id].push(Number(e.nota));
+          }
+        });
+      }
+      // Calcular promedio por usuario
+      const resultado = {};
+      Object.entries(mapaNotas).forEach(([uid, notas]) => {
+        resultado[Number(uid)] = Math.round(notas.reduce((a,b)=>a+b,0) / notas.length * 10) / 10;
+      });
+      return resultado;
+    } catch { return {}; }
+  };
 
   useEffect(() => {
     if (!materia?.id) return;
+    // Cargar config de evaluaciones
     fetch(`${API}/api/eval-config/materia/${materia.id}`)
-      .then(r => r.json()).then(d => { if (Array.isArray(d)) setEvals(d); }).catch(() => {});
+      .then(r => r.json()).then(async d => {
+        if (!Array.isArray(d)) return;
+        setEvals(d);
+        // Si hay alguna eval tipo "Trabajo/Tarea/Práctica", calcular desde tareas
+        const tieneTarea = d.some(ev => esTareaEval(ev.nombre));
+        if (tieneTarea) {
+          const prom = await calcularPromedioTareas(materia.id);
+          setNotasTarea(prom);
+        }
+      }).catch(() => {});
+    // Cargar calificaciones existentes
     fetch(`${API}/api/calificaciones/materia/${materia.id}`)
       .then(r => r.json()).then(d => {
         if (d.libro) {
@@ -147,23 +189,36 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
     }
   }, [participantes, evals]);
 
+  // Obtener nota de una eval para un usuario (usa promedio tareas si aplica)
+  const getNotaEval = (uid, evNombre) => {
+    if (esTareaEval(evNombre)) return notasTarea[uid] ?? 0;
+    return notas[uid]?.[evNombre] ?? 0;
+  };
+
   const prom = uid => {
     if (!evals.length) return 0;
-    const n = notas[uid] || {};
     let sp = 0, sn = 0;
-    evals.forEach(ev => { sn += (n[ev.nombre] ?? 0) * Number(ev.peso); sp += Number(ev.peso); });
+    evals.forEach(ev => {
+      sn += getNotaEval(uid, ev.nombre) * Number(ev.peso);
+      sp += Number(ev.peso);
+    });
     return sp > 0 ? sn / sp : 0;
   };
 
   const guardar = async () => {
     setSaving(true);
     try {
+      // Combinar notas manuales + notas calculadas desde tareas
+      const calificaciones = participantes.map(p => {
+        const notasCompletas = { ...notas[p.id] };
+        evals.forEach(ev => {
+          if (esTareaEval(ev.nombre)) notasCompletas[ev.nombre] = getNotaEval(p.id, ev.nombre);
+        });
+        return { usuario_id: p.id, notas: notasCompletas };
+      });
       const r = await fetch(`${API}/api/calificaciones`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          curso_id: materia.curso_id, materia_id: materia.id,
-          calificaciones: participantes.map(p => ({ usuario_id: p.id, notas: notas[p.id] || {} }))
-        })
+        body: JSON.stringify({ curso_id: materia.curso_id, materia_id: materia.id, calificaciones })
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.message);
@@ -173,6 +228,7 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
   };
 
   const min = evals.length ? Number(evals[0].nota_min_apro) : 70;
+  const totalTareas = Object.values(notasTarea).length;
 
   return (
     <div>
@@ -182,58 +238,102 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
           <p style={{fontSize:12,marginTop:6}}>Configure las evaluaciones en Gestión Educativa → Calificaciones.</p>
         </div>
       ) : (
-        <div className="doc-table-wrap" style={{overflowX:"auto"}}>
-          <table className="doc-table">
-            <thead>
-              <tr>
-                <th>Participante</th><th>CI</th>
-                {evals.map(ev => (
-                  <th key={ev.nombre} style={{textAlign:"center"}}>
-                    {ev.nombre}<br/>
-                    <span style={{fontSize:10,color:"#aaa",fontWeight:400}}>{ev.peso}%</span>
-                  </th>
-                ))}
-                <th style={{textAlign:"center"}}>Promedio</th>
-                <th style={{textAlign:"center"}}>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {participantes.map(p => {
-                const pr = prom(p.id);
-                const ap = pr >= min;
-                return (
-                  <tr key={p.id}>
-                    <td className="bold">{p.ap_paterno} {p.ap_materno}, {p.nombre}</td>
-                    <td className="muted">{p.ci}</td>
-                    {evals.map(ev => (
-                      <td key={ev.nombre} style={{textAlign:"center"}}>
-                        <input
-                          type="number" min="0" max="100"
-                          className={`nota-input ${(notas[p.id]?.[ev.nombre] ?? 0) >= min ? "nota-ap" : "nota-rp"}`}
-                          value={notas[p.id]?.[ev.nombre] ?? 0}
-                          onChange={e => setNotas(prev => ({
-                            ...prev,
-                            [p.id]: { ...prev[p.id], [ev.nombre]: Math.min(100, Math.max(0, Number(e.target.value) || 0)) }
-                          }))}
-                        />
+        <>
+          {/* Info sobre cálculo automático */}
+          {evals.some(ev => esTareaEval(ev.nombre)) && (
+            <div style={{
+              display:"flex", alignItems:"center", gap:10,
+              background:"#e3f2fd", border:"1.5px solid #90caf9",
+              borderRadius:10, padding:"10px 16px", marginBottom:16,
+              fontSize:13, color:"#1565c0"
+            }}>
+              <span style={{fontSize:18}}>📊</span>
+              <span>
+                Las columnas <strong>Trabajo / Tarea / Práctica</strong> se calculan automáticamente
+                como promedio de las tareas calificadas ({totalTareas > 0
+                  ? `${totalTareas} cursante${totalTareas>1?"s":""} con tareas calificadas`
+                  : "sin tareas calificadas aún"}).
+              </span>
+            </div>
+          )}
+          <div className="doc-table-wrap" style={{overflowX:"auto"}}>
+            <table className="doc-table">
+              <thead>
+                <tr>
+                  <th>Participante</th><th>CI</th>
+                  {evals.map(ev => (
+                    <th key={ev.nombre} style={{textAlign:"center"}}>
+                      {ev.nombre}
+                      {esTareaEval(ev.nombre) && (
+                        <span title="Calculado desde tareas" style={{marginLeft:4,fontSize:12}}>🔄</span>
+                      )}
+                      <br/>
+                      <span style={{fontSize:10,color:"#aaa",fontWeight:400}}>{ev.peso}%</span>
+                    </th>
+                  ))}
+                  <th style={{textAlign:"center"}}>Promedio</th>
+                  <th style={{textAlign:"center"}}>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {participantes.map(p => {
+                  const pr = prom(p.id);
+                  const ap = pr >= min;
+                  return (
+                    <tr key={p.id}>
+                      <td className="bold">{p.ap_paterno} {p.ap_materno}, {p.nombre}</td>
+                      <td className="muted">{p.ci}</td>
+                      {evals.map(ev => {
+                        const nota = getNotaEval(p.id, ev.nombre);
+                        const esAuto = esTareaEval(ev.nombre);
+                        return (
+                          <td key={ev.nombre} style={{textAlign:"center"}}>
+                            {esAuto ? (
+                              // Columna calculada automáticamente — solo lectura
+                              <div style={{
+                                display:"inline-flex", alignItems:"center", justifyContent:"center",
+                                minWidth:60, padding:"6px 10px",
+                                background: nota >= min ? "#e8f5e9" : "#fff3e0",
+                                border: `2px solid ${nota >= min ? "#a5d6a7" : "#ffcc80"}`,
+                                borderRadius:8, fontWeight:700,
+                                fontFamily:"'IBM Plex Mono',monospace",
+                                color: nota >= min ? "#2e7d32" : "#e65100",
+                                fontSize:14, gap:4
+                              }}>
+                                🔄 {nota.toFixed(1)}
+                              </div>
+                            ) : (
+                              // Columna editable manualmente
+                              <input
+                                type="number" min="0" max="100"
+                                className={`nota-input ${nota >= min ? "nota-ap" : "nota-rp"}`}
+                                value={nota}
+                                onChange={e => setNotas(prev => ({
+                                  ...prev,
+                                  [p.id]: { ...prev[p.id], [ev.nombre]: Math.min(100, Math.max(0, Number(e.target.value) || 0)) }
+                                }))}
+                              />
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td style={{textAlign:"center"}}>
+                        <strong style={{color: ap ? "#2e7d32" : "#c62828", fontFamily:"'IBM Plex Mono',monospace"}}>
+                          {pr.toFixed(1)}
+                        </strong>
                       </td>
-                    ))}
-                    <td style={{textAlign:"center"}}>
-                      <strong style={{color: ap ? "#2e7d32" : "#c62828", fontFamily:"'IBM Plex Mono',monospace"}}>
-                        {pr.toFixed(1)}
-                      </strong>
-                    </td>
-                    <td style={{textAlign:"center"}}>
-                      <span className={`badge ${ap ? "badge-pres" : "badge-aus"}`}>
-                        {ap ? "Aprobado" : "Reprobado"}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      <td style={{textAlign:"center"}}>
+                        <span className={`badge ${ap ? "badge-pres" : "badge-aus"}`}>
+                          {ap ? "Aprobado" : "Reprobado"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
       <div className="vista-footer">
         <button className="btn-primary" onClick={guardar} disabled={saving}>
