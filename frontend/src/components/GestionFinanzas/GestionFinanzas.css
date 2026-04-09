@@ -1,0 +1,108 @@
+/* ═══════════════════════════════════════════════════════════
+   GestionFinanzas.css — EAEN Avaroa
+   ═══════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+
+.gfin-page{min-height:100vh;background:#f0f4f8;font-family:'IBM Plex Sans',sans-serif;display:flex;flex-direction:column;}
+.gfin-header{background:#003366;color:#fff;padding:20px 32px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+.gfin-back{background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.25);color:#fff;padding:8px 16px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;}
+.gfin-back:hover{background:rgba(255,255,255,.22);}
+.gfin-header h1{font-size:22px;font-weight:700;}
+.gfin-header p{font-size:13px;opacity:.7;margin-top:2px;}
+.gfin-main{padding:24px 32px;display:flex;flex-direction:column;gap:18px;}
+
+/* Curso bar */
+.gfin-curso-bar{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;}
+.gfin-form-group{display:flex;flex-direction:column;gap:5px;}
+.gfin-form-group label{font-size:11.5px;font-weight:700;color:#6b7a90;text-transform:uppercase;letter-spacing:.5px;}
+.gfin-form-group input,.gfin-form-group select{padding:9px 13px;border:2px solid #e8ecf2;border-radius:9px;font-size:13.5px;font-family:inherit;color:#1a2535;background:#fff;transition:border-color .2s;}
+.gfin-form-group input:focus,.gfin-form-group select:focus{outline:none;border-color:#003366;}
+.gfin-form-group input:disabled{background:#f5f5f5;color:#aaa;}
+
+/* Buttons */
+.gfin-btn-primary{padding:10px 22px;border-radius:9px;background:#ff6600;color:#fff;border:none;font-size:13.5px;font-weight:700;cursor:pointer;transition:all .18s;font-family:inherit;}
+.gfin-btn-primary:hover{background:#e65c00;transform:translateY(-1px);}
+.gfin-btn-primary:disabled{opacity:.55;cursor:not-allowed;transform:none;}
+.gfin-btn-ghost{padding:10px 20px;border-radius:9px;background:transparent;color:#5a6a80;border:2px solid #e8ecf2;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;}
+.gfin-btn-ghost:hover{border-color:#003366;color:#003366;}
+
+/* Stats */
+.gfin-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+.gfin-stat{border-radius:14px;padding:18px 20px;display:flex;align-items:center;gap:14px;color:#fff;box-shadow:0 2px 12px rgba(0,0,0,.1);}
+.gfin-stat-icon{font-size:28px;}
+.gfin-stat-val{font-size:26px;font-weight:700;font-family:'IBM Plex Mono',monospace;line-height:1;}
+.gfin-stat-lbl{font-size:11px;opacity:.8;text-transform:uppercase;letter-spacing:.5px;margin-top:3px;}
+.s-green{background:linear-gradient(135deg,#1b5e20,#2e7d32);}
+.s-red  {background:linear-gradient(135deg,#b71c1c,#e53935);}
+.s-orange{background:linear-gradient(135deg,#e65c00,#ff6600);}
+.s-blue {background:linear-gradient(135deg,#003366,#0055aa);}
+
+/* Card */
+.gfin-card{background:#fff;border-radius:16px;box-shadow:0 2px 16px rgba(0,51,102,.07);overflow:hidden;}
+.gfin-card-header{display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:2px solid #f0f4f8;background:#fafbff;flex-wrap:wrap;}
+.gfin-card-header h2{font-size:15px;font-weight:700;color:#003366;flex:1;}
+
+/* Filtros */
+.gfin-filter-btn{padding:5px 13px;border-radius:20px;border:2px solid #e8ecf2;background:#fff;font-size:12px;font-weight:600;cursor:pointer;color:#5a6a80;transition:all .18s;font-family:inherit;}
+.gfin-filter-btn:hover{border-color:#003366;color:#003366;}
+.gfin-filter-btn.active{background:#003366;color:#fff;border-color:#003366;}
+
+/* Search */
+.gfin-search{padding:8px 14px;border:2px solid #e8ecf2;border-radius:9px;font-size:13px;font-family:inherit;color:#1a2535;width:220px;}
+.gfin-search:focus{outline:none;border-color:#003366;}
+
+/* Conceptos */
+.gfin-conceptos-list{padding:14px 18px;display:flex;flex-direction:column;gap:8px;}
+.gfin-concepto-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:10px;border-left:4px solid;}
+
+/* Tabla */
+.gfin-tabla-wrap{overflow-x:auto;}
+.gfin-tabla{width:100%;border-collapse:collapse;font-size:13px;}
+.gfin-tabla th{padding:10px 12px;background:#f7f9fc;font-size:10.5px;font-weight:700;letter-spacing:.5px;color:#6b7a90;text-transform:uppercase;border-bottom:2px solid #eef2f7;text-align:left;white-space:nowrap;}
+.gfin-tabla td{padding:11px 12px;border-bottom:1px solid #f0f4f8;vertical-align:middle;}
+.gfin-tabla tr:last-child td{border-bottom:none;}
+.gfin-tabla tr:hover td{background:#fafbff;}
+.gfin-tabla tr.tr-mora td{background:#fff5f5 !important;}
+.gfin-bold{font-weight:600;color:#1a2535;}
+.gfin-muted{color:#8898aa;font-size:12px;}
+
+/* Botón de estado de pago */
+.gfin-pago-btn{padding:5px 10px;border-radius:8px;border:none;font-size:11.5px;font-weight:700;cursor:pointer;transition:all .18s;font-family:inherit;white-space:nowrap;}
+.gfin-pago-btn:hover{filter:brightness(.9);transform:scale(1.03);}
+
+/* Badges */
+.gfin-badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:20px;font-size:11.5px;font-weight:700;}
+.gfin-badge.mora{background:#ffebee;color:#c62828;}
+.gfin-badge.ok{background:#e8f5e9;color:#2e7d32;}
+.gfin-badge.pend{background:#fff8e1;color:#f57f17;}
+
+/* Empty/Spinner */
+.gfin-empty{text-align:center;padding:60px;color:#8898aa;display:flex;flex-direction:column;align-items:center;gap:12px;}
+.gfin-empty div{font-size:44px;opacity:.3;}
+.gfin-empty p{font-size:14px;}
+.gfin-spinner{display:flex;justify-content:center;padding:50px;}
+.gfin-ring{width:34px;height:34px;border:3px solid #e8ecf2;border-top-color:#003366;border-radius:50%;animation:gfin-spin .7s linear infinite;}
+@keyframes gfin-spin{to{transform:rotate(360deg);}}
+
+/* ── Modal ──────────────────────────────────────────────── */
+.gfin-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:2000;padding:20px;backdrop-filter:blur(4px);}
+.gfin-modal{background:#fff;border-radius:18px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);display:flex;flex-direction:column;}
+.gfin-modal-header{display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:2px solid #f0f4f8;position:sticky;top:0;background:#fff;z-index:1;}
+.gfin-modal-title{font-size:16px;font-weight:700;color:#003366;}
+.gfin-close{background:none;border:none;font-size:18px;cursor:pointer;color:#aaa;padding:4px 8px;border-radius:6px;}
+.gfin-close:hover{background:#f0f4f8;color:#1a2535;}
+.gfin-modal-body{padding:20px 22px;flex:1;}
+.gfin-modal-footer{display:flex;gap:10px;padding:14px 22px;border-top:2px solid #f0f4f8;background:#fafbff;position:sticky;bottom:0;}
+
+.gfin-form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+.gfin-tipo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
+.gfin-tipo-card{border:2.5px solid #e8ecf2;border-radius:12px;padding:14px;cursor:pointer;text-align:center;transition:all .2s;}
+.gfin-tipo-card:hover{border-color:#003366;}
+.gfin-tipo-card.selected{box-shadow:0 0 0 3px rgba(0,51,102,.12);}
+.gfin-error{background:#fff0f0;border:1.5px solid #ef9a9a;color:#c62828;padding:10px 14px;border-radius:9px;font-size:13px;font-weight:600;margin-top:8px;}
+
+/* Toast */
+.gfin-toast{position:fixed;bottom:28px;right:28px;background:#1b5e20;color:#fff;padding:13px 22px;border-radius:12px;font-weight:700;font-size:14px;box-shadow:0 8px 28px rgba(0,0,0,.18);z-index:9999;animation:gfin-tin .3s cubic-bezier(.34,1.2,.64,1);}
+.gfin-toast-error{background:#b71c1c;}
+@keyframes gfin-tin{from{opacity:0;transform:translateY(16px) scale(.95)}to{opacity:1;transform:none}}

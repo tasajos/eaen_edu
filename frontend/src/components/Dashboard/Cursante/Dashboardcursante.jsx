@@ -8,6 +8,7 @@ import EvaluacionInstitucional from "../../EvaluacionInstitucional/EvaluacionIns
 import "../../EvaluacionInstitucional/EvaluacionInstitucional.css";
 import VistaCalendario from "../../Shared/VistaCalendario";
 import "../../Shared/VistaCalendario.css";
+import ModalBloqueoFinanciero from "../../Shared/ModalBloqueoFinanciero";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 function getSession() {
@@ -203,7 +204,9 @@ export default function DashboardCursante() {
   const [asist,     setAsist]     = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [vista,     setVista]     = useState("tareas");
-  const [toast,     setToast]     = useState(null);
+  const [toast,           setToast]           = useState(null);
+  const [bloqueoFin,      setBloqueoFin]      = useState(null);   // null | {deudas, totalDeuda}
+  const [checkingFin,     setCheckingFin]     = useState(true);   // true mientras verifica finanzas
 
   const { notifs, noLeidas, loading: loadingNotifs, marcarLeida, marcarTodasLeidas } = useNotificaciones(30);
 
@@ -214,6 +217,12 @@ export default function DashboardCursante() {
 
   useEffect(() => {
     if (!session) { navigate("/"); return; }
+    // Verificar bloqueo financiero PRIMERO antes de cargar el resto
+    fetch(`${API}/api/finanzas/estado/${session.id}`)
+      .then(r=>r.json())
+      .then(d=>{ if(d.bloqueado) setBloqueoFin({deudas:d.deudas,totalDeuda:d.total_deuda}); })
+      .catch(()=>{})
+      .finally(()=>setCheckingFin(false));
     fetch(`${API}/api/cursos`)
       .then(r => r.json())
       .then(async all => {
@@ -336,7 +345,7 @@ export default function DashboardCursante() {
           </div>
         </header>
 
-        {loading ? <Spinner/> : (<>
+        {(loading || checkingFin) ? <Spinner/> : (<>
           <div className="cur-stats">
             <div className="cur-stat blue"><span>🎓</span><div><div className="st-val">{cursos.length}</div><div className="st-lbl">Cursos</div></div></div>
             <div className="cur-stat orange"><span>📚</span><div><div className="st-val">{materias.length}</div><div className="st-lbl">Materias</div></div></div>
@@ -482,6 +491,11 @@ export default function DashboardCursante() {
       </main>
 
       {/* Toast */}
+      {/* Modal bloqueo financiero */}
+      {bloqueoFin && (
+        <ModalBloqueoFinanciero deudas={bloqueoFin.deudas} totalDeuda={bloqueoFin.totalDeuda}/>
+      )}
+
       {toast && (
         <div className={`cur-toast ${toast.type === "error" ? "toast-error" : ""}`}>
           {toast.msg}

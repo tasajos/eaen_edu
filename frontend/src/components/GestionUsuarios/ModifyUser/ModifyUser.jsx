@@ -70,6 +70,17 @@ const USER_TYPES = [
   "Docente",
 ];
 
+// ✅ Roles del sistema (incluye ADMIN_FINANZAS)
+const ROL_OPTIONS = [
+  ["", "— Sin rol especial —"],
+  ["ADMIN",          "🔧 ADMIN"],
+  ["JEFE_ESTUDIOS",  "🎓 JEFE_ESTUDIOS"],
+  ["DOCENTE",        "👨‍🏫 DOCENTE"],
+  ["JEFE_CURSO",     "📚 JEFE_CURSO"],
+  ["CURSANTE",       "🎒 CURSANTE"],
+  ["ADMIN_FINANZAS", "💰 ADMIN_FINANZAS"],
+];
+
 const blankUser = {
   id: "",
   tipo_usuario: "",
@@ -173,9 +184,25 @@ export default function ModifyUser({ onBack }) {
     setSaving(false);
   };
 
+  // Mapa: rol -> tipo_usuario equivalente
+  const ROL_TO_TIPO = {
+    "ADMIN":           "Administrador",
+    "JEFE_ESTUDIOS":   "Jefe de Unidad o Director",
+    "DOCENTE":         "Docente",
+    "JEFE_CURSO":      "Jefe de Carrera",
+    "CURSANTE":        "Cursante",
+    "ADMIN_FINANZAS":  "Administrador",
+  };
+
   const onEditChange = (e) => {
     const { name, value } = e.target;
-    setEditUser((prev) => ({ ...prev, [name]: value }));
+    if (name === "rol") {
+      // Sincronizar tipo_usuario automáticamente según el rol
+      const tipoAuto = ROL_TO_TIPO[value] || "";
+      setEditUser((prev) => ({ ...prev, rol: value, tipo_usuario: tipoAuto }));
+    } else {
+      setEditUser((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   // ✅ BUSCAR REAL: coincidencia exacta con CI
@@ -388,16 +415,63 @@ export default function ModifyUser({ onBack }) {
 
             <form onSubmit={handleSave} className="eaen-form">
               <div className="eaen-form-grid">
-                <FieldSelect
-                  label="Tipo de Usuario"
-                  name="tipo_usuario"
-                  value={editUser.tipo_usuario}
-                  onChange={onEditChange}
-                  options={[
-                    ["", "Seleccione..."],
-                    ...USER_TYPES.map((x) => [x, x]),
-                  ]}
-                />
+                {/* ✅ Rol del Sistema — controla acceso al dashboard */}
+                <div className="eaen-form-group">
+                  <label htmlFor="rol" style={{ color: "#003366", fontWeight: 700 }}>
+                    🔐 Rol del Sistema:
+                  </label>
+                  <select
+                    id="rol"
+                    name="rol"
+                    value={editUser.rol || ""}
+                    onChange={onEditChange}
+                    style={{
+                      border: editUser.rol === "ADMIN_FINANZAS"
+                        ? "2px solid #ff6600"
+                        : "2px solid #003366",
+                      background: editUser.rol === "ADMIN_FINANZAS"
+                        ? "#fff8f0"
+                        : "#f0f4ff",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {ROL_OPTIONS.map(([val, text]) => (
+                      <option key={val} value={val}>{text}</option>
+                    ))}
+                  </select>
+                  <span style={{
+                    fontSize: 10.5, color: "#8898aa", marginTop: 3, display: "block",
+                    fontStyle: "italic"
+                  }}>
+                    ⚠️ Determina a qué panel accede al iniciar sesión.
+                    Distinto del Tipo de Usuario.
+                  </span>
+                  {editUser.rol === "ADMIN_FINANZAS" && (
+                    <span style={{ fontSize: 11, color: "#e65100", marginTop: 2, display: "block", fontWeight: 700 }}>
+                      💰 Accederá al panel de Gestión de Finanzas
+                    </span>
+                  )}
+                  {editUser.rol === "JEFE_ESTUDIOS" && (
+                    <span style={{ fontSize: 11, color: "#1565c0", marginTop: 2, display: "block", fontWeight: 700 }}>
+                      🎓 Accederá al panel de Jefe de Estudios
+                    </span>
+                  )}
+                  {editUser.rol === "DOCENTE" && (
+                    <span style={{ fontSize: 11, color: "#2e7d32", marginTop: 2, display: "block", fontWeight: 700 }}>
+                      👨‍🏫 Accederá al panel del Docente
+                    </span>
+                  )}
+                  {editUser.rol === "JEFE_CURSO" && (
+                    <span style={{ fontSize: 11, color: "#6a1b9a", marginTop: 2, display: "block", fontWeight: 700 }}>
+                      📚 Accederá al panel de Jefe de Curso
+                    </span>
+                  )}
+                  {editUser.rol === "CURSANTE" && (
+                    <span style={{ fontSize: 11, color: "#c62828", marginTop: 2, display: "block", fontWeight: 700 }}>
+                      🎒 Accederá al dashboard del Cursante
+                    </span>
+                  )}
+                </div>
 
                 {/* ✅ Igual que Addusers */}
                 <FieldSelect

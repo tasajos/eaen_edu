@@ -1351,6 +1351,206 @@ app.put("/api/horarios/:id", async (req,res) => {
   }
 });
 
+
+// ════════════════════════════════════════════════════════════
+// FINANZAS
+// ════════════════════════════════════════════════════════════
+
+/** GET /api/finanzas/conceptos?curso_id=X */
+app.get("/api/finanzas/conceptos", async (req,res) => {
+  try {
+    const {curso_id} = req.query;
+    if(!curso_id) return res.status(400).json({message:"curso_id requerido"});
+    const [rows] = await pool.execute(
+      `SELECT * FROM finanzas_conceptos WHERE curso_id=? AND activo=1
+       ORDER BY FIELD(tipo,'MATRICULA','GUIA','MENSUALIDAD'), mes ASC, anio ASC`,
+      [Number(curso_id)]);
+    res.json(rows);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/** POST /api/finanzas/conceptos — Crear concepto */
+app.post("/api/finanzas/conceptos", async (req,res) => {
+  try {
+    const {curso_id,tipo,descripcion,monto,fecha_venc,mes,anio,creado_por} = req.body;
+    if(!curso_id) return res.status(400).json({message:"curso_id requerido"});
+    if(!["MATRICULA","GUIA","MENSUALIDAD","OTRO"].includes(tipo))
+      return res.status(400).json({message:"tipo inválido"});
+    if(!monto || Number(monto)<=0) return res.status(400).json({message:"monto debe ser mayor a 0"});
+
+    const [r] = await pool.execute(
+      `INSERT INTO finanzas_conceptos (curso_id,tipo,descripcion,monto,fecha_venc,mes,anio,creado_por)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [curso_id,tipo,descripcion||null,Number(monto),fecha_venc||null,
+       mes?Number(mes):null, anio?Number(anio):null, creado_por||null]);
+
+    // Auto-generar registros PENDIENTE para todos los participantes del curso
+    const [parts] = await pool.execute(
+      `SELECT usuario_id FROM curso_participantes WHERE curso_id=?`,[curso_id]);
+    if(parts.length){
+      const vals = parts.map(()=>"(?,?,?,'PENDIENTE')").join(",");
+      await pool.execute(
+        `INSERT IGNORE INTO finanzas_pagos (concepto_id,usuario_id,curso_id,estado) VALUES ${vals}`,
+        parts.flatMap(p=>[r.insertId, p.usuario_id, curso_id]));
+    }
+    res.status(201).json({message:"Concepto creado",id:r.insertId,pagos_generados:parts.length});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/** DELETE /api/finanzas/conceptos/:id */
+app.delete("/api/finanzas/conceptos/:id", async (req,res) => {
+  try {
+    const [r] = await pool.execute(
+      `UPDATE finanzas_conceptos SET activo=0 WHERE id=? LIMIT 1`,[req.params.id]);
+    if(!r.affectedRows) return res.status(404).json({message:"No encontrado"});
+    res.json({message:"Concepto eliminado"});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/**
+ * GET /api/finanzas/pagos?curso_id=X
+ * Retorna resumen de pagos de todos los participantes del curso
+ */
+app.get("/api/finanzas/pagos", async (req,res) => {
+  try {
+    const {curso_id} = req.query;
+    if(!curso_id) return res.status(400).json({message:"curso_id requerido"});
+
+    const [participantes] = await pool.execute(
+      `SELECT u.id,u.nombre,u.ap_paterno,u.ap_materno,u.ci,u.grado
+       FROM curso_participantes cp
+       JOIN usuarios u ON u.id=cp.usuario_id
+       WHERE cp.curso_id=? ORDER BY u.ap_paterno,u.ap_materno`,
+      [Number(curso_id)]);
+
+    const [conceptos] = await pool.execute(
+      `SELECT * FROM finanzas_conceptos WHERE curso_id=? AND activo=1
+       ORDER BY FIELD(tipo,'MATRICULA','GUIA','MENSUALIDAD','OTRO'),mes,anio`,
+      [Number(curso_id)]);
+
+    const [pagos] = await pool.execute(
+      `SELECT fp.*,fc.tipo,fc.descripcion,fc.monto AS monto_concepto,fc.mes,fc.anio,fc.fecha_venc
+       FROM finanzas_pagos fp
+       JOIN finanzas_conceptos fc ON fc.id=fp.concepto_id
+       WHERE fp.curso_id=?`, [Number(curso_id)]);
+
+    // Construir mapa de pagos por usuario
+    const pagoMap = {};
+    for(const p of pagos){
+      if(!pagoMap[p.usuario_id]) pagoMap[p.usuario_id] = {};
+      pagoMap[p.usuario_id][p.concepto_id] = p;
+    }
+
+    const resultado = participantes.map(u => ({
+      ...u,
+      pagos: conceptos.map(c => ({
+        concepto_id: c.id,
+        tipo: c.tipo,
+        descripcion: c.descripcion,
+        monto: c.monto,
+        mes: c.mes,
+        anio: c.anio,
+        fecha_venc: c.fecha_venc,
+        ...(pagoMap[u.id]?.[c.id] || {estado:"PENDIENTE",monto_pagado:null,fecha_pago:null,comprobante:null})
+      }))
+    }));
+
+    res.json({conceptos, participantes: resultado});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/**
+ * PATCH /api/finanzas/pagos/:conceptoId/:usuarioId
+ * Registrar pago o cambiar estado
+ */
+app.patch("/api/finanzas/pagos/:conceptoId/:usuarioId", async (req,res) => {
+  try {
+    const {conceptoId, usuarioId} = req.params;
+    const {estado,monto_pagado,fecha_pago,comprobante,observacion,registrado_por} = req.body;
+
+    if(!["PENDIENTE","PAGADO","EXONERADO","MORA"].includes(estado))
+      return res.status(400).json({message:"estado inválido"});
+
+    const [[concepto]] = await pool.execute(
+      `SELECT curso_id FROM finanzas_conceptos WHERE id=? LIMIT 1`,[conceptoId]);
+    if(!concepto) return res.status(404).json({message:"Concepto no encontrado"});
+
+    await pool.execute(
+      `INSERT INTO finanzas_pagos (concepto_id,usuario_id,curso_id,estado,monto_pagado,fecha_pago,comprobante,observacion,registrado_por)
+       VALUES (?,?,?,?,?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE estado=VALUES(estado),monto_pagado=VALUES(monto_pagado),
+         fecha_pago=VALUES(fecha_pago),comprobante=VALUES(comprobante),
+         observacion=VALUES(observacion),registrado_por=VALUES(registrado_por)`,
+      [conceptoId,usuarioId,concepto.curso_id,estado,
+       monto_pagado?Number(monto_pagado):null, fecha_pago||null,
+       comprobante||null, observacion||null, registrado_por||null]);
+
+    res.json({message:"Pago actualizado"});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/**
+ * GET /api/finanzas/estado/:usuarioId
+ * Verifica si el cursante tiene pagos en MORA que bloqueen su acceso
+ */
+app.get("/api/finanzas/estado/:usuarioId", async (req,res) => {
+  try {
+    const uid = Number(req.params.usuarioId);
+
+    // Buscar mensualidades en MORA o vencidas sin pagar
+    const hoy = new Date().toISOString().slice(0,10);
+
+    // 1. Cualquier pago marcado explícitamente como MORA (cualquier tipo)
+    const [mora] = await pool.execute(
+      `SELECT fp.id, fc.descripcion, fc.tipo, fc.mes, fc.anio, fc.fecha_venc, fc.monto,
+              fp.estado, c.nombre AS curso_nombre
+       FROM finanzas_pagos fp
+       JOIN finanzas_conceptos fc ON fc.id=fp.concepto_id
+       JOIN cursos c ON c.id=fp.curso_id
+       WHERE fp.usuario_id=? AND fp.estado='MORA' AND fc.activo=1`,
+      [uid]);
+
+    // 2. Mensualidades PENDIENTES con fecha_venc vencida más de 30 días
+    const [vencidas] = await pool.execute(
+      `SELECT fp.id, fc.descripcion, fc.tipo, fc.mes, fc.anio, fc.fecha_venc, fc.monto,
+              fp.estado, c.nombre AS curso_nombre
+       FROM finanzas_pagos fp
+       JOIN finanzas_conceptos fc ON fc.id=fp.concepto_id
+       JOIN cursos c ON c.id=fp.curso_id
+       WHERE fp.usuario_id=? AND fp.estado='PENDIENTE'
+         AND fc.tipo='MENSUALIDAD' AND fc.activo=1
+         AND fc.fecha_venc IS NOT NULL
+         AND DATEDIFF(?, fc.fecha_venc) > 30`,
+      [uid, hoy]);
+
+    const bloqueado = mora.length > 0 || vencidas.length > 0;
+    const deudas = [...mora, ...vencidas];
+
+    res.json({bloqueado, deudas, total_deuda: deudas.reduce((s,d)=>s+Number(d.monto),0)});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/**
+ * GET /api/finanzas/resumen/:usuarioId
+ * Resumen financiero del cursante
+ */
+app.get("/api/finanzas/resumen/:usuarioId", async (req,res) => {
+  try {
+    const uid = Number(req.params.usuarioId);
+    const [rows] = await pool.execute(
+      `SELECT fp.estado, fc.tipo, fc.descripcion, fc.monto, fc.mes, fc.anio,
+              fc.fecha_venc, fp.monto_pagado, fp.fecha_pago, fp.comprobante,
+              c.nombre AS curso_nombre
+       FROM finanzas_pagos fp
+       JOIN finanzas_conceptos fc ON fc.id=fp.concepto_id
+       JOIN cursos c ON c.id=fp.curso_id
+       WHERE fp.usuario_id=? AND fc.activo=1
+       ORDER BY FIELD(fc.tipo,'MATRICULA','GUIA','MENSUALIDAD'),fc.anio,fc.mes`,
+      [uid]);
+    res.json(rows);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
 // ════════════════════════════════════════════════════════════
 // NOTIFICACIONES
 // ════════════════════════════════════════════════════════════

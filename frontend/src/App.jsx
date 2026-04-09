@@ -5,6 +5,7 @@ import GestionUsuarios      from "./components/GestionUsuarios/GestionUsuarios";
 import GestionCursos        from "./components/GestionCursos/GestionCursos";
 import GestionNotificaciones from "./components/GestionNotificaciones/GestionNotificaciones";
 import GestionEvaluaciones from "./components/GestionEvaluaciones/GestionEvaluaciones";
+import GestionFinanzas     from "./components/GestionFinanzas/GestionFinanzas";
 import GestionEducativa     from "./components/GestionEducativa/GestionEducativa";
 import DashboardDocente     from "./components/Dashboard/Docente/Dashboarddocente";
 import DashboardCursante    from "./components/Dashboard/Cursante/Dashboardcursante";
@@ -25,6 +26,7 @@ function getRolDashboard(session) {
   if (rol  === "ADMIN")             return "/dashboard-jefe";
   if (rol  === "DOCENTE")           return "/dashboard-docente";
   if (rol  === "JEFE_CURSO")        return "/dashboard-jefe-curso";
+  if (rol  === "ADMIN_FINANZAS")    return "/gestion-finanzas";
   return "/dashboard-jefe"; // fallback para admins
 }
 
@@ -39,6 +41,7 @@ function PrivateRoute({ children, rolesPermitidos }) {
     const tiene = rolesPermitidos.some(r => {
       if (r === "CURSANTE"       && tipo === "Cursante")    return true;
       if (r === "JEFE_ESTUDIOS"  && (rol === "JEFE_ESTUDIOS" || rol === "ADMIN")) return true;
+      if (r === "ADMIN_FINANZAS" && rol === "ADMIN_FINANZAS") return true;
       if (r === rol) return true;
       return false;
     });
@@ -84,6 +87,11 @@ export default function App() {
         <Route path="/gestion-notificaciones" element={
           <PrivateRoute rolesPermitidos={["JEFE_ESTUDIOS","ADMIN"]}>
             <GestionNotificaciones />
+          </PrivateRoute>
+        }/>
+        <Route path="/gestion-finanzas" element={
+          <PrivateRoute rolesPermitidos={["ADMIN","JEFE_ESTUDIOS","ADMIN_FINANZAS"]}>
+            <GestionFinanzas/>
           </PrivateRoute>
         }/>
         <Route path="/gestion-evaluaciones" element={
