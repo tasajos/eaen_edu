@@ -8,6 +8,8 @@ import EvaluacionInstitucional from "../../EvaluacionInstitucional/EvaluacionIns
 import "../../EvaluacionInstitucional/EvaluacionInstitucional.css";
 import VistaCalendario from "../../Shared/VistaCalendario";
 import "../../Shared/VistaCalendario.css";
+import VistaPagos from "../../Shared/VistaPagos";
+import "../../Shared/VistaPagos.css";
 import ModalBloqueoFinanciero from "../../Shared/ModalBloqueoFinanciero";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -287,6 +289,7 @@ export default function DashboardCursante() {
     { id:"notas",         icon:"📊", label:"Mis notas" },
     { id:"asistencia",    icon:"📋", label:"Asistencia" },
     { id:"calendario",    icon:"📅", label:"Calendario" },
+    { id:"pagos",         icon:"💰", label:"Pagos" },
     { id:"notificaciones",icon:"🔔", label:"Notificaciones" },
   ];
 
@@ -416,6 +419,11 @@ export default function DashboardCursante() {
                         titulo="Mi Calendario de Clases"
                         modoDocente={false}
                       />
+                    )}
+
+                    {/* PAGOS */}
+                    {vista === "pagos" && (
+                      <VistaPagos session={session}/>
                     )}
 
                     {/* TAREAS */}
