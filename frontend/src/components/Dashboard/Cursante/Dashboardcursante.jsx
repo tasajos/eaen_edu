@@ -6,6 +6,8 @@ import "../../Shared/NotificacionesPanel.css";
 import "./DashboardCursante.css";
 import EvaluacionInstitucional from "../../EvaluacionInstitucional/EvaluacionInstitucional";
 import "../../EvaluacionInstitucional/EvaluacionInstitucional.css";
+import VistaCalendario from "../../Shared/VistaCalendario";
+import "../../Shared/VistaCalendario.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 function getSession() {
@@ -275,6 +277,7 @@ export default function DashboardCursante() {
     { id:"tareas",        icon:"📤", label:"Tareas" },
     { id:"notas",         icon:"📊", label:"Mis notas" },
     { id:"asistencia",    icon:"📋", label:"Asistencia" },
+    { id:"calendario",    icon:"📅", label:"Calendario" },
     { id:"notificaciones",icon:"🔔", label:"Notificaciones" },
   ];
 
@@ -395,6 +398,15 @@ export default function DashboardCursante() {
                     {/* EVALUACIONES */}
                     {vista === "evaluaciones" && (
                       <EvaluacionInstitucional usuarioId={session?.id}/>
+                    )}
+
+                    {/* CALENDARIO */}
+                    {vista === "calendario" && (
+                      <VistaCalendario
+                        cursos={cursos}
+                        titulo="Mi Calendario de Clases"
+                        modoDocente={false}
+                      />
                     )}
 
                     {/* TAREAS */}

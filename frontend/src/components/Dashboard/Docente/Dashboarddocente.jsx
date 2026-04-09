@@ -4,6 +4,8 @@ import { useNotificaciones } from "../../../hooks/useNotificaciones";
 import { NotificacionesPanel, NotifBell } from "../../Shared/NotificacionesPanel";
 import "../../Shared/NotificacionesPanel.css";
 import "./DashboardDocente.css";
+import VistaCalendario from "../../Shared/VistaCalendario";
+import "../../Shared/VistaCalendario.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -737,6 +739,7 @@ export default function DashboardDocente() {
   const session  = getSession();
 
   const [materias,      setMaterias]      = useState([]);
+  const [todosLosCursos, setTodosLosCursos] = useState([]);
   const [materiaId,     setMateriaId]     = useState(null);
   const [participantes, setParticipantes] = useState([]);
   const [loading,       setLoading]       = useState(true);
@@ -755,6 +758,7 @@ export default function DashboardDocente() {
       .then(r => r.json())
       .then(async cursos => {
         if (!Array.isArray(cursos)) return;
+        setTodosLosCursos(cursos);  // guardar todos para el calendario
         const todas = [];
         for (const c of cursos) {
           const mr = await fetch(`${API}/api/cursos/${c.id}/materias`);
@@ -793,6 +797,7 @@ export default function DashboardDocente() {
     { id:"asistencia",     icon:"📋", label:"Asistencia" },
     { id:"calificaciones", icon:"📊", label:"Calificaciones" },
     { id:"tareas",         icon:"📤", label:"Tareas" },
+    { id:"calendario",     icon:"📅", label:"Calendario" },
     { id:"notificaciones", icon:"🔔", label:"Notificaciones" },
   ];
 
@@ -907,6 +912,13 @@ export default function DashboardDocente() {
                     {materia && vista === "asistencia"     && <VistaAsistencia     materia={materia} participantes={participantes} showToast={showToast}/>}
                     {materia && vista === "calificaciones" && <VistaCalificaciones materia={materia} participantes={participantes} showToast={showToast}/>}
                     {materia && vista === "tareas"         && <VistaTareas         materia={materia} participantes={participantes} showToast={showToast}/>}
+                    {vista === "calendario" && (
+                      <VistaCalendario
+                        cursos={todosLosCursos}
+                        titulo="Calendario de Clases — Todos los Cursos"
+                        modoDocente={true}
+                      />
+                    )}
                   </div>
                 </div>
           )}

@@ -961,6 +961,9 @@ app.delete("/api/tareas/:id", async (req,res) => {
 
 
 
+
+// ════════════════════════════════════════════════════════════
+
 // ════════════════════════════════════════════════════════════
 // EVALUACIONES INSTITUCIONALES
 // ════════════════════════════════════════════════════════════
@@ -1029,12 +1032,10 @@ app.patch("/api/eval-inst/periodos/:id/toggle", async (req,res) => {
 
 /**
  * GET /api/eval-inst/pendientes/:usuarioId
- * Cursante: evaluaciones pendientes que debe completar
  */
 app.get("/api/eval-inst/pendientes/:usuarioId", async (req,res) => {
   try {
     const uid = Number(req.params.usuarioId);
-    // Periodos habilitados donde el cursante participa
     const [periodos] = await pool.execute(
       `SELECT p.*, pl.titulo AS plantilla_titulo, pl.tipo,
               c.nombre AS curso_nombre, m.nombre AS materia_nombre
@@ -1045,12 +1046,9 @@ app.get("/api/eval-inst/pendientes/:usuarioId", async (req,res) => {
        JOIN curso_participantes cp ON cp.curso_id=p.curso_id AND cp.usuario_id=?
        WHERE p.habilitado=1
        ORDER BY p.creado_en DESC`, [uid]);
-
-    // Para cada periodo, ver si ya completó
     const result = [];
     for(const per of periodos){
       if(per.tipo === 'CURSANTE_A_CURSANTE'){
-        // Debe evaluar a cada compañero del curso (excepto sí mismo)
         const [pares] = await pool.execute(
           `SELECT u.id,u.nombre,u.ap_paterno,u.ap_materno,u.grado,u.ci
            FROM curso_participantes cp
@@ -1066,7 +1064,6 @@ app.get("/api/eval-inst/pendientes/:usuarioId", async (req,res) => {
         }
         if(pendientes.length) result.push({...per, pendientes, total_pares:pares.length});
       } else {
-        // CURSANTE_A_DOCENTE — evalúa al docente de la materia
         const [ex] = await pool.execute(
           `SELECT id,completada FROM eval_inst_respuestas WHERE periodo_id=? AND evaluador_id=? LIMIT 1`,
           [per.id, uid]);
@@ -1079,8 +1076,6 @@ app.get("/api/eval-inst/pendientes/:usuarioId", async (req,res) => {
 
 /**
  * POST /api/eval-inst/responder
- * Cursante envía su evaluación
- * body: { periodo_id, evaluador_id, evaluado_id?, valoraciones:[{indicador_id,valor}], observaciones? }
  */
 app.post("/api/eval-inst/responder", async (req,res) => {
   const conn = await pool.getConnection();
@@ -1088,16 +1083,12 @@ app.post("/api/eval-inst/responder", async (req,res) => {
     const {periodo_id,evaluador_id,evaluado_id,valoraciones,observaciones} = req.body;
     if(!periodo_id||!evaluador_id||!Array.isArray(valoraciones)||!valoraciones.length)
       return res.status(400).json({message:"Datos incompletos"});
-
     await conn.beginTransaction();
-
-    // Upsert respuesta
     await conn.execute(
       `INSERT INTO eval_inst_respuestas (periodo_id,evaluador_id,evaluado_id,completada,enviado_en)
        VALUES (?,?,?,1,NOW())
        ON DUPLICATE KEY UPDATE completada=1,enviado_en=NOW()`,
       [periodo_id,evaluador_id,evaluado_id||null]);
-
     let resp;
     if(evaluado_id){
       const [[r2]] = await conn.execute(
@@ -1110,8 +1101,6 @@ app.post("/api/eval-inst/responder", async (req,res) => {
         [periodo_id, evaluador_id]);
       resp = r2;
     }
-
-    // Guardar valoraciones
     for(const v of valoraciones){
       await conn.execute(
         `INSERT INTO eval_inst_valoraciones (respuesta_id,indicador_id,valor)
@@ -1126,30 +1115,19 @@ app.post("/api/eval-inst/responder", async (req,res) => {
   } finally { conn.release(); }
 });
 
-
-/**
- * GET /api/eval-inst/periodos/:id/resultados-cursantes
- * Jefe: para evaluaciones CURSANTE_A_CURSANTE, devuelve promedio por cursante evaluado
- */
+/** GET /api/eval-inst/periodos/:id/resultados-cursantes */
 app.get("/api/eval-inst/periodos/:id/resultados-cursantes", async (req,res) => {
   try {
     const pid = Number(req.params.id);
-
-    // Info del periodo
     const [[periodo]] = await pool.execute(
       `SELECT p.*,pl.tipo FROM eval_inst_periodos p
        JOIN eval_inst_plantillas pl ON pl.id=p.plantilla_id WHERE p.id=? LIMIT 1`,[pid]);
     if(!periodo) return res.status(404).json({message:"Periodo no encontrado"});
-
-    // Cursantes del curso
     const [cursantes] = await pool.execute(
       `SELECT u.id,u.nombre,u.ap_paterno,u.ap_materno,u.grado,u.ci
        FROM curso_participantes cp
        JOIN usuarios u ON u.id=cp.usuario_id
-       WHERE cp.curso_id=?
-       ORDER BY u.ap_paterno,u.ap_materno`, [periodo.curso_id]);
-
-    // Para cada cursante, calcular promedio de valoraciones recibidas
+       WHERE cp.curso_id=? ORDER BY u.ap_paterno,u.ap_materno`, [periodo.curso_id]);
     const resultados = [];
     for(const cur of cursantes){
       const [vals] = await pool.execute(
@@ -1160,31 +1138,18 @@ app.get("/api/eval-inst/periodos/:id/resultados-cursantes", async (req,res) => {
          WHERE r.periodo_id=? AND r.evaluado_id=? AND r.completada=1
          GROUP BY i.id ORDER BY i.orden`,
         [pid, cur.id]);
-
       const promGeneral = vals.length
-        ? Math.round(vals.reduce((a,v)=>a+Number(v.promedio),0)/vals.length)
-        : null;
-
+        ? Math.round(vals.reduce((a,v)=>a+Number(v.promedio),0)/vals.length) : null;
       const [evCount] = await pool.execute(
         `SELECT COUNT(*) AS total FROM eval_inst_respuestas
          WHERE periodo_id=? AND evaluado_id=? AND completada=1`,[pid,cur.id]);
-
-      resultados.push({
-        ...cur,
-        promedio_general: promGeneral,
-        evaluadores: evCount[0].total,
-        indicadores: vals
-      });
+      resultados.push({...cur, promedio_general:promGeneral, evaluadores:evCount[0].total, indicadores:vals});
     }
-
     res.json({ periodo, resultados });
   } catch(e){ res.status(500).json({message:e.message}); }
 });
 
-/**
- * GET /api/eval-inst/periodos/:id/resultados
- * Jefe: ver resultados agregados de un periodo
- */
+/** GET /api/eval-inst/periodos/:id/resultados */
 app.get("/api/eval-inst/periodos/:id/resultados", async (req,res) => {
   try {
     const pid = Number(req.params.id);
@@ -1192,13 +1157,11 @@ app.get("/api/eval-inst/periodos/:id/resultados", async (req,res) => {
       `SELECT p.*,pl.tipo,pl.titulo AS plantilla_titulo FROM eval_inst_periodos p
        JOIN eval_inst_plantillas pl ON pl.id=p.plantilla_id WHERE p.id=? LIMIT 1`,[pid]);
     if(!periodo) return res.status(404).json({message:"Periodo no encontrado"});
-
     const [indicadores] = await pool.execute(
       `SELECT i.* FROM eval_inst_indicadores i
        JOIN eval_inst_plantillas pl ON pl.id=i.plantilla_id
        JOIN eval_inst_periodos p ON p.plantilla_id=pl.id
        WHERE p.id=? ORDER BY i.orden`,[pid]);
-
     const [stats] = await pool.execute(
       `SELECT i.id AS indicador_id, i.texto,
               ROUND(AVG(v.valor),1) AS promedio,
@@ -1208,12 +1171,10 @@ app.get("/api/eval-inst/periodos/:id/resultados", async (req,res) => {
        JOIN eval_inst_respuestas r ON r.id=v.respuesta_id
        WHERE r.periodo_id=?
        GROUP BY i.id ORDER BY i.id`,[pid]);
-
     const [participacion] = await pool.execute(
       `SELECT COUNT(DISTINCT evaluador_id) AS completaron,
               (SELECT COUNT(*) FROM curso_participantes WHERE curso_id=?) AS total
        FROM eval_inst_respuestas WHERE periodo_id=? AND completada=1`,[periodo.curso_id,pid]);
-
     res.json({periodo,indicadores,stats,participacion:participacion[0]});
   } catch(e){ res.status(500).json({message:e.message}); }
 });
@@ -1222,11 +1183,7 @@ app.get("/api/eval-inst/periodos/:id/resultados", async (req,res) => {
 // TAREAS — ENDPOINTS EXTENDIDOS
 // ════════════════════════════════════════════════════════════
 
-/**
- * POST /api/tareas/:tareaId/entregar
- * Cursante envía su respuesta
- * body: { usuario_id, respuesta }
- */
+/** POST /api/tareas/:tareaId/entregar */
 app.post("/api/tareas/:tareaId/entregar", async (req,res) => {
   try {
     const tareaId = Number(req.params.tareaId);
@@ -1237,17 +1194,13 @@ app.post("/api/tareas/:tareaId/entregar", async (req,res) => {
     const [result] = await pool.execute(
       `UPDATE tarea_entregas SET estado='ENTREGADO', respuesta=?, entregado_en=NOW()
        WHERE tarea_id=? AND usuario_id=? LIMIT 1`,
-      [String(respuesta).trim(), tareaId, usuario_id]
-    );
+      [String(respuesta).trim(), tareaId, usuario_id]);
     if(result.affectedRows===0) return res.status(404).json({message:"Entrega no encontrada para este alumno"});
     res.json({message:"Tarea entregada exitosamente"});
   } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
 });
 
-/**
- * GET /api/tareas/:tareaId/mi-entrega/:usuarioId
- * Cursante: ver estado y feedback de su propia entrega
- */
+/** GET /api/tareas/:tareaId/mi-entrega/:usuarioId */
 app.get("/api/tareas/:tareaId/mi-entrega/:usuarioId", async (req,res) => {
   try {
     const tareaId   = Number(req.params.tareaId);
@@ -1264,21 +1217,18 @@ app.get("/api/tareas/:tareaId/mi-entrega/:usuarioId", async (req,res) => {
   } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
 });
 
-/**
- * GET /api/tareas/materia/:materiaId/resumen
- * Docente: resumen estadístico de todas las tareas de una materia
- */
+/** GET /api/tareas/materia/:materiaId/resumen */
 app.get("/api/tareas/materia/:materiaId/resumen", async (req,res) => {
   try {
     const materiaId = Number(req.params.materiaId);
     if(!materiaId) return res.status(400).json({message:"ID inválido"});
     const [r] = await pool.execute(
       `SELECT t.id, t.titulo, t.descripcion, t.fecha_limite, t.creado_en,
-              COUNT(te.id)                                            AS total,
-              SUM(te.estado='ENTREGADO')                              AS entregadas,
-              SUM(te.estado='PENDIENTE')                              AS pendientes,
-              SUM(te.estado='ENTREGADO' AND te.nota IS NOT NULL)      AS calificadas,
-              SUM(te.estado='ENTREGADO' AND te.nota IS NULL)          AS sin_calificar,
+              COUNT(te.id) AS total,
+              SUM(te.estado='ENTREGADO') AS entregadas,
+              SUM(te.estado='PENDIENTE') AS pendientes,
+              SUM(te.estado='ENTREGADO' AND te.nota IS NOT NULL) AS calificadas,
+              SUM(te.estado='ENTREGADO' AND te.nota IS NULL) AS sin_calificar,
               ROUND(AVG(CASE WHEN te.nota IS NOT NULL THEN te.nota END),1) AS promedio_nota
        FROM tareas t LEFT JOIN tarea_entregas te ON te.tarea_id=t.id
        WHERE t.materia_id=?
@@ -1287,10 +1237,7 @@ app.get("/api/tareas/materia/:materiaId/resumen", async (req,res) => {
   } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
 });
 
-/**
- * GET /api/tareas/:tareaId/entregas/detalle
- * Docente: todas las entregas de una tarea con respuesta y estado de calificación
- */
+/** GET /api/tareas/:tareaId/entregas/detalle */
 app.get("/api/tareas/:tareaId/entregas/detalle", async (req,res) => {
   try {
     const tareaId = Number(req.params.tareaId);
@@ -1309,11 +1256,7 @@ app.get("/api/tareas/:tareaId/entregas/detalle", async (req,res) => {
   } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
 });
 
-/**
- * POST /api/tareas/:tareaId/entregas/:usuarioId/calificar
- * Docente califica una entrega recibida
- * body: { nota, feedback, calificado_por }
- */
+/** POST /api/tareas/:tareaId/entregas/:usuarioId/calificar */
 app.post("/api/tareas/:tareaId/entregas/:usuarioId/calificar", async (req,res) => {
   try {
     const tareaId   = Number(req.params.tareaId);
@@ -1325,11 +1268,87 @@ app.post("/api/tareas/:tareaId/entregas/:usuarioId/calificar", async (req,res) =
     const [result] = await pool.execute(
       `UPDATE tarea_entregas SET nota=?, feedback=?, calificado_por=?, actualizado_en=NOW()
        WHERE tarea_id=? AND usuario_id=? LIMIT 1`,
-      [notaNum, feedback??null, calificado_por??null, tareaId, usuarioId]
-    );
+      [notaNum, feedback??null, calificado_por??null, tareaId, usuarioId]);
     if(result.affectedRows===0) return res.status(404).json({message:"Entrega no encontrada"});
     res.json({message:"Tarea calificada", nota:notaNum});
   } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+// ════════════════════════════════════════════════════════════
+// HORARIOS
+// ════════════════════════════════════════════════════════════
+
+/** GET /api/horarios?curso_id=X&fecha_inicio=Y&fecha_fin=Z */
+app.get("/api/horarios", async (req,res) => {
+  try {
+    const {curso_id, fecha_inicio, fecha_fin} = req.query;
+    if(!curso_id) return res.status(400).json({message:"curso_id requerido"});
+    let sql = `SELECT h.id,h.curso_id,h.materia_id,h.fecha,h.hora_inicio,h.hora_fin,
+                      h.aula,h.observacion,h.creado_en,
+                      m.nombre AS materia_nombre,
+                      u.nombre AS docente_nombre,u.ap_paterno AS docente_ap
+               FROM horarios h
+               JOIN curso_materias m ON m.id=h.materia_id
+               LEFT JOIN usuarios u ON u.id=m.docente_id
+               WHERE h.curso_id=?`;
+    const params = [Number(curso_id)];
+    if(fecha_inicio){sql+=` AND h.fecha>=?`; params.push(fecha_inicio);}
+    if(fecha_fin)   {sql+=` AND h.fecha<=?`; params.push(fecha_fin);}
+    sql += ` ORDER BY h.fecha ASC, h.hora_inicio ASC`;
+    const [rows] = await pool.execute(sql, params);
+    res.json(rows);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/** POST /api/horarios — Crear horario */
+app.post("/api/horarios", async (req,res) => {
+  try {
+    const {curso_id,materia_id,fecha,hora_inicio,hora_fin,aula,observacion,creado_por} = req.body;
+    if(!curso_id)    return res.status(400).json({message:"Campo requerido: curso_id"});
+    if(!materia_id)  return res.status(400).json({message:"Campo requerido: materia_id"});
+    if(!fecha)       return res.status(400).json({message:"Campo requerido: fecha"});
+    if(!hora_inicio) return res.status(400).json({message:"Campo requerido: hora_inicio"});
+    if(!hora_fin)    return res.status(400).json({message:"Campo requerido: hora_fin"});
+    if(hora_fin<=hora_inicio) return res.status(400).json({message:"hora_fin debe ser mayor a hora_inicio"});
+
+    const [r] = await pool.execute(
+      `INSERT INTO horarios (curso_id,materia_id,fecha,hora_inicio,hora_fin,aula,observacion,creado_por)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [curso_id,materia_id,fecha,hora_inicio,hora_fin,aula||null,observacion||null,creado_por||null]);
+    res.status(201).json({message:"Horario creado",id:r.insertId});
+  } catch(e){
+    if(e?.code==="ER_DUP_ENTRY") return res.status(409).json({message:"Ya existe un horario en ese slot (mismo curso, fecha, hora y aula)."});
+    res.status(500).json({message:"Error interno",detail:e.message});
+  }
+});
+
+/** DELETE /api/horarios/:id */
+app.delete("/api/horarios/:id", async (req,res) => {
+  try {
+    const id = Number(req.params.id);
+    if(!id) return res.status(400).json({message:"ID inválido"});
+    const [r] = await pool.execute(`DELETE FROM horarios WHERE id=? LIMIT 1`,[id]);
+    if(!r.affectedRows) return res.status(404).json({message:"Horario no encontrado"});
+    res.json({message:"Horario eliminado"});
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+/** PUT /api/horarios/:id — Editar horario */
+app.put("/api/horarios/:id", async (req,res) => {
+  try {
+    const id = Number(req.params.id);
+    const {materia_id,fecha,hora_inicio,hora_fin,aula,observacion} = req.body;
+    if(!id) return res.status(400).json({message:"ID inválido"});
+    const [r] = await pool.execute(
+      `UPDATE horarios SET materia_id=?,fecha=?,hora_inicio=?,hora_fin=?,aula=?,observacion=?
+       WHERE id=? LIMIT 1`,
+      [materia_id,fecha,hora_inicio,hora_fin,aula||null,observacion||null,id]);
+    if(!r.affectedRows) return res.status(404).json({message:"Horario no encontrado"});
+    res.json({message:"Horario actualizado"});
+  } catch(e){
+    if(e?.code==="ER_DUP_ENTRY") return res.status(409).json({message:"Conflicto: ya existe un horario en ese slot."});
+    res.status(500).json({message:"Error interno",detail:e.message});
+  }
 });
 
 // ════════════════════════════════════════════════════════════

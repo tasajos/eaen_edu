@@ -589,3 +589,21 @@
   .horario-grid { grid-template-columns: 60px repeat(5, 1fr); }
   .asist-grid { grid-template-columns: 140px repeat(auto-fill, minmax(34px, 1fr)); }
 }
+
+/* ── Filtro tags de fecha (horarios) ─────────────────────── */
+.edu-tag {
+  padding: 5px 12px; border-radius: 20px;
+  border: 2px solid #e8ecf2; background: #fff;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  color: #5a6a80; transition: all .18s; font-family: inherit;
+}
+.edu-tag:hover { border-color: #003366; color: #003366; }
+.edu-tag.active { background: #003366; color: #fff; border-color: #003366; }
+
+/* ── edu-form-input ──────────────────────────────────────── */
+.edu-form-input {
+  padding: 9px 12px; border: 2px solid #e8ecf2; border-radius: 9px;
+  font-size: 13.5px; font-family: inherit; color: #1a2535;
+  background: #fff; width: 100%; transition: border-color .2s;
+}
+.edu-form-input:focus { outline: none; border-color: #003366; }

@@ -906,69 +906,417 @@ function ModuloTareas({ showToast }) {
 const HORAS=["07:00","08:00","09:00","10:00","11:00","14:00","15:00","16:00","17:00"];
 const DIAS =["Lunes","Martes","Miércoles","Jueves","Viernes"];
 function ModuloHorarios({ showToast }) {
+  const session = (() => { try{ return JSON.parse(localStorage.getItem("eaen_session")||"null"); }catch{ return null; } })();
   const { cursos, loading:loadingC, cursoId, setCursoId } = useCursos();
   const { materias, loading:loadingM } = useMaterias(cursoId);
-  const [horario, setHorario]   = useState({});
-  const [selected, setSelected] = useState(null);
-  const [form, setForm]         = useState({materia_id:"",aula:""});
+
+  const hoy = new Date().toISOString().slice(0,10);
+  const [clases,     setClases]     = useState([]);
+  const [loadingH,   setLoadingH]   = useState(false);
+  const [saving,     setSaving]     = useState(false);
+  const [filtroFecha,setFiltroFecha]= useState(hoy.slice(0,7));
+  const [modoForm,   setModoForm]   = useState("unica"); // "unica" | "rango"
+  const [form, setForm] = useState({
+    materia_id:"", fecha:hoy, fecha_inicio:hoy, fecha_fin:hoy,
+    dias:[], hora_inicio:"07:00", hora_fin:"09:00", aula:"", observacion:""
+  });
+  const [editId, setEditId] = useState(null);
+
+  // Calcula cuántas fechas caen en el rango para los días seleccionados
+  const calcularClases = (fi, ff, dias) => {
+    if(!fi||!ff||!dias?.length) return 0;
+    let count=0, cur=new Date(fi+"T12:00:00"), end=new Date(ff+"T12:00:00");
+    while(cur<=end){ if(dias.includes(cur.getDay())) count++; cur.setDate(cur.getDate()+1); }
+    return count;
+  };
+
+  const AULAS = ["Aula A1","Aula A2","Aula B1","Aula B2","Aula C1","Aula C2","Aula C3","Auditorio","Sala Virtual","Aula Magna"];
+  const HORAS = ["06:00","07:00","08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00","21:00","22:00"];
+
+  const cargar = async () => {
+    if(!cursoId) return;
+    setLoadingH(true);
+    try {
+      const [y,m] = filtroFecha.split("-");
+      const inicio = `${y}-${m}-01`;
+      const fin    = `${y}-${m}-31`;
+      const r = await fetch(`${API}/api/horarios?curso_id=${cursoId}&fecha_inicio=${inicio}&fecha_fin=${fin}`);
+      const d = await r.json();
+      if(Array.isArray(d)) setClases(d);
+    } catch {}
+    finally { setLoadingH(false); }
+  };
+
+  useEffect(()=>{ cargar(); }, [cursoId, filtroFecha]);
+
+  const guardar = async () => {
+    if(!form.materia_id) return showToast("Seleccione una materia","error");
+    if(!form.hora_inicio||!form.hora_fin) return showToast("Ingrese hora inicio y fin","error");
+    if(form.hora_fin<=form.hora_inicio)   return showToast("Hora fin debe ser mayor a hora inicio","error");
+
+    if(modoForm==="rango"){
+      if(!form.fecha_inicio||!form.fecha_fin) return showToast("Ingrese fecha inicio y fin","error");
+      if(form.fecha_fin<form.fecha_inicio)    return showToast("Fecha fin debe ser mayor a fecha inicio","error");
+      if(!form.dias?.length)                  return showToast("Seleccione al menos un día de la semana","error");
+      const total = calcularClases(form.fecha_inicio, form.fecha_fin, form.dias);
+      if(total===0) return showToast("No hay fechas que coincidan con los días seleccionados","error");
+    } else {
+      if(!form.fecha) return showToast("Ingrese la fecha","error");
+    }
+
+    setSaving(true);
+    let creadas=0, errores=0;
+    try {
+      if(modoForm==="unica"){
+        const r = await fetch(`${API}/api/horarios`,{
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({...form, curso_id:cursoId,
+            materia_id:Number(form.materia_id), creado_por:session?.id})
+        });
+        const d = await r.json();
+        if(!r.ok) throw new Error(d.message);
+        creadas=1;
+      } else {
+        // Generar todas las fechas del rango
+        let cur = new Date(form.fecha_inicio+"T12:00:00");
+        const end = new Date(form.fecha_fin+"T12:00:00");
+        const fechas = [];
+        while(cur<=end){
+          if(form.dias.includes(cur.getDay()))
+            fechas.push(cur.toISOString().slice(0,10));
+          cur.setDate(cur.getDate()+1);
+        }
+        for(const fecha of fechas){
+          try {
+            const r = await fetch(`${API}/api/horarios`,{
+              method:"POST", headers:{"Content-Type":"application/json"},
+              body: JSON.stringify({...form, fecha, curso_id:cursoId,
+                materia_id:Number(form.materia_id), creado_por:session?.id})
+            });
+            const d = await r.json();
+            if(r.ok) creadas++; else errores++;
+          } catch { errores++; }
+        }
+      }
+      if(creadas>0) showToast(`✅ ${creadas} clase(s) programada(s)${errores>0?` (${errores} duplicadas omitidas)`:""}`);
+      else showToast("⚠️ Todas las fechas ya estaban programadas","error");
+      setForm(p=>({...p, materia_id:"", observacion:"", dias:[]}));
+      cargar();
+    } catch(e){ showToast(`❌ ${e.message}`,"error"); }
+    finally { setSaving(false); }
+  };
+
+  const eliminar = async (id) => {
+    try {
+      const r = await fetch(`${API}/api/horarios/${id}`,{method:"DELETE"});
+      const d = await r.json();
+      if(!r.ok) throw new Error(d.message);
+      showToast("🗑 Clase eliminada");
+      cargar();
+    } catch(e){ showToast(`❌ ${e.message}`,"error"); }
+  };
+
+  // Agrupar clases por fecha
+  const clasesPorFecha = clases.reduce((acc, cl) => {
+    const f = cl.fecha?.slice(0,10) || "";
+    if(!acc[f]) acc[f] = [];
+    acc[f].push(cl);
+    return acc;
+  }, {});
+
+  const DIAS_ES = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+  const MESES_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  const fmtFecha = f => {
+    if(!f) return "—";
+    const d = new Date(f+"T00:00:00");
+    return `${DIAS_ES[d.getDay()]} ${d.getDate()} de ${MESES_ES[d.getMonth()]} ${d.getFullYear()}`;
+  };
+  const fmtHora = h => h?.slice(0,5) || "—";
+
+  const COLORES = [
+    "#e3f2fd","#f3e5f5","#e8f5e9","#fff3e0","#fce4ec","#e0f7fa","#f9fbe7","#ede7f6"
+  ];
+  const BORDES = [
+    "#90caf9","#ce93d8","#a5d6a7","#ffcc80","#f48fb1","#80deea","#c5e1a5","#b39ddb"
+  ];
+  const colorMateria = (materiaId) => {
+    const idx = materias.findIndex(m=>m.id===materiaId) % COLORES.length;
+    return { bg: COLORES[Math.max(0,idx)], border: BORDES[Math.max(0,idx)] };
+  };
+
   return (
-    <div style={{padding:"0 26px 26px"}}>
-      <CursoSelector cursos={cursos} cursoId={cursoId} onChange={id=>{setCursoId(id);setHorario({});}} loading={loadingC}/>
-      <div style={{height:16}}/>
-      <div style={{display:"flex",gap:22,flexWrap:"wrap",alignItems:"flex-start"}}>
-        <div style={{flex:"1 1 500px",overflowX:"auto"}}>
-          <div className="horario-grid">
-            <div/>
-            {DIAS.map(d=><div key={d} className="dia-header">{d}</div>)}
-            {HORAS.map(hora=>(
-              <>
-                <div key={`h-${hora}`} className="hora-label">{hora}</div>
-                {DIAS.map(dia=>{
-                  const key=`${hora}-${dia}`,slot=horario[key];
-                  return (
-                    <div key={key} className={`horario-slot${slot?" ocupado":""}${selected===key?" selected":""}`}
-                      onClick={()=>{setSelected(key);setForm(slot?{...slot}:{materia_id:"",aula:""}); }}
-                      style={selected===key?{outline:"2px solid #ff6600"}:{}}>
-                      {slot?(<><div className="slot-materia">{materias.find(m=>m.id===slot.materia_id)?.nombre||slot.materia_id}</div><div className="slot-aula">{slot.aula}</div></>):<span style={{fontSize:18,color:"#ddd"}}>+</span>}
-                    </div>
-                  );
-                })}
-              </>
+    <div style={{padding:"0 26px 32px"}}>
+      <CursoSelector cursos={cursos} cursoId={cursoId} onChange={id=>{setCursoId(id);setClases([]);}} loading={loadingC}/>
+      <div style={{height:20}}/>
+
+      <div style={{display:"flex", gap:22, alignItems:"flex-start", flexWrap:"wrap"}}>
+
+        {/* ── Panel izquierdo: formulario ── */}
+        <div style={{
+          flex:"0 0 320px", background:"#fff", borderRadius:16,
+          border:"2px solid #eef2f7", padding:"22px 24px",
+          boxShadow:"0 2px 16px rgba(0,51,102,.06)"
+        }}>
+          {/* Tabs: clase única vs rango de fechas */}
+          <div style={{display:"flex",gap:0,marginBottom:18,borderRadius:10,overflow:"hidden",border:"2px solid #e8ecf2"}}>
+            {[["unica","📅 Clase única"],["rango","📆 Rango de fechas"]].map(([v,l])=>(
+              <button key={v} onClick={()=>setModoForm(v)} style={{
+                flex:1, padding:"9px 0", border:"none", fontSize:13, fontWeight:700,
+                cursor:"pointer", fontFamily:"inherit", transition:"all .2s",
+                background: modoForm===v ? "#003366" : "#fff",
+                color: modoForm===v ? "#fff" : "#5a6a80"
+              }}>{l}</button>
             ))}
           </div>
-        </div>
-        <div style={{flex:"0 0 240px",background:"#f8fafc",borderRadius:12,padding:18,border:"1px solid #eef0f3"}}>
-          <div style={{fontSize:13,fontWeight:800,color:"#003366",marginBottom:14}}>{selected?`✏️ ${selected}`:"Selecciona un slot"}</div>
-          {selected&&(
+
+          <div className="edu-form-group">
+            <label className="edu-form-label">Materia *</label>
+            {loadingM ? <Spinner/> : (
+              <select className="edu-form-select" value={form.materia_id}
+                onChange={e=>setForm(p=>({...p,materia_id:e.target.value}))}>
+                <option value="">— Seleccionar —</option>
+                {materias.map(m=><option key={m.id} value={m.id}>{m.nombre}</option>)}
+              </select>
+            )}
+          </div>
+
+          {modoForm === "unica" ? (
+            /* ── Modo clase única ── */
+            <div className="edu-form-group">
+              <label className="edu-form-label">Fecha *</label>
+              <input type="date" className="edu-form-input" value={form.fecha}
+                onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/>
+            </div>
+          ) : (
+            /* ── Modo rango ── */
             <>
-              <div className="edu-form-group" style={{marginBottom:12}}>
-                <label className="edu-form-label">Materia</label>
-                {loadingM?<Spinner/>:
-                  <select className="edu-form-select" value={form.materia_id} onChange={e=>setForm(p=>({...p,materia_id:Number(e.target.value)}))}>
-                    <option value="">Seleccionar...</option>
-                    {materias.map(m=><option key={m.id} value={m.id}>{m.nombre}</option>)}
-                  </select>}
+              <div style={{
+                background:"#e8f4fd", border:"1.5px solid #90caf9",
+                borderRadius:10, padding:"10px 13px", marginBottom:12,
+                fontSize:12.5, color:"#1565c0"
+              }}>
+                📌 Se programarán clases para <strong>cada día seleccionado</strong> dentro del rango de fechas.
               </div>
-              <div className="edu-form-group" style={{marginBottom:16}}>
-                <label className="edu-form-label">Aula</label>
-                <select className="edu-form-select" value={form.aula} onChange={e=>setForm(p=>({...p,aula:e.target.value}))}>
-                  <option value="">Seleccionar...</option>
-                  {["Aula A1","Aula A2","Aula B1","Aula B2","Aula C3","Auditorio"].map(a=><option key={a}>{a}</option>)}
-                </select>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                <div className="edu-form-group">
+                  <label className="edu-form-label">Fecha inicio *</label>
+                  <input type="date" className="edu-form-input" value={form.fecha_inicio}
+                    onChange={e=>setForm(p=>({...p,fecha_inicio:e.target.value}))}/>
+                </div>
+                <div className="edu-form-group">
+                  <label className="edu-form-label">Fecha fin *</label>
+                  <input type="date" className="edu-form-input" value={form.fecha_fin}
+                    onChange={e=>setForm(p=>({...p,fecha_fin:e.target.value}))}/>
+                </div>
               </div>
-              <button className="btn-primary" style={{width:"100%",marginBottom:8}} onClick={()=>{
-                if(!form.materia_id||!form.aula) return showToast("Complete todos los campos","error");
-                setHorario(p=>({...p,[selected]:{...form}}));setSelected(null);showToast("Horario asignado");
-              }}>✅ Asignar</button>
-              {horario[selected]&&<button className="btn-secondary" style={{width:"100%"}} onClick={()=>{setHorario(p=>{const n={...p};delete n[selected];return n;});setSelected(null);showToast("Slot liberado");}}>🗑 Liberar slot</button>}
+              {/* Días de la semana */}
+              <div className="edu-form-group">
+                <label className="edu-form-label">Días de la semana *</label>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:4}}>
+                  {["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"].map((d,i)=>(
+                    <button key={i} onClick={()=>setForm(p=>({
+                      ...p, dias: p.dias?.includes(i)
+                        ? p.dias.filter(x=>x!==i)
+                        : [...(p.dias||[]),i]
+                    }))} style={{
+                      padding:"6px 12px", borderRadius:8, fontSize:12.5,
+                      fontWeight:700, cursor:"pointer", border:"2px solid",
+                      fontFamily:"inherit", transition:"all .18s",
+                      borderColor: form.dias?.includes(i) ? "#003366" : "#e8ecf2",
+                      background:  form.dias?.includes(i) ? "#003366" : "#fff",
+                      color:       form.dias?.includes(i) ? "#fff" : "#5a6a80"
+                    }}>{d}</button>
+                  ))}
+                </div>
+                {form.dias?.length>0 && (
+                  <div style={{fontSize:11.5,color:"#6b7a90",marginTop:6}}>
+                    {calcularClases(form.fecha_inicio, form.fecha_fin, form.dias)} clase(s) a generar
+                  </div>
+                )}
+              </div>
             </>
           )}
-          {!selected&&<div style={{fontSize:13,color:"#bbb",textAlign:"center",paddingTop:20}}>Haz clic en una celda</div>}
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            <div className="edu-form-group">
+              <label className="edu-form-label">Hora inicio *</label>
+              <select className="edu-form-select" value={form.hora_inicio}
+                onChange={e=>setForm(p=>({...p,hora_inicio:e.target.value}))}>
+                {HORAS.map(h=><option key={h} value={h}>{h}</option>)}
+              </select>
+            </div>
+            <div className="edu-form-group">
+              <label className="edu-form-label">Hora fin *</label>
+              <select className="edu-form-select" value={form.hora_fin}
+                onChange={e=>setForm(p=>({...p,hora_fin:e.target.value}))}>
+                {HORAS.map(h=><option key={h} value={h}>{h}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="edu-form-group">
+            <label className="edu-form-label">Aula</label>
+            <select className="edu-form-select" value={form.aula}
+              onChange={e=>setForm(p=>({...p,aula:e.target.value}))}>
+              <option value="">— Sin aula —</option>
+              {AULAS.map(a=><option key={a}>{a}</option>)}
+            </select>
+          </div>
+
+          <div className="edu-form-group">
+            <label className="edu-form-label">Observación</label>
+            <input type="text" className="edu-form-input"
+              placeholder="Ej: Clase recuperatoria..."
+              value={form.observacion}
+              onChange={e=>setForm(p=>({...p,observacion:e.target.value}))}/>
+          </div>
+
+          <button className="btn-primary" style={{width:"100%",marginTop:4}}
+            onClick={guardar} disabled={saving||!cursoId}>
+            {saving ? "⏳ Guardando..." : modoForm==="rango" ? `✅ Programar ${calcularClases(form.fecha_inicio,form.fecha_fin,form.dias)} clase(s)` : "✅ Programar clase"}
+          </button>
+        </div>
+
+        {/* ── Panel derecho: lista de clases ── */}
+        <div style={{flex:1, minWidth:0}}>
+          {/* Filtro por mes */}
+          <div style={{
+            display:"flex", alignItems:"center", justifyContent:"space-between",
+            marginBottom:16, flexWrap:"wrap", gap:10
+          }}>
+            <div style={{fontSize:15,fontWeight:700,color:"#003366"}}>
+              📅 Clases programadas
+              {clases.length>0 && (
+                <span style={{
+                  marginLeft:10, background:"#003366", color:"#fff",
+                  fontSize:11, fontWeight:700, padding:"2px 10px", borderRadius:12
+                }}>{clases.length}</span>
+              )}
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <label style={{fontSize:12,fontWeight:600,color:"#6b7a90"}}>Mes:</label>
+              <input type="month" value={filtroFecha}
+                onChange={e=>setFiltroFecha(e.target.value)}
+                style={{
+                  padding:"7px 12px", border:"2px solid #e8ecf2", borderRadius:9,
+                  fontSize:13, fontFamily:"inherit", color:"#1a2535"
+                }}/>
+              <button onClick={cargar} style={{
+                padding:"7px 14px", background:"#f0f4f8", border:"1.5px solid #e8ecf2",
+                borderRadius:8, fontSize:13, cursor:"pointer", fontWeight:600, color:"#5a6a80"
+              }}>🔄</button>
+            </div>
+          </div>
+
+          {loadingH ? <div style={{textAlign:"center",padding:40}}><Spinner/></div> :
+           !clases.length ? (
+            <div style={{
+              textAlign:"center", padding:"50px 20px",
+              background:"#fafbff", borderRadius:14, border:"2px dashed #e8ecf2"
+            }}>
+              <div style={{fontSize:40,marginBottom:12,opacity:.3}}>📅</div>
+              <div style={{fontSize:14,color:"#8898aa"}}>No hay clases programadas para este mes.</div>
+              <div style={{fontSize:12,color:"#bbb",marginTop:6}}>Use el formulario para programar clases.</div>
+            </div>
+          ) : (
+            <div style={{display:"flex",flexDirection:"column",gap:14}}>
+              {Object.entries(clasesPorFecha).sort(([a],[b])=>a.localeCompare(b)).map(([fecha,clsDay])=>(
+                <div key={fecha} style={{
+                  background:"#fff", borderRadius:14,
+                  border:"2px solid #eef2f7",
+                  overflow:"hidden",
+                  boxShadow:"0 2px 12px rgba(0,0,0,.05)"
+                }}>
+                  {/* Header fecha */}
+                  <div style={{
+                    background:"#003366", color:"#fff",
+                    padding:"10px 18px", fontSize:13.5, fontWeight:700,
+                    display:"flex", alignItems:"center", gap:8
+                  }}>
+                    <span>📆</span> {fmtFecha(fecha)}
+                    <span style={{
+                      marginLeft:"auto", background:"rgba(255,255,255,.2)",
+                      padding:"2px 10px", borderRadius:10, fontSize:11
+                    }}>{clsDay.length} clase{clsDay.length>1?"s":""}</span>
+                  </div>
+
+                  {/* Clases del día */}
+                  {clsDay.sort((a,b)=>a.hora_inicio.localeCompare(b.hora_inicio)).map(cl => {
+                    const col = colorMateria(cl.materia_id);
+                    return (
+                      <div key={cl.id} style={{
+                        display:"flex", alignItems:"center", gap:14,
+                        padding:"13px 18px", borderBottom:"1px solid #f0f4f8",
+                        background: col.bg, borderLeft:`4px solid ${col.border}`
+                      }}>
+                        {/* Horario */}
+                        <div style={{
+                          flexShrink:0, textAlign:"center",
+                          background:"#fff", borderRadius:10,
+                          padding:"8px 14px", border:`1.5px solid ${col.border}`,
+                          minWidth:90
+                        }}>
+                          <div style={{
+                            fontSize:16, fontWeight:900,
+                            fontFamily:"'IBM Plex Mono',monospace", color:"#003366"
+                          }}>{fmtHora(cl.hora_inicio)}</div>
+                          <div style={{fontSize:10,color:"#aaa",margin:"2px 0"}}>━━━━━</div>
+                          <div style={{
+                            fontSize:13, fontWeight:700,
+                            fontFamily:"'IBM Plex Mono',monospace", color:"#5a6a80"
+                          }}>{fmtHora(cl.hora_fin)}</div>
+                        </div>
+
+                        {/* Info materia */}
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:14,fontWeight:700,color:"#1a2535",marginBottom:3}}>
+                            {cl.materia_nombre}
+                          </div>
+                          <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
+                            {cl.aula && (
+                              <span style={{
+                                fontSize:11.5,fontWeight:600,
+                                background:"rgba(255,255,255,.7)",
+                                padding:"2px 9px",borderRadius:8,color:"#5a6a80",
+                                border:"1px solid rgba(0,0,0,.08)"
+                              }}>🏫 {cl.aula}</span>
+                            )}
+                            {cl.docente_nombre && (
+                              <span style={{
+                                fontSize:11.5,fontWeight:600,
+                                background:"rgba(255,255,255,.7)",
+                                padding:"2px 9px",borderRadius:8,color:"#5a6a80",
+                                border:"1px solid rgba(0,0,0,.08)"
+                              }}>👨‍🏫 {cl.docente_ap} {cl.docente_nombre}</span>
+                            )}
+                            {cl.observacion && (
+                              <span style={{
+                                fontSize:11.5,fontStyle:"italic",color:"#8898aa"
+                              }}>💬 {cl.observacion}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Acciones */}
+                        <button onClick={()=>eliminar(cl.id)} title="Eliminar clase" style={{
+                          flexShrink:0, background:"#ffebee", color:"#c62828",
+                          border:"1.5px solid #ef9a9a", borderRadius:8,
+                          padding:"6px 12px", cursor:"pointer", fontSize:13,
+                          fontWeight:700, transition:"all .2s"
+                        }}>🗑</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
+
 
 // ════════════════════════════════════════════════════════════
 // MÓDULO 6: CALENDARIO (sin cambios)

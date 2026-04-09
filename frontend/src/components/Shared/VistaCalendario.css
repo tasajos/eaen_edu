@@ -1,0 +1,231 @@
+/* ═══════════════════════════════════════════════════════════
+   VistaCalendario.css — EAEN Avaroa
+   ═══════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap');
+
+.vcal-wrap {
+  font-family: 'IBM Plex Sans', sans-serif;
+  background: #fff;
+  border-radius: 16px;
+  border: 2px solid #eef2f7;
+  overflow: hidden;
+  box-shadow: 0 2px 16px rgba(0,51,102,.07);
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+.vcal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px;
+  padding: 16px 22px;
+  background: #003366; color: #fff;
+}
+.vcal-titulo {
+  font-size: 16px; font-weight: 700; letter-spacing: -.3px;
+}
+.vcal-controls {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.vcal-tabs {
+  display: flex; border-radius: 9px; overflow: hidden;
+  border: 1.5px solid rgba(255,255,255,.25);
+}
+.vcal-tab {
+  padding: 6px 16px; border: none; font-size: 12.5px; font-weight: 700;
+  cursor: pointer; font-family: inherit; transition: all .18s;
+  background: transparent; color: rgba(255,255,255,.7);
+}
+.vcal-tab.active { background: rgba(255,255,255,.2); color: #fff; }
+.vcal-nav {
+  display: flex; align-items: center; gap: 6px;
+}
+.vcal-nav-btn {
+  width: 30px; height: 30px; border-radius: 8px;
+  border: 1.5px solid rgba(255,255,255,.3);
+  background: transparent; color: #fff; font-size: 18px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background .18s;
+}
+.vcal-nav-btn:hover { background: rgba(255,255,255,.15); }
+.vcal-mes-label {
+  font-size: 14px; font-weight: 700; min-width: 140px; text-align: center;
+  text-transform: capitalize;
+}
+.vcal-hoy-btn {
+  padding: 5px 14px; border-radius: 8px; font-size: 12px; font-weight: 700;
+  border: 1.5px solid rgba(255,255,255,.35); background: transparent;
+  color: #fff; cursor: pointer; font-family: inherit; transition: all .18s;
+}
+.vcal-hoy-btn:hover { background: rgba(255,255,255,.2); }
+
+/* ── Loading ─────────────────────────────────────────────── */
+.vcal-loading {
+  display: flex; justify-content: center; padding: 40px;
+}
+.vcal-ring {
+  width: 32px; height: 32px;
+  border: 3px solid #e8ecf2; border-top-color: #003366;
+  border-radius: 50%; animation: vcal-spin .7s linear infinite;
+}
+@keyframes vcal-spin { to { transform: rotate(360deg); } }
+
+/* ── Body ────────────────────────────────────────────────── */
+.vcal-body {
+  display: flex; gap: 0; align-items: flex-start;
+  min-height: 400px;
+}
+
+/* ── Grilla mensual ──────────────────────────────────────── */
+.vcal-grid {
+  flex: 1; display: grid; grid-template-columns: repeat(7, 1fr);
+  border-right: 1.5px solid #eef2f7;
+}
+.vcal-dow {
+  padding: 10px 0; text-align: center;
+  font-size: 11.5px; font-weight: 700; color: #8898aa;
+  text-transform: uppercase; letter-spacing: .5px;
+  background: #f7f9fc; border-bottom: 2px solid #eef2f7;
+}
+.vcal-celda {
+  min-height: 90px; padding: 6px 7px;
+  border-bottom: 1px solid #f0f4f8;
+  border-right: 1px solid #f0f4f8;
+  cursor: pointer; transition: background .15s;
+  vertical-align: top;
+}
+.vcal-celda:hover:not(.vacía) { background: #f8faff; }
+.vcal-celda.vacía { background: #fafbff; cursor: default; }
+.vcal-celda.hoy { background: #e8f0fb !important; }
+.vcal-celda.sel { background: #fff3e0 !important; outline: 2px solid #ff6600 inset; }
+.vcal-dia-num {
+  font-size: 13px; font-weight: 700; color: #1a2535;
+  margin-bottom: 4px; line-height: 1;
+}
+.vcal-celda.hoy .vcal-dia-num {
+  background: #003366; color: #fff;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+}
+
+/* Eventos en celda */
+.vcal-eventos { display: flex; flex-direction: column; gap: 2px; }
+.vcal-evento-pill {
+  padding: 2px 5px; border-radius: 4px;
+  font-size: 10.5px; font-weight: 600;
+  display: flex; align-items: center; gap: 3px;
+  line-height: 1.4; overflow: hidden;
+}
+.vcal-ev-hora { font-family: 'IBM Plex Mono',monospace; font-size: 10px; flex-shrink: 0; }
+.vcal-ev-mat  { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vcal-mas     { font-size: 10px; color: #8898aa; font-weight: 600; padding: 1px 4px; }
+
+/* ── Panel lateral del día ───────────────────────────────── */
+.vcal-dia-panel {
+  width: 280px; flex-shrink: 0;
+  border-left: 2px solid #eef2f7;
+  display: flex; flex-direction: column;
+  max-height: 600px; overflow-y: auto;
+}
+.vcal-dia-header {
+  padding: 16px 18px 12px;
+  border-bottom: 1.5px solid #f0f4f8;
+  background: #fafbff;
+  position: sticky; top: 0; z-index: 1;
+}
+.vcal-dia-titulo {
+  font-size: 16px; font-weight: 800; color: #003366;
+  text-transform: capitalize;
+}
+.vcal-dia-fecha { font-size: 13px; color: #6b7a90; margin-top: 2px; }
+.vcal-close-btn {
+  position: absolute; top: 14px; right: 14px;
+  background: none; border: none; font-size: 16px; color: #aaa;
+  cursor: pointer; line-height: 1; padding: 4px;
+}
+.vcal-close-btn:hover { color: #1a2535; }
+
+.vcal-sin-clases {
+  text-align: center; padding: 40px 20px; color: #bbb;
+}
+.vcal-sin-clases span { font-size: 32px; display: block; margin-bottom: 10px; }
+.vcal-sin-clases p    { font-size: 13px; }
+
+.vcal-dia-clases { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.vcal-clase-card {
+  border-radius: 10px; padding: 12px 14px;
+}
+.vcal-clase-hora {
+  font-size: 13px; font-weight: 800;
+  font-family: 'IBM Plex Mono',monospace; margin-bottom: 5px;
+}
+.vcal-clase-mat  { font-size: 14px; font-weight: 700; color: #1a2535; margin-bottom: 6px; line-height: 1.3; }
+.vcal-clase-meta { display: flex; flex-direction: column; gap: 3px; }
+.vcal-clase-meta span { font-size: 12px; color: #5a6a80; font-weight: 500; }
+.vcal-clase-obs  { font-size: 11.5px; color: #8898aa; font-style: italic; margin-top: 5px; }
+
+/* ── Vista lista ─────────────────────────────────────────── */
+.vcal-lista {
+  padding: 20px 22px;
+  display: flex; flex-direction: column; gap: 16px;
+  max-height: 600px; overflow-y: auto;
+}
+.vcal-lista-grupo {
+  display: flex; gap: 16px; align-items: flex-start;
+}
+.vcal-lista-grupo.hoy .vcal-lista-fecha { background: #003366; color: #fff; }
+.vcal-lista-grupo.hoy .vcal-lista-dia-num { color: #fff; }
+.vcal-lista-grupo.hoy .vcal-lista-dow,
+.vcal-lista-grupo.hoy .vcal-lista-mes { color: rgba(255,255,255,.8); }
+
+.vcal-lista-fecha {
+  flex-shrink: 0; width: 80px;
+  background: #f7f9fc; border-radius: 12px;
+  padding: 10px; text-align: center;
+  border: 1.5px solid #eef2f7;
+  position: relative;
+}
+.vcal-lista-dia-num { font-size: 26px; font-weight: 900; color: #003366; line-height: 1; }
+.vcal-lista-dow     { font-size: 12px; font-weight: 700; color: #5a6a80; margin-top: 2px; }
+.vcal-lista-mes     { font-size: 11px; color: #8898aa; }
+.vcal-hoy-badge {
+  position: absolute; top: -8px; right: -8px;
+  background: #ff6600; color: #fff; font-size: 9px; font-weight: 800;
+  padding: 2px 6px; border-radius: 8px; letter-spacing: .5px;
+}
+
+.vcal-lista-clases { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.vcal-lista-clase {
+  display: flex; align-items: flex-start; gap: 12px;
+  background: #fafbff; border-radius: 10px; padding: 12px 14px;
+  border: 1.5px solid #eef2f7;
+}
+.vcal-lc-hora {
+  flex-shrink: 0; font-family: 'IBM Plex Mono',monospace;
+  font-size: 13px; font-weight: 800; min-width: 100px;
+  display: flex; flex-direction: column; align-items: center;
+}
+.vcal-lc-hora span { font-size: 10px; color: #aaa; margin: 1px 0; }
+.vcal-lc-info { flex: 1; min-width: 0; }
+.vcal-lc-mat  { font-size: 14px; font-weight: 700; color: #1a2535; margin-bottom: 4px; }
+.vcal-lc-meta { display: flex; flex-wrap: wrap; gap: 8px; }
+.vcal-lc-meta span { font-size: 12px; color: #5a6a80; font-weight: 500; }
+
+/* ── Empty ───────────────────────────────────────────────── */
+.vcal-empty {
+  text-align: center; padding: 60px 20px; color: #bbb;
+}
+.vcal-empty div { font-size: 44px; margin-bottom: 12px; opacity: .3; }
+.vcal-empty p   { font-size: 14px; }
+
+/* ── Leyenda ─────────────────────────────────────────────── */
+.vcal-leyenda {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 12px 22px; border-top: 1.5px solid #f0f4f8;
+  background: #fafbff;
+}
+.vcal-ley-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  border: 1.5px solid transparent;
+}
+.vcal-ley-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
