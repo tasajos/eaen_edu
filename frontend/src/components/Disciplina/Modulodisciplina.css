@@ -1,0 +1,110 @@
+/* ═══════════════════════════════════════════════════════════
+   ModuloDisciplina.css — EAEN Avaroa
+   ═══════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap');
+
+.disc-wrap { font-family:'IBM Plex Sans',sans-serif; display:flex; flex-direction:column; gap:16px; }
+
+/* Topbar */
+.disc-topbar { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+.disc-title   { font-size:20px; font-weight:800; color:#003366; margin:0; }
+.disc-subtitle{ font-size:13px; color:#6b7a90; margin-top:3px; }
+
+/* Buttons */
+.disc-btn-primary { padding:10px 20px; border-radius:9px; background:#ff6600; color:#fff; border:none; font-size:13.5px; font-weight:700; cursor:pointer; font-family:inherit; transition:all .18s; }
+.disc-btn-primary:hover { background:#e65c00; transform:translateY(-1px); }
+.disc-btn-primary:disabled { opacity:.55; cursor:not-allowed; transform:none; }
+.disc-btn-ghost  { padding:10px 18px; border-radius:9px; background:transparent; color:#5a6a80; border:2px solid #e8ecf2; font-size:13.5px; font-weight:600; cursor:pointer; font-family:inherit; }
+.disc-btn-ghost:hover { border-color:#003366; color:#003366; }
+.disc-btn-ver   { padding:6px 12px; border-radius:8px; background:#e3f2fd; color:#1565c0; border:none; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; transition:all .18s; }
+.disc-btn-ver:hover { background:#1565c0; color:#fff; }
+
+/* Stats */
+.disc-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+.disc-stat  { border-radius:14px; padding:16px 18px; display:flex; align-items:center; gap:12px; color:#fff; box-shadow:0 2px 12px rgba(0,0,0,.1); }
+.disc-stat-icon { font-size:26px; flex-shrink:0; }
+.disc-stat-val  { font-size:26px; font-weight:900; font-family:'IBM Plex Mono',monospace; line-height:1; }
+.disc-stat-lbl  { font-size:11px; opacity:.85; text-transform:uppercase; letter-spacing:.4px; margin-top:2px; }
+.disc-stat-sub  { font-size:10.5px; opacity:.7; margin-top:1px; }
+.disc-green  { background:linear-gradient(135deg,#1b5e20,#2e7d32); }
+.disc-red    { background:linear-gradient(135deg,#b71c1c,#e53935); }
+.disc-blue   { background:linear-gradient(135deg,#003366,#0055aa); }
+.disc-orange { background:linear-gradient(135deg,#e65c00,#ff6600); }
+
+/* Filtros */
+.disc-filtros { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.disc-search  { padding:8px 14px; border:2px solid #e8ecf2; border-radius:9px; font-size:13px; font-family:inherit; color:#1a2535; flex:1; min-width:180px; max-width:280px; }
+.disc-search:focus { outline:none; border-color:#003366; }
+.disc-filter-btn { padding:6px 14px; border-radius:20px; border:2px solid #e8ecf2; background:#fff; font-size:12px; font-weight:600; cursor:pointer; color:#5a6a80; font-family:inherit; transition:all .18s; }
+.disc-filter-btn:hover { border-color:#003366; color:#003366; }
+.disc-filter-btn.active { background:#003366; color:#fff; border-color:#003366; }
+
+/* Tabla */
+.disc-tabla-wrap { background:#fff; border-radius:14px; box-shadow:0 2px 16px rgba(0,51,102,.07); overflow:hidden; }
+.disc-tabla { width:100%; border-collapse:collapse; font-size:13px; }
+.disc-tabla th { padding:10px 12px; background:#f7f9fc; font-size:10.5px; font-weight:700; letter-spacing:.5px; color:#6b7a90; text-transform:uppercase; border-bottom:2px solid #eef2f7; text-align:left; white-space:nowrap; }
+.disc-tabla td { padding:12px 12px; border-bottom:1px solid #f0f4f8; vertical-align:middle; }
+.disc-tabla tr:last-child td { border-bottom:none; }
+.disc-tabla tr:hover td { background:#fafbff; }
+.disc-tabla tr.tr-merito td   { background:#fafffe; }
+.disc-tabla tr.tr-demerito td { background:#fff9f9; }
+.disc-nombre { font-weight:700; color:#1a2535; }
+.disc-grado  { font-size:11px; color:#8898aa; margin-top:2px; }
+.disc-muted  { color:#8898aa; font-size:12px; }
+
+/* Badges */
+.disc-badge-merito   { display:inline-flex; align-items:center; padding:4px 10px; border-radius:20px; font-size:11.5px; font-weight:700; background:#e8f5e9; color:#2e7d32; }
+.disc-badge-demerito { display:inline-flex; align-items:center; padding:4px 10px; border-radius:20px; font-size:11.5px; font-weight:700; background:#ffebee; color:#c62828; }
+.disc-badge-limpio   { display:inline-flex; align-items:center; padding:4px 10px; border-radius:20px; font-size:11.5px; font-weight:700; background:#f5f5f5; color:#9e9e9e; }
+.disc-badge-ok  { display:inline-flex; align-items:center; padding:4px 10px; border-radius:20px; font-size:11.5px; font-weight:700; background:#e8f5e9; color:#2e7d32; }
+.disc-badge-mal { display:inline-flex; align-items:center; padding:4px 10px; border-radius:20px; font-size:11.5px; font-weight:700; background:#ffebee; color:#c62828; }
+
+/* Empty / Spinner */
+.disc-empty { text-align:center; padding:50px; color:#8898aa; }
+.disc-empty span { font-size:40px; display:block; margin-bottom:10px; opacity:.3; }
+.disc-empty p { font-size:14px; }
+.disc-spinner { display:flex; justify-content:center; padding:40px; }
+.disc-ring { width:32px; height:32px; border:3px solid #e8ecf2; border-top-color:#003366; border-radius:50%; animation:disc-spin .7s linear infinite; }
+@keyframes disc-spin { to { transform:rotate(360deg); } }
+
+/* ── Modal ─────────────────────────────────────────────── */
+.disc-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; z-index:2000; padding:20px; backdrop-filter:blur(4px); }
+.disc-modal { background:#fff; border-radius:18px; width:100%; max-width:540px; max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,.25); display:flex; flex-direction:column; }
+.disc-modal-lg { max-width:680px; }
+.disc-modal-header { display:flex; justify-content:space-between; align-items:flex-start; padding:18px 22px; border-bottom:2px solid #f0f4f8; position:sticky; top:0; background:#fff; z-index:1; }
+.disc-modal-title { font-size:16px; font-weight:700; color:#003366; }
+.disc-close { background:none; border:none; font-size:18px; cursor:pointer; color:#aaa; padding:4px 8px; border-radius:6px; flex-shrink:0; }
+.disc-close:hover { background:#f0f4f8; color:#1a2535; }
+.disc-modal-body { padding:18px 22px; flex:1; }
+.disc-modal-footer { display:flex; gap:10px; padding:14px 22px; border-top:2px solid #f0f4f8; background:#fafbff; position:sticky; bottom:0; }
+
+/* Tipo selector en modal */
+.disc-tipo-selector { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+.disc-tipo-card { border:2.5px solid #e8ecf2; border-radius:12px; padding:14px; cursor:pointer; text-align:center; display:flex; flex-direction:column; align-items:center; gap:6px; transition:all .2s; }
+.disc-tipo-card:hover { border-color:#003366; }
+.disc-tipo-card.selected { box-shadow:0 0 0 3px rgba(0,51,102,.1); }
+
+/* Form */
+.disc-form-row   { display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+.disc-form-group { display:flex; flex-direction:column; gap:5px; margin-bottom:12px; flex:1; min-width:120px; }
+.disc-form-group label { font-size:11.5px; font-weight:700; color:#6b7a90; text-transform:uppercase; letter-spacing:.5px; }
+.disc-form-group input, .disc-form-group select { padding:9px 12px; border:2px solid #e8ecf2; border-radius:9px; font-size:13.5px; font-family:inherit; color:#1a2535; background:#fff; transition:border-color .2s; }
+.disc-form-group input:focus, .disc-form-group select:focus { outline:none; border-color:#003366; }
+.disc-error { background:#fff0f0; border:1.5px solid #ef9a9a; color:#c62828; padding:10px 14px; border-radius:9px; font-size:13px; font-weight:600; margin-top:4px; }
+
+/* Historial stats */
+.disc-hist-resumen { display:flex; gap:10px; padding:14px 22px; border-bottom:2px solid #f0f4f8; background:#fafbff; flex-wrap:wrap; }
+.disc-hist-stat { flex:1; min-width:100px; border-radius:10px; padding:12px 14px; display:flex; align-items:center; gap:10px; }
+
+/* Registro row en historial */
+.disc-reg-row { display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:10px; border-left:4px solid; }
+
+/* Toast */
+.disc-toast { position:fixed; bottom:28px; right:28px; background:#1b5e20; color:#fff; padding:13px 22px; border-radius:12px; font-weight:700; font-size:14px; box-shadow:0 8px 28px rgba(0,0,0,.18); z-index:9999; animation:disc-tin .3s cubic-bezier(.34,1.2,.64,1); }
+.disc-toast-error { background:#b71c1c; }
+@keyframes disc-tin { from{opacity:0;transform:translateY(16px) scale(.95)} to{opacity:1;transform:none} }
+
+@media (max-width:700px) {
+  .disc-stats { grid-template-columns:repeat(2,1fr); }
+  .disc-tabla-wrap { overflow-x:auto; }
+}

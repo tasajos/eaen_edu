@@ -23,6 +23,7 @@ export default function DashboardJefe() {
           <li><button className="navlink" onClick={() => navigate("/gestion-notificaciones")}>🔔 Gestión de Notificaciones</button></li>
           <li><button className="navlink" onClick={() => navigate("/gestion-educativa")}>🎓 Gestión Educativa</button></li>
           <li><button className="navlink" onClick={() => navigate("/gestion-evaluaciones")}>📋 Evaluaciones Inst.</button></li>
+          <li><button className="navlink" onClick={() => navigate("/gestion-disciplina")}>⚖️ Disciplina</button></li>
           <li><button className="navlink" onClick={() => navigate("/gestion-finanzas")}>💰 Finanzas</button></li>
           <li>
             <button className="navlink" onClick={() => setVistaNotif(v => !v)}
@@ -62,6 +63,9 @@ export default function DashboardJefe() {
           <Card icon="🔔" title="Gestión de Notificaciones"
             desc="Envíe alertas y actualizaciones a usuarios."
             onAccess={() => navigate("/gestion-notificaciones")} />
+          <Card icon="⚖️" title="Disciplina"
+            desc="Configura el porcentaje de la nota final que corresponde a méritos y deméritos por materia."
+            onAccess={() => navigate("/gestion-disciplina")} />
           <Card icon="💰" title="Gestión de Finanzas"
             desc="Control de matrícula, guía y mensualidades. Bloqueo automático por mora."
             onAccess={() => navigate("/gestion-finanzas")} />

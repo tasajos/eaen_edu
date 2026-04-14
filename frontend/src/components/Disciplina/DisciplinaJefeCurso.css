@@ -1,0 +1,575 @@
+/* ═══════════════════════════════════════════════════
+   MÓDULO DE DISCIPLINA — DisciplinaJefeCurso.css
+   EAEN Avaroa
+════════════════════════════════════════════════════ */
+
+.disc-wrap {
+  padding: 0 2px;
+  font-family: inherit;
+}
+
+/* ── Header ─────────────────────────────────────── */
+.disc-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.disc-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #1a2535;
+  margin: 0 0 2px 0;
+}
+
+.disc-subtitle {
+  font-size: 0.82rem;
+  color: #6b7a90;
+  margin: 0;
+}
+
+/* ── Botón principal ────────────────────────────── */
+.disc-btn-primary {
+  background: #6b1c1c;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s;
+  white-space: nowrap;
+}
+.disc-btn-primary:hover { background: #8b2424; }
+
+/* ── Stats ──────────────────────────────────────── */
+.disc-stats-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.disc-stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 12px;
+  border-radius: 10px;
+  border: 1.5px solid #e0e0e0;
+  background: #fff;
+  gap: 2px;
+}
+.disc-stat-card.merito   { border-color: #66bb6a; background: #f1faf2; }
+.disc-stat-card.demerito { border-color: #ef9a9a; background: #fff5f5; }
+.disc-stat-card.neutral  { border-color: #90caf9; background: #f0f7ff; }
+
+.disc-stat-num {
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.disc-stat-card.merito   .disc-stat-num { color: #2e7d32; }
+.disc-stat-card.demerito .disc-stat-num { color: #c62828; }
+.disc-stat-card.neutral  .disc-stat-num { color: #1565c0; }
+
+.disc-stat-lbl  { font-size: 0.78rem; color: #555; font-weight: 600; }
+.disc-stat-sub  { font-size: 0.72rem; color: #888; }
+
+/* ── Filtros ────────────────────────────────────── */
+.disc-filtros {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.disc-search {
+  flex: 1;
+  min-width: 180px;
+  padding: 8px 14px;
+  border: 1.5px solid #d0d7de;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.18s;
+}
+.disc-search:focus { border-color: #6b1c1c; }
+
+.disc-filtro-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.disc-filtro-btn {
+  padding: 7px 14px;
+  border: 1.5px solid #d0d7de;
+  border-radius: 7px;
+  background: #fff;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: #444;
+}
+.disc-filtro-btn:hover { border-color: #6b1c1c; color: #6b1c1c; }
+.disc-filtro-btn.active { background: #6b1c1c; color: #fff; border-color: #6b1c1c; }
+
+/* ── Tabla ──────────────────────────────────────── */
+.disc-table-wrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1.5px solid #e0e0e0;
+}
+
+.disc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.disc-table thead tr {
+  background: #f5f5f5;
+}
+
+.disc-table th {
+  padding: 11px 14px;
+  text-align: left;
+  font-weight: 700;
+  color: #333;
+  border-bottom: 2px solid #e0e0e0;
+  white-space: nowrap;
+}
+.disc-th-center { text-align: center !important; }
+.merito-col  { color: #2e7d32 !important; }
+.demerito-col { color: #c62828 !important; }
+
+.disc-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: middle;
+}
+
+.disc-tr-par   { background: #fff; }
+.disc-tr-impar { background: #fafafa; }
+.disc-table tr:last-child td { border-bottom: none; }
+.disc-table tbody tr:hover { background: #f0f4ff; }
+
+.disc-td-num    { color: #999; font-size: 0.8rem; width: 40px; text-align: center; }
+.disc-td-ci     { color: #666; font-size: 0.82rem; }
+.disc-td-center { text-align: center; }
+
+.disc-td-nombre {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.disc-grado {
+  background: #6b1c1c;
+  color: #fff;
+  font-size: 0.68rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Badges puntos */
+.disc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.disc-badge.merito   { background: #e8f5e9; color: #2e7d32; }
+.disc-badge.demerito { background: #ffebee; color: #c62828; }
+.disc-badge.none     { color: #bbb; font-size: 0.78rem; }
+.disc-badge small    { font-size: 0.72rem; opacity: 0.75; }
+
+/* Saldo */
+.disc-saldo {
+  font-weight: 700;
+  font-size: 0.92rem;
+  padding: 3px 8px;
+  border-radius: 8px;
+}
+.disc-saldo.positivo { color: #2e7d32; background: #e8f5e9; }
+.disc-saldo.negativo { color: #c62828; background: #ffebee; }
+.disc-saldo.neutro   { color: #888;    background: #f5f5f5; }
+
+/* Acciones inline */
+.disc-acciones {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.disc-action-btn {
+  width: 32px; height: 32px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 7px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.95rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.disc-action-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,0.12); }
+.disc-action-btn.merito:hover   { border-color: #66bb6a; background: #f1faf2; }
+.disc-action-btn.demerito:hover { border-color: #ef9a9a; background: #fff5f5; }
+.disc-action-btn.historial:hover { border-color: #90caf9; background: #e3f2fd; }
+
+/* ── Empty / Spinner ────────────────────────────── */
+.disc-empty {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 48px 20px; gap: 10px;
+  color: #aaa;
+}
+.disc-empty span { font-size: 2.5rem; }
+.disc-empty p    { font-size: 0.9rem; margin: 0; }
+
+.disc-spinner {
+  display: flex; justify-content: center; padding: 40px;
+}
+.disc-ring {
+  width: 36px; height: 36px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #6b1c1c;
+  border-radius: 50%;
+  animation: disc-spin 0.8s linear infinite;
+}
+@keyframes disc-spin { to { transform: rotate(360deg); } }
+
+/* ═══════════════════════════════════════════════
+   MODALES
+═══════════════════════════════════════════════ */
+.disc-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+
+.disc-modal {
+  background: #fff;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  overflow: hidden;
+}
+.disc-modal-lg { max-width: 680px; }
+
+.disc-modal-header {
+  display: flex; align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1.5px solid #f0f0f0;
+}
+.disc-modal-header h3 {
+  margin: 0 0 4px 0;
+  font-size: 1.1rem;
+  color: #1a2535;
+}
+.disc-modal-sub { margin: 0; font-size: 0.82rem; color: #6b7a90; }
+
+.disc-modal-close {
+  background: none; border: none;
+  font-size: 1.1rem; color: #888;
+  cursor: pointer; padding: 2px 6px;
+  border-radius: 5px; transition: background 0.15s;
+  flex-shrink: 0;
+}
+.disc-modal-close:hover { background: #f0f0f0; }
+
+.disc-modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 16px;
+  flex: 1;
+}
+
+.disc-modal-footer {
+  padding: 16px 24px;
+  border-top: 1.5px solid #f0f0f0;
+  display: flex; gap: 10px; justify-content: flex-end;
+}
+
+/* Selector tipo */
+.disc-tipo-selector {
+  display: flex; gap: 0;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 12px 24px 0;
+}
+.disc-tipo-btn {
+  flex: 1; padding: 12px;
+  border: none; background: #f8f8f8;
+  cursor: pointer; font-size: 0.95rem;
+  font-weight: 600; transition: all 0.18s; color: #666;
+}
+.disc-tipo-btn.merito.active   { background: #e8f5e9; color: #2e7d32; }
+.disc-tipo-btn.demerito.active { background: #ffebee; color: #c62828; }
+.disc-tipo-btn:hover:not(.active) { background: #f0f0f0; }
+
+/* Campos form */
+.disc-field { display: flex; flex-direction: column; gap: 5px; }
+.disc-field label {
+  font-size: 0.82rem; font-weight: 600; color: #444;
+}
+.disc-opcional { font-weight: 400; color: #999; font-size: 0.78rem; }
+.disc-field input,
+.disc-field select,
+.disc-field textarea {
+  padding: 9px 12px;
+  border: 1.5px solid #d0d7de;
+  border-radius: 7px;
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.18s;
+  font-family: inherit;
+}
+.disc-field input:focus,
+.disc-field select:focus,
+.disc-field textarea:focus { border-color: #6b1c1c; }
+
+.disc-row2 {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+}
+
+/* Catálogo grid */
+.disc-catalogo-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.disc-catalogo-item {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 9px 12px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fafafa;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+}
+.disc-catalogo-item:hover { border-color: #aaa; background: #f5f5f5; }
+.disc-catalogo-item.selected.merito   { border-color: #4caf50; background: #e8f5e9; }
+.disc-catalogo-item.selected.demerito { border-color: #f44336; background: #ffebee; }
+
+.disc-cat-codigo { font-size: 0.7rem; color: #999; }
+.disc-cat-nombre { font-size: 0.82rem; color: #333; font-weight: 500; }
+.disc-cat-pts    { font-size: 0.78rem; font-weight: 700; margin-top: 2px; }
+.disc-catalogo-item.selected.merito   .disc-cat-pts { color: #2e7d32; }
+.disc-catalogo-item.selected.demerito .disc-cat-pts { color: #c62828; }
+.disc-catalogo-item:not(.selected) .disc-cat-pts { color: #888; }
+
+/* Error */
+.disc-error-msg {
+  background: #fff3cd; color: #856404;
+  padding: 9px 14px;
+  border-radius: 7px;
+  font-size: 0.85rem;
+  border: 1px solid #ffc107;
+}
+
+/* Botones modal */
+.disc-btn-cancel {
+  padding: 9px 20px;
+  border: 1.5px solid #d0d7de;
+  border-radius: 7px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.88rem;
+  color: #555;
+  transition: background 0.15s;
+}
+.disc-btn-cancel:hover { background: #f5f5f5; }
+
+.disc-btn-guardar {
+  padding: 9px 22px;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.18s;
+}
+.disc-btn-guardar.merito   { background: #2e7d32; color: #fff; }
+.disc-btn-guardar.demerito { background: #c62828; color: #fff; }
+.disc-btn-guardar:hover { opacity: 0.88; }
+.disc-btn-guardar:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ─── Historial ─────────────────────────────────── */
+.disc-hist-resumen {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px; margin-bottom: 4px;
+}
+.disc-hist-stat {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 12px 8px;
+  border-radius: 8px;
+  border: 1.5px solid #e0e0e0;
+}
+.disc-hist-stat.merito   { background: #f1faf2; border-color: #a5d6a7; }
+.disc-hist-stat.demerito { background: #fff5f5; border-color: #ef9a9a; }
+.disc-hist-stat.saldo    { background: #f8f8f8; }
+
+.disc-hist-stat-num { font-size: 1.4rem; font-weight: 700; }
+.disc-hist-stat.merito   .disc-hist-stat-num { color: #2e7d32; }
+.disc-hist-stat.demerito .disc-hist-stat-num { color: #c62828; }
+.disc-hist-stat-lbl { font-size: 0.75rem; color: #888; }
+
+.disc-hist-list { display: flex; flex-direction: column; gap: 8px; }
+
+.disc-hist-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 14px;
+  border-radius: 9px;
+  border: 1.5px solid #e8e8e8;
+  background: #fafafa;
+}
+.disc-hist-item.merito   { border-left: 4px solid #4caf50; }
+.disc-hist-item.demerito { border-left: 4px solid #f44336; }
+
+.disc-hist-badge {
+  display: flex; flex-direction: column; align-items: center;
+  min-width: 44px; gap: 2px;
+  font-size: 0.75rem; font-weight: 700;
+}
+.disc-hist-item.merito   .disc-hist-badge { color: #2e7d32; }
+.disc-hist-item.demerito .disc-hist-badge { color: #c62828; }
+.disc-hist-badge > span:first-child { font-size: 1.3rem; }
+
+.disc-hist-content { flex: 1; }
+.disc-hist-desc { font-size: 0.88rem; font-weight: 500; color: #222; margin-bottom: 4px; }
+.disc-hist-meta {
+  display: flex; gap: 12px; flex-wrap: wrap;
+  font-size: 0.75rem; color: #888;
+}
+.disc-hist-codigo {
+  background: #efefef; color: #555;
+  padding: 1px 7px; border-radius: 4px;
+  font-weight: 600; font-size: 0.72rem;
+}
+.disc-hist-obs { font-size: 0.78rem; color: #666; margin-top: 4px; font-style: italic; }
+
+.disc-hist-del {
+  background: none; border: none;
+  font-size: 1rem; cursor: pointer;
+  opacity: 0.45; transition: opacity 0.15s;
+  padding: 2px 4px; flex-shrink: 0;
+}
+.disc-hist-del:hover { opacity: 1; }
+
+@media (max-width: 600px) {
+  .disc-stats-row       { grid-template-columns: 1fr; }
+  .disc-catalogo-grid   { grid-template-columns: 1fr; }
+  .disc-row2            { grid-template-columns: 1fr; }
+  .disc-hist-resumen    { grid-template-columns: 1fr; }
+  .disc-filtros         { flex-direction: column; align-items: stretch; }
+}
+
+/* ═══════════════════════════════════════════════
+   MODAL ÉXITO
+═══════════════════════════════════════════════ */
+.disc-overlay-exito {
+  z-index: 1100;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 40px;
+  background: transparent;
+  pointer-events: none;
+}
+
+.disc-modal-exito {
+  pointer-events: all;
+  width: 360px;
+  border-radius: 16px;
+  padding: 28px 28px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.22);
+  overflow: hidden;
+  animation: disc-exito-in 0.3s cubic-bezier(.34,1.56,.64,1);
+}
+.disc-modal-exito.merito   { background: #fff; border: 2px solid #4caf50; }
+.disc-modal-exito.demerito { background: #fff; border: 2px solid #f44336; }
+
+@keyframes disc-exito-in {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.disc-exito-icono  { font-size: 2.8rem; line-height: 1; }
+
+.disc-exito-titulo {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1a2535;
+}
+
+.disc-exito-participante {
+  font-size: 0.85rem;
+  color: #555;
+  text-align: center;
+}
+
+.disc-exito-detalle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 12px;
+}
+
+.disc-exito-pts {
+  font-size: 1.2rem;
+  font-weight: 800;
+  padding: 2px 10px;
+  border-radius: 8px;
+}
+.disc-exito-pts.merito   { color: #2e7d32; background: #e8f5e9; }
+.disc-exito-pts.demerito { color: #c62828; background: #ffebee; }
+
+.disc-exito-desc {
+  font-size: 0.83rem;
+  color: #666;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Barra de progreso animada como timer */
+.disc-exito-bar {
+  width: calc(100% + 56px);
+  height: 4px;
+  background: #eee;
+  margin: 0 -28px;
+}
+.disc-exito-progress {
+  height: 100%;
+  width: 100%;
+  animation: disc-exito-drain 3.5s linear forwards;
+}
+.disc-exito-progress.merito   { background: #4caf50; }
+.disc-exito-progress.demerito { background: #f44336; }
+
+@keyframes disc-exito-drain {
+  from { width: 100%; }
+  to   { width: 0%; }
+}

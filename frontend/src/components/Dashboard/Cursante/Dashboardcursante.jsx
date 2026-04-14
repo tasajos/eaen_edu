@@ -11,6 +11,8 @@ import "../../Shared/VistaCalendario.css";
 import VistaPagos from "../../Shared/VistaPagos";
 import "../../Shared/VistaPagos.css";
 import ModalBloqueoFinanciero from "../../Shared/ModalBloqueoFinanciero";
+import VistaDisciplinaCursante from "../../Disciplina/Vistadisciplinacursante";
+import "../../Disciplina/Modulodisciplina.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 function getSession() {
@@ -289,6 +291,7 @@ export default function DashboardCursante() {
     { id:"notas",         icon:"📊", label:"Mis notas" },
     { id:"asistencia",    icon:"📋", label:"Asistencia" },
     { id:"calendario",    icon:"📅", label:"Calendario" },
+    { id:"disciplina",    icon:"⚖️", label:"Disciplina" },
     { id:"pagos",         icon:"💰", label:"Pagos" },
     { id:"notificaciones",icon:"🔔", label:"Notificaciones" },
   ];
@@ -419,6 +422,11 @@ export default function DashboardCursante() {
                         titulo="Mi Calendario de Clases"
                         modoDocente={false}
                       />
+                    )}
+
+                    {/* DISCIPLINA */}
+                    {vista === "disciplina" && (
+                      <VistaDisciplinaCursante session={session} cursoId={cursoId}/>
                     )}
 
                     {/* PAGOS */}

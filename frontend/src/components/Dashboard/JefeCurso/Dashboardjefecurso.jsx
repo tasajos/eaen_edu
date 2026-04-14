@@ -4,6 +4,8 @@ import { useNotificaciones } from "../../../hooks/useNotificaciones";
 import { NotificacionesPanel, NotifBell } from "../../Shared/NotificacionesPanel";
 import "../../Shared/NotificacionesPanel.css";
 import "./DashboardJefeCurso.css";
+import DisciplinaJefeCurso from "../../Disciplina/DisciplinaJefeCurso";
+import "../../Disciplina/DisciplinaJefeCurso.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 function getSession() {
@@ -29,10 +31,10 @@ export default function DashboardJefeCurso() {
 
   useEffect(()=>{
     if(!session){navigate("/");return;}
-    fetch(`${API}/api/cursos`).then(r=>r.json()).then(all=>{
-      if(!Array.isArray(all))return;
-      const mios=all.filter(c=>c.jefe_curso_id===session.id);
-      setCursos(mios); if(mios.length)setCursoId(mios[0].id);
+    fetch(`${API}/api/cursos/jefe/${session.id}`).then(r=>r.json()).then(d=>{
+      if(!Array.isArray(d))return;
+      setCursos(d);
+      if(d.length) setCursoId(d[0].id);
     }).catch(()=>{}).finally(()=>setLoading(false));
   },[]);
 
@@ -49,6 +51,7 @@ export default function DashboardJefeCurso() {
     {id:"resumen",       icon:"📊", label:"Resumen"},
     {id:"participantes", icon:"👥", label:"Participantes"},
     {id:"materias",      icon:"📚", label:"Materias"},
+    {id:"disciplina",    icon:"⚖️", label:"Disciplina"},
     {id:"notificaciones",icon:"🔔", label:"Notificaciones"},
   ];
 
@@ -141,6 +144,7 @@ export default function DashboardJefeCurso() {
                 </div>
                 <div className="panel-body">
                   {loadingCurso ? <Spinner/> : (<>
+
                     {/* RESUMEN */}
                     {vista==="resumen"&&cursoDetalle&&(
                       <div className="resumen-grid">
@@ -163,6 +167,7 @@ export default function DashboardJefeCurso() {
                         </div>
                       </div>
                     )}
+
                     {/* PARTICIPANTES */}
                     {vista==="participantes"&&(!cursoDetalle?.participantes?.length?<p className="empty-msg">No hay participantes.</p>:
                       <div className="jc-table-wrap"><table className="jc-table">
@@ -175,6 +180,7 @@ export default function DashboardJefeCurso() {
                         </tbody>
                       </table></div>
                     )}
+
                     {/* MATERIAS */}
                     {vista==="materias"&&(!cursoDetalle?.materias?.length?<p className="empty-msg">Sin materias registradas.</p>:
                       <div className="materias-cards">{cursoDetalle.materias.map(m=>(
@@ -189,6 +195,15 @@ export default function DashboardJefeCurso() {
                         </div>))}
                       </div>
                     )}
+
+                    {/* DISCIPLINA */}
+                    {vista==="disciplina" && (
+                      <DisciplinaJefeCurso
+                        session={session}
+                        cursoId={cursoId}
+                      />
+                    )}
+
                   </>)}
                 </div>
               </div>

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import LoginEAEN            from "./components/LoginEAEN/LoginEAEN";
 import DashboardJefe        from "./components/Dashboard/Jefeunidad/Dashboardjefe";
@@ -6,6 +7,7 @@ import GestionCursos        from "./components/GestionCursos/GestionCursos";
 import GestionNotificaciones from "./components/GestionNotificaciones/GestionNotificaciones";
 import GestionEvaluaciones from "./components/GestionEvaluaciones/GestionEvaluaciones";
 import GestionFinanzas     from "./components/GestionFinanzas/GestionFinanzas";
+import ConfigDisciplina    from "./components/Disciplina/Configdisciplina";
 import GestionEducativa     from "./components/GestionEducativa/GestionEducativa";
 import DashboardDocente     from "./components/Dashboard/Docente/Dashboarddocente";
 import DashboardCursante    from "./components/Dashboard/Cursante/Dashboardcursante";
@@ -31,6 +33,41 @@ function getRolDashboard(session) {
 }
 
 // ─── Guard: solo si está autenticado ────────────────────────
+// Wrapper para ConfigDisciplina — selecciona curso
+function ConfigDisciplinaWrapper() {
+  const [cursos, setCursos] = useState([]);
+  const [cursoId, setCursoId] = useState(null);
+  const [cursoDetalle, setCursoDetalle] = useState(null);
+  const session = (() => { try{ return JSON.parse(localStorage.getItem("eaen_session")||"null"); }catch{ return null; } })();
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+  useEffect(()=>{
+    fetch(`${API}/api/cursos`).then(r=>r.json()).then(d=>{ if(Array.isArray(d)){ setCursos(d); if(d.length) setCursoId(d[0].id); }}).catch(()=>{});
+  },[]);
+
+  useEffect(()=>{
+    if(!cursoId) return;
+    fetch(`${API}/api/cursos/${cursoId}`).then(r=>r.json()).then(d=>setCursoDetalle(d)).catch(()=>{});
+  },[cursoId]);
+
+  return (
+    <div style={{minHeight:"100vh",background:"#f0f4f8",padding:"24px 32px",fontFamily:"'IBM Plex Sans',sans-serif"}}>
+      <div style={{background:"#003366",color:"#fff",borderRadius:14,padding:"18px 24px",marginBottom:20,display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+        <button onClick={()=>window.history.back()} style={{background:"rgba(255,255,255,.12)",border:"1.5px solid rgba(255,255,255,.25)",color:"#fff",padding:"7px 16px",borderRadius:9,cursor:"pointer",fontWeight:600,fontSize:13}}>← Volver</button>
+        <div style={{flex:1}}>
+          <div style={{fontSize:20,fontWeight:800}}>⚖️ Configuración de Disciplina</div>
+          <div style={{fontSize:12,opacity:.7,marginTop:2}}>Define el porcentaje disciplinario por materia</div>
+        </div>
+        <select value={cursoId||""} onChange={e=>setCursoId(Number(e.target.value))}
+          style={{padding:"8px 14px",borderRadius:9,border:"2px solid rgba(255,255,255,.3)",background:"rgba(255,255,255,.1)",color:"#fff",fontSize:13,fontFamily:"inherit"}}>
+          {cursos.map(c=><option key={c.id} value={c.id} style={{color:"#1a2535"}}>{c.nombre}</option>)}
+        </select>
+      </div>
+      <ConfigDisciplina cursoId={cursoId} cursoDetalle={cursoDetalle} session={session}/>
+    </div>
+  );
+}
+
 function PrivateRoute({ children, rolesPermitidos }) {
   const session = getSession();
   if (!session) return <Navigate to="/" replace />;
@@ -87,6 +124,11 @@ export default function App() {
         <Route path="/gestion-notificaciones" element={
           <PrivateRoute rolesPermitidos={["JEFE_ESTUDIOS","ADMIN"]}>
             <GestionNotificaciones />
+          </PrivateRoute>
+        }/>
+        <Route path="/gestion-disciplina" element={
+          <PrivateRoute rolesPermitidos={["ADMIN","JEFE_ESTUDIOS"]}>
+            <ConfigDisciplinaWrapper/>
           </PrivateRoute>
         }/>
         <Route path="/gestion-finanzas" element={

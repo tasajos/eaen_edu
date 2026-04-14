@@ -211,6 +211,31 @@ app.post("/api/cursos", async (req,res) => {
   } finally{conn.release();}
 });
 
+
+/** GET /api/cursos/jefe/:usuarioId
+ *  Devuelve cursos donde el usuario es jefe_curso_id O tiene rol JEFE_CURSO en responsabilidades
+ */
+app.get("/api/cursos/jefe/:usuarioId", async (req,res) => {
+  try {
+    const uid = Number(req.params.usuarioId);
+    if(!uid) return res.status(400).json({message:"ID inválido"});
+    const [r] = await pool.execute(`
+      SELECT DISTINCT c.id, c.nombre, c.descripcion, c.jefe_curso_id,
+             c.fecha_inicio, c.fecha_fin, c.modalidad, c.horas_academicas,
+             c.estado, c.creado_en,
+             (SELECT COUNT(*) FROM curso_participantes cp WHERE cp.curso_id=c.id) AS participantes_total,
+             (SELECT COUNT(*) FROM curso_materias cm WHERE cm.curso_id=c.id) AS materias_total
+      FROM cursos c
+      WHERE c.jefe_curso_id = ?
+         OR c.id IN (
+              SELECT curso_id FROM curso_responsabilidades
+              WHERE usuario_id = ? AND rol = 'JEFE_CURSO'
+            )
+      ORDER BY c.creado_en DESC`, [uid, uid]);
+    res.json(r);
+  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
 app.get("/api/cursos", async (req,res) => {
   try {
     const [r] = await pool.query(`
@@ -290,16 +315,30 @@ app.delete("/api/cursos/:id/participantes", async (req,res) => {
   } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
 });
 
+// ════════════════════════════════════════════════════════════
+// FIX #1: GET responsabilidades — excluir JEFE_CURSO de curso_responsabilidades
+// ya que el jefe se devuelve por separado desde cursos.jefe_curso_id
+// ════════════════════════════════════════════════════════════
 app.get("/api/cursos/:id/responsabilidades", async (req,res) => {
   try {
     const cursoId = Number(req.params.id);
     if(!cursoId) return res.status(400).json({message:"ID inválido"});
     const curso = await assertCursoExists(pool,cursoId);
     if(!curso) return res.status(404).json({message:"Curso no encontrado"});
-    const [jR] = await pool.execute(`SELECT u.id,u.nombre,u.ap_paterno,u.ap_materno,u.ci,u.tipo_usuario,u.estado FROM usuarios u WHERE u.id=? LIMIT 1`,[curso.jefe_curso_id]);
-    const [rR] = await pool.execute(`SELECT cr.id,cr.rol,cr.usuario_id,cr.creado_en,u.nombre,u.ap_paterno,u.ap_materno,u.ci,u.tipo_usuario,u.estado
-      FROM curso_responsabilidades cr INNER JOIN usuarios u ON u.id=cr.usuario_id WHERE cr.curso_id=? ORDER BY cr.rol ASC`,[cursoId]);
-    res.json({curso_id:cursoId,jefe_curso:jR.length?{rol:"JEFE_CURSO",...jR[0]}:null,responsabilidades:rR});
+    const [jR] = await pool.execute(
+      `SELECT u.id,u.nombre,u.ap_paterno,u.ap_materno,u.ci,u.tipo_usuario,u.estado
+       FROM usuarios u WHERE u.id=? LIMIT 1`,
+      [curso.jefe_curso_id]);
+    // CAMBIO: AND cr.rol != 'JEFE_CURSO' evita que aparezca duplicado
+    const [rR] = await pool.execute(
+      `SELECT cr.id,cr.rol,cr.usuario_id,cr.creado_en,
+              u.nombre,u.ap_paterno,u.ap_materno,u.ci,u.tipo_usuario,u.estado
+       FROM curso_responsabilidades cr
+       INNER JOIN usuarios u ON u.id=cr.usuario_id
+       WHERE cr.curso_id=? AND cr.rol != 'JEFE_CURSO'
+       ORDER BY cr.rol ASC`,
+      [cursoId]);
+    res.json({curso_id:cursoId, jefe_curso:jR.length?{rol:"JEFE_CURSO",...jR[0]}:null, responsabilidades:rR});
   } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
 });
 
@@ -318,7 +357,11 @@ app.post("/api/cursos/:id/responsabilidades", async (req,res) => {
       const uid = Number(usuario_id);
       const ok = await assertNoCursanteActivo(conn,uid);
       if(!ok.ok){await conn.rollback();return res.status(ok.code).json({message:ok.msg});}
+      // Actualizar jefe_curso_id en cursos
       await conn.execute(`UPDATE cursos SET jefe_curso_id=? WHERE id=? LIMIT 1`,[uid,cursoId]);
+      // También registrar en curso_responsabilidades para que el dashboard lo encuentre
+      await conn.execute(`DELETE FROM curso_responsabilidades WHERE curso_id=? AND rol='JEFE_CURSO'`,[cursoId]);
+      await conn.execute(`INSERT INTO curso_responsabilidades (curso_id,usuario_id,rol) VALUES (?,?,'JEFE_CURSO')`,[cursoId,uid]);
       await conn.commit();return res.json({message:"Jefe asignado",curso_id:cursoId,rol});
     }
     if(ROLES_SINGLE.has(rol)){
@@ -343,6 +386,9 @@ app.post("/api/cursos/:id/responsabilidades", async (req,res) => {
   finally{conn.release();}
 });
 
+// ════════════════════════════════════════════════════════════
+// FIX #2: DELETE responsabilidades JEFE_CURSO — limpiar ambas tablas
+// ════════════════════════════════════════════════════════════
 app.delete("/api/cursos/:id/responsabilidades", async (req,res) => {
   const conn = await pool.getConnection();
   try {
@@ -354,7 +400,9 @@ app.delete("/api/cursos/:id/responsabilidades", async (req,res) => {
     const curso = await assertCursoExists(conn,cursoId);
     if(!curso){await conn.rollback();return res.status(404).json({message:"Curso no encontrado"});}
     if(rol==="JEFE_CURSO"){
+      // CAMBIO: limpiar también curso_responsabilidades al remover jefe
       await conn.execute(`UPDATE cursos SET jefe_curso_id=NULL WHERE id=? LIMIT 1`,[cursoId]);
+      await conn.execute(`DELETE FROM curso_responsabilidades WHERE curso_id=? AND rol='JEFE_CURSO'`,[cursoId]);
       await conn.commit();return res.json({message:"Jefe removido"});
     }
     let ids = usuario_id?[Number(usuario_id)]:Array.isArray(usuarios_ids)?usuarios_ids.map(x=>Number(x)).filter(Boolean):[];
@@ -399,7 +447,6 @@ app.post("/api/cursos/:cursoId/materias", async (req,res) => {
     const [cR] = await pool.execute(`SELECT id FROM cursos WHERE id=? LIMIT 1`,[cursoId]);
     if(!cR.length) return res.status(404).json({message:"Curso no encontrado"});
 
-    // Si se asigna docente, validar que exista y sea no-cursante activo
     if(docente_id){
       const ok = await assertNoCursanteActivo(pool,Number(docente_id));
       if(!ok.ok) return res.status(ok.code).json({message:ok.msg});
@@ -621,7 +668,6 @@ app.post("/api/calificaciones", async (req,res) => {
 
     await conn.beginTransaction();
 
-    // Obtener o crear eval_config para esta materia
     let [evalRows] = await conn.execute(`SELECT id,nombre FROM eval_config WHERE materia_id=? ORDER BY orden ASC`,[materia_id]);
     if(!evalRows.length){
       const nombresEval = Object.keys(calificaciones[0]?.notas||{});
@@ -674,7 +720,6 @@ app.post("/api/calificaciones/usuario", async (req,res) => {
     const materia = await assertMateriaExists(conn, materia_id);
     if(!materia) return res.status(404).json({message:"Materia no encontrada"});
 
-    // Verificar si ya está bloqueado
     const [chk] = await conn.execute(
       `SELECT bloqueado FROM calificaciones WHERE materia_id=? AND usuario_id=? LIMIT 1`,
       [materia_id, usuario_id]);
@@ -683,7 +728,6 @@ app.post("/api/calificaciones/usuario", async (req,res) => {
 
     await conn.beginTransaction();
 
-    // Obtener eval_config
     let [evalRows] = await conn.execute(
       `SELECT id,nombre FROM eval_config WHERE materia_id=? ORDER BY orden ASC`,[materia_id]);
     if(!evalRows.length){
@@ -740,7 +784,7 @@ app.get("/api/calificaciones/materia/:materiaId", async (req,res) => {
        WHERE c.materia_id=?`,[materiaId]);
 
     const notasMap = {};
-    const bloqueadoMap = {}; // { usuario_id: true/false }
+    const bloqueadoMap = {};
     for(const n of notaRows){
       if(!notasMap[n.usuario_id]) notasMap[n.usuario_id]={};
       notasMap[n.usuario_id][n.eval_nombre]=Number(n.nota);
@@ -881,7 +925,6 @@ app.post("/api/tareas", async (req,res) => {
     );
     const tareaId = result.insertId;
 
-    // Crear entregas pendientes para todos los participantes del curso
     const [partRows] = await conn.execute(
       `SELECT usuario_id FROM curso_participantes WHERE curso_id=?`,[curso_id]);
 
@@ -928,9 +971,7 @@ app.patch("/api/tareas/:tareaId/entregas/:usuarioId", async (req,res) => {
     if(estado && !estadosValidos.has(String(estado).toUpperCase())) return res.status(400).json({message:"Estado inválido"});
 
     const estadoFinal  = estado?String(estado).toUpperCase():undefined;
-    const entregado_en = estadoFinal==="ENTREGADO"?"NOW()":null;
 
-    // Build dynamic SET
     const sets = [];
     const params = [];
     if(estadoFinal){sets.push("estado=?");params.push(estadoFinal);}
@@ -958,11 +999,6 @@ app.delete("/api/tareas/:id", async (req,res) => {
     res.json({message:"Tarea eliminada"});
   } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
 });
-
-
-
-
-// ════════════════════════════════════════════════════════════
 
 // ════════════════════════════════════════════════════════════
 // EVALUACIONES INSTITUCIONALES
@@ -1384,7 +1420,6 @@ app.post("/api/finanzas/conceptos", async (req,res) => {
       [curso_id,tipo,descripcion||null,Number(monto),fecha_venc||null,
        mes?Number(mes):null, anio?Number(anio):null, creado_por||null]);
 
-    // Auto-generar registros PENDIENTE para todos los participantes del curso
     const [parts] = await pool.execute(
       `SELECT usuario_id FROM curso_participantes WHERE curso_id=?`,[curso_id]);
     if(parts.length){
@@ -1434,7 +1469,6 @@ app.get("/api/finanzas/pagos", async (req,res) => {
        JOIN finanzas_conceptos fc ON fc.id=fp.concepto_id
        WHERE fp.curso_id=?`, [Number(curso_id)]);
 
-    // Construir mapa de pagos por usuario
     const pagoMap = {};
     for(const p of pagos){
       if(!pagoMap[p.usuario_id]) pagoMap[p.usuario_id] = {};
@@ -1496,11 +1530,8 @@ app.patch("/api/finanzas/pagos/:conceptoId/:usuarioId", async (req,res) => {
 app.get("/api/finanzas/estado/:usuarioId", async (req,res) => {
   try {
     const uid = Number(req.params.usuarioId);
-
-    // Buscar mensualidades en MORA o vencidas sin pagar
     const hoy = new Date().toISOString().slice(0,10);
 
-    // 1. Cualquier pago marcado explícitamente como MORA (cualquier tipo)
     const [mora] = await pool.execute(
       `SELECT fp.id, fc.descripcion, fc.tipo, fc.mes, fc.anio, fc.fecha_venc, fc.monto,
               fp.estado, c.nombre AS curso_nombre
@@ -1510,7 +1541,6 @@ app.get("/api/finanzas/estado/:usuarioId", async (req,res) => {
        WHERE fp.usuario_id=? AND fp.estado='MORA' AND fc.activo=1`,
       [uid]);
 
-    // 2. Mensualidades PENDIENTES con fecha_venc vencida más de 30 días
     const [vencidas] = await pool.execute(
       `SELECT fp.id, fc.descripcion, fc.tipo, fc.mes, fc.anio, fc.fecha_venc, fc.monto,
               fp.estado, c.nombre AS curso_nombre
@@ -1549,6 +1579,93 @@ app.get("/api/finanzas/resumen/:usuarioId", async (req,res) => {
       [uid]);
     res.json(rows);
   } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+});
+
+// ════════════════════════════════════════════════════════════
+// DISCIPLINA — 
+// ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// DISCIPLINA // ════════════════════════════════════════════════════════════
+
+// GET /api/disciplina/catalogo
+app.get("/api/disciplina/catalogo", async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT * FROM disciplina_catalogo WHERE activo=1 ORDER BY tipo, puntos DESC`
+    );
+    res.json(rows);
+  } catch (e) { res.status(500).json({ message: "Error interno", detail: e.message }); }
+});
+
+// GET /api/disciplina/resumen/:cursoId  — solo cursantes (tipo_usuario = 'Cursante')
+app.get("/api/disciplina/resumen/:cursoId", async (req, res) => {
+  try {
+    const { cursoId } = req.params;
+    const [rows] = await pool.query(
+      `SELECT
+         u.id AS usuario_id,
+         u.nombre, u.ap_paterno, u.ap_materno, u.ci, u.grado,
+         COALESCE(SUM(CASE WHEN dr.tipo='MERITO'   THEN dr.puntos ELSE 0 END), 0) AS meritos,
+         COALESCE(SUM(CASE WHEN dr.tipo='DEMERITO' THEN dr.puntos ELSE 0 END), 0) AS demeritos,
+         COALESCE(SUM(CASE WHEN dr.tipo='MERITO'   THEN dr.puntos ELSE 0 END), 0)
+           - COALESCE(SUM(CASE WHEN dr.tipo='DEMERITO' THEN dr.puntos ELSE 0 END), 0) AS saldo,
+         COUNT(CASE WHEN dr.tipo='MERITO'   THEN 1 END) AS cant_meritos,
+         COUNT(CASE WHEN dr.tipo='DEMERITO' THEN 1 END) AS cant_demeritos
+       FROM usuarios u
+       JOIN curso_participantes cp ON cp.usuario_id = u.id AND cp.curso_id = ?
+       LEFT JOIN disciplina_registros dr ON dr.usuario_id = u.id AND dr.curso_id = ?
+       WHERE u.tipo_usuario = 'Cursante'
+       GROUP BY u.id, u.nombre, u.ap_paterno, u.ap_materno, u.ci, u.grado
+       ORDER BY u.ap_paterno, u.ap_materno`,
+      [cursoId, cursoId]
+    );
+    res.json(rows);
+  } catch (e) { res.status(500).json({ message: "Error interno", detail: e.message }); }
+});
+
+// GET /api/disciplina/historial/:cursoId/:usuarioId
+app.get("/api/disciplina/historial/:cursoId/:usuarioId", async (req, res) => {
+  try {
+    const { cursoId, usuarioId } = req.params;
+    const [rows] = await pool.query(
+      `SELECT dr.id, dr.tipo, dr.descripcion, dr.puntos, dr.fecha, dr.observacion, dr.creado_en,
+              dc.codigo, dc.nombre AS catalogo_nombre,
+              CONCAT(u.ap_paterno,' ',u.ap_materno,' ',u.nombre) AS registrado_por_nombre
+       FROM disciplina_registros dr
+       LEFT JOIN disciplina_catalogo dc ON dc.id = dr.catalogo_id
+       JOIN usuarios u ON u.id = dr.registrado_por
+       WHERE dr.curso_id = ? AND dr.usuario_id = ?
+       ORDER BY dr.fecha DESC, dr.creado_en DESC`,
+      [cursoId, usuarioId]
+    );
+    res.json(rows);
+  } catch (e) { res.status(500).json({ message: "Error interno", detail: e.message }); }
+});
+
+// POST /api/disciplina/registrar
+app.post("/api/disciplina/registrar", async (req, res) => {
+  try {
+    const { curso_id, usuario_id, catalogo_id, tipo, descripcion, puntos, fecha, registrado_por, observacion } = req.body;
+    if (!curso_id || !usuario_id || !tipo || !descripcion || !puntos || !fecha || !registrado_por) {
+      return res.status(400).json({ message: "Faltan campos requeridos" });
+    }
+    const [result] = await pool.query(
+      `INSERT INTO disciplina_registros
+         (curso_id, usuario_id, catalogo_id, tipo, descripcion, puntos, fecha, registrado_por, observacion)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [curso_id, usuario_id, catalogo_id || null, tipo, descripcion, puntos, fecha, registrado_por, observacion || null]
+    );
+    res.json({ id: result.insertId, message: "Registro guardado" });
+  } catch (e) { res.status(500).json({ message: "Error interno", detail: e.message }); }
+});
+
+// DELETE /api/disciplina/registro/:id
+app.delete("/api/disciplina/registro/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query(`DELETE FROM disciplina_registros WHERE id = ?`, [id]);
+    res.json({ message: "Registro eliminado" });
+  } catch (e) { res.status(500).json({ message: "Error interno", detail: e.message }); }
 });
 
 // ════════════════════════════════════════════════════════════
@@ -1625,13 +1742,6 @@ app.post("/api/notificaciones/:id/leer", async (req,res) => {
 /**
  * POST /api/auth/login
  * body: { ci, password }
- *
- * Redirige según:
- *   tipo_usuario = "Cursante"          → dashboard-cursante
- *   rol = "JEFE_ESTUDIOS" / "ADMIN"   → dashboard-jefe
- *   rol = "DOCENTE"                    → dashboard-docente
- *   rol = "JEFE_CURSO"                 → dashboard-jefe-curso
- *   rol = "CURSANTE"                   → dashboard-cursante
  */
 app.post("/api/auth/login", async (req, res) => {
   try {
@@ -1660,13 +1770,10 @@ app.post("/api/auth/login", async (req, res) => {
 
     let valid = false;
     if (hash.startsWith("$2b$") || hash.startsWith("$2a$")) {
-      // Password hasheado con bcrypt
       valid = await bcrypt.compare(String(password), hash);
     } else {
-      // Password en texto plano (legado) — comparar directo y luego hashear
       valid = hash === String(password);
       if (valid) {
-        // Migrar a bcrypt automáticamente
         const nuevoHash = await bcrypt.hash(String(password), 10);
         await pool.execute(`UPDATE usuarios SET password=? WHERE id=? LIMIT 1`, [nuevoHash, usuario.id]);
         console.log(`[auth] Password migrado a bcrypt para usuario id=${usuario.id}`);
