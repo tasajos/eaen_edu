@@ -44,7 +44,7 @@ function VistaTareasCursante({ materia, session, showToast }) {
   useEffect(() => {
     if (!materia?.id || !session?.id) return;
     setCargando(true);
-    fetch(`${API}/api/tareas/materia/${materia.id}`)
+    fetch(`${API}/tareas/materia/${materia.id}`)
       .then(r => r.json())
       .then(async d => {
         if (!Array.isArray(d)) return;
@@ -52,7 +52,7 @@ function VistaTareasCursante({ materia, session, showToast }) {
         const map = {};
         for (const t of d) {
           try {
-            const er = await fetch(`${API}/api/tareas/${t.id}/mi-entrega/${session.id}`);
+            const er = await fetch(`${API}/tareas/${t.id}/mi-entrega/${session.id}`);
             if (er.ok) { const ed = await er.json(); map[t.id] = ed; }
           } catch {}
         }
@@ -67,7 +67,7 @@ function VistaTareasCursante({ materia, session, showToast }) {
     if (!resp) return showToast("❌ Escribe tu respuesta antes de enviar", "error");
     setEnviando(p => ({ ...p, [tareaId]: true }));
     try {
-      const r = await fetch(`${API}/api/tareas/${tareaId}/entregar`, {
+      const r = await fetch(`${API}/tareas/${tareaId}/entregar`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ usuario_id: session.id, respuesta: resp })
       });
@@ -75,7 +75,7 @@ function VistaTareasCursante({ materia, session, showToast }) {
       if (!r.ok) throw new Error(d.message);
       showToast("✅ Tarea entregada exitosamente");
       // Actualizar estado local
-      const er = await fetch(`${API}/api/tareas/${tareaId}/mi-entrega/${session.id}`);
+      const er = await fetch(`${API}/tareas/${tareaId}/mi-entrega/${session.id}`);
       if (er.ok) { const ed = await er.json(); setEntregas(p => ({ ...p, [tareaId]: ed })); }
       setRespForm(p => ({ ...p, [tareaId]: "" }));
     } catch(e) { showToast(`❌ ${e.message}`, "error"); }
@@ -222,18 +222,18 @@ export default function DashboardCursante() {
   useEffect(() => {
     if (!session) { navigate("/"); return; }
     // Verificar bloqueo financiero PRIMERO antes de cargar el resto
-    fetch(`${API}/api/finanzas/estado/${session.id}`)
+    fetch(`${API}/finanzas/estado/${session.id}`)
       .then(r=>r.json())
       .then(d=>{ if(d.bloqueado) setBloqueoFin({deudas:d.deudas,totalDeuda:d.total_deuda}); })
       .catch(()=>{})
       .finally(()=>setCheckingFin(false));
-    fetch(`${API}/api/cursos`)
+    fetch(`${API}/cursos`)
       .then(r => r.json())
       .then(async all => {
         if (!Array.isArray(all)) return;
         const mios = [];
         for (const c of all) {
-          const dr = await fetch(`${API}/api/cursos/${c.id}`);
+          const dr = await fetch(`${API}/cursos/${c.id}`);
           const dd = await dr.json();
           if (Array.isArray(dd.participantes) && dd.participantes.find(p => p.id === session.id))
             mios.push(c);
@@ -247,7 +247,7 @@ export default function DashboardCursante() {
 
   useEffect(() => {
     if (!cursoId) return;
-    fetch(`${API}/api/cursos/${cursoId}/materias`)
+    fetch(`${API}/cursos/${cursoId}/materias`)
       .then(r => r.json())
       .then(d => {
         if (Array.isArray(d)) { setMaterias(d); setMateriaId(d.length ? d[0].id : null); }
@@ -257,7 +257,7 @@ export default function DashboardCursante() {
 
   useEffect(() => {
     if (!materiaId || !session) return;
-    fetch(`${API}/api/calificaciones/materia/${materiaId}`)
+    fetch(`${API}/calificaciones/materia/${materiaId}`)
       .then(r => r.json())
       .then(d => {
         if (d.libro) {
@@ -265,7 +265,7 @@ export default function DashboardCursante() {
           setNotas(e ? { ...e, evaluaciones: d.evaluaciones } : null);
         }
       }).catch(() => setNotas(null));
-    fetch(`${API}/api/asistencia/materia/${materiaId}?usuario_id=${session.id}`)
+    fetch(`${API}/asistencia/materia/${materiaId}?usuario_id=${session.id}`)
       .then(r => r.json())
       .then(d => setAsist(Array.isArray(d) ? d : []))
       .catch(() => setAsist([]));

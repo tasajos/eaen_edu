@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import "../subview.css";
 import "./CrearCurso.css";
 
-const API_BASE = "http://localhost:5000";
+const API_BASE = import.meta.env.VITE_API_URL;
 
 // ===== UI Helpers =====
 function fullName(u) {
@@ -74,8 +74,8 @@ export default function CrearCurso({ onBack }) {
         setLoadError("");
 
         const [rC, rJ] = await Promise.all([
-          fetch(`${API_BASE}/api/usuarios/cursantes-activos`),
-          fetch(`${API_BASE}/api/usuarios/jefes-curso`),
+          fetch(`${API_BASE}/usuarios/cursantes-activos`),
+          fetch(`${API_BASE}/usuarios/jefes-curso`),
         ]);
 
         const cursData = await rC.json().catch(() => []);
@@ -224,7 +224,7 @@ export default function CrearCurso({ onBack }) {
         participantes_ids: selectedIds.map(Number),
       };
 
-      const resp = await fetch(`${API_BASE}/api/cursos`, {
+      const resp = await fetch(`${API_BASE}/cursos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -287,7 +287,7 @@ export default function CrearCurso({ onBack }) {
         <div className="eaen-alert">
           <b>Error:</b> {loadError}
           <div style={{ marginTop: 8 }}>
-            Verifica: <code>http://localhost:5000/api/health</code>
+            Verifica: <code>import.meta.env.VITE_API_URL/health</code>
           </div>
         </div>
       )}
@@ -512,3 +512,5 @@ function StatusModal({ type = "success", title, message, onClose }) {
     </div>
   );
 }
+
+

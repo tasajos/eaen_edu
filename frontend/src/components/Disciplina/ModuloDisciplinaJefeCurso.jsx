@@ -42,7 +42,7 @@ function ModalRegistrar({ participantes, catalogo, cursoId, registradoPor, onClo
     if (!puntos || puntos <= 0) return setError("Los puntos deben ser mayor a 0.");
     setError(""); setSaving(true);
     try {
-      const res = await fetch(`${API}/api/disciplina/registros`, {
+      const res = await fetch(`${API}/disciplina/registros`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -190,7 +190,7 @@ function ModalHistorial({ cursante, cursoId, onClose, onEliminado }) {
     setLoading(true);
     try {
       const res = await fetch(
-        `${API}/api/disciplina/registros?curso_id=${cursoId}&usuario_id=${cursante.id}`
+        `${API}/disciplina/registros?curso_id=${cursoId}&usuario_id=${cursante.id}`
       );
       const data = await res.json();
       setRegistros(Array.isArray(data) ? data : []);
@@ -203,7 +203,7 @@ function ModalHistorial({ cursante, cursoId, onClose, onEliminado }) {
   const eliminar = async (id) => {
     if (!window.confirm("¿Eliminar este registro?")) return;
     try {
-      await fetch(`${API}/api/disciplina/registros/${id}`, { method: "DELETE" });
+      await fetch(`${API}/disciplina/registros/${id}`, { method: "DELETE" });
       onEliminado();
       cargar();
     } catch {}
@@ -311,8 +311,8 @@ export default function ModuloDisciplinaJefeCurso({ cursoId, cursoDetalle, sessi
     setLoading(true);
     try {
       const [resR, catR] = await Promise.all([
-        fetch(`${API}/api/disciplina/resumen/${cursoId}`).then(r => r.json()),
-        fetch(`${API}/api/disciplina/catalogo`).then(r => r.json()),
+        fetch(`${API}/disciplina/resumen/${cursoId}`).then(r => r.json()),
+        fetch(`${API}/disciplina/catalogo`).then(r => r.json()),
       ]);
       setResumen(Array.isArray(resR) ? resR : []);
       setCatalogo(Array.isArray(catR) ? catR : []);

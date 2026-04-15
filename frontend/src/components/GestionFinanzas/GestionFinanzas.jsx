@@ -50,7 +50,7 @@ function ModalPago({ pago, usuario, onClose, onGuardado, registrado_por }){
   const guardar = async () => {
     setSaving(true); setError("");
     try {
-      const r = await fetch(`${API}/api/finanzas/pagos/${pago.concepto_id}/${usuario.id}`,{
+      const r = await fetch(`${API}/finanzas/pagos/${pago.concepto_id}/${usuario.id}`,{
         method:"PATCH", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({...form, registrado_por})
       });
@@ -176,7 +176,7 @@ function ModalConcepto({ cursoId, onClose, onCreado, creado_por }){
     if(!form.monto || Number(form.monto)<=0) return setError("El monto debe ser mayor a 0");
     setSaving(true); setError("");
     try {
-      const r = await fetch(`${API}/api/finanzas/conceptos`,{
+      const r = await fetch(`${API}/finanzas/conceptos`,{
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({...form, curso_id:cursoId,
           monto:Number(form.monto), mes:form.mes?Number(form.mes):null,
@@ -283,14 +283,14 @@ export default function GestionFinanzas(){
   // Cargar cursos
   useEffect(()=>{
     if(!session){ navigate("/"); return; }
-    fetch(`${API}/api/cursos`).then(r=>r.json()).then(d=>{ if(Array.isArray(d)){ setCursos(d); if(d.length) setCursoId(d[0].id); }}).catch(()=>{});
+    fetch(`${API}/cursos`).then(r=>r.json()).then(d=>{ if(Array.isArray(d)){ setCursos(d); if(d.length) setCursoId(d[0].id); }}).catch(()=>{});
   },[]);
 
   const cargar = useCallback(async()=>{
     if(!cursoId) return;
     setLoading(true);
     try {
-      const r = await fetch(`${API}/api/finanzas/pagos?curso_id=${cursoId}`);
+      const r = await fetch(`${API}/finanzas/pagos?curso_id=${cursoId}`);
       const d = await r.json();
       if(d.conceptos) setConceptos(d.conceptos);
       if(d.participantes) setPartics(d.participantes);
@@ -320,7 +320,7 @@ export default function GestionFinanzas(){
   const eliminarConcepto = async (id) => {
     if(!confirm("¿Eliminar este concepto y todos sus pagos asociados?")) return;
     try {
-      const r = await fetch(`${API}/api/finanzas/conceptos/${id}`,{method:"DELETE"});
+      const r = await fetch(`${API}/finanzas/conceptos/${id}`,{method:"DELETE"});
       const d = await r.json();
       if(!r.ok) throw new Error(d.message);
       showToast("🗑 Concepto eliminado");

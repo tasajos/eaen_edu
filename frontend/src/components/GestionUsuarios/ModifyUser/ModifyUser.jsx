@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import "./ModifyUser.css";
 
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = import.meta.env.VITE_API_URL;
 
 // ✅ Mismas opciones que Addusers.jsx
 const GRADO_OPTIONS = [
@@ -665,3 +665,4 @@ function StatusModal({ type = "success", title, message, onClose }) {
     </div>
   );
 }
+

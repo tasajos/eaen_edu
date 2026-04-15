@@ -147,7 +147,7 @@ export default function VistaPagos({ session }) {
 
   useEffect(() => {
     if (!session?.id) return;
-    fetch(`${API}/api/finanzas/resumen/${session.id}`)
+    fetch(`${API}/finanzas/resumen/${session.id}`)
       .then(r => r.json())
       .then(d => { if (Array.isArray(d)) setPagos(d); })
       .catch(() => {})

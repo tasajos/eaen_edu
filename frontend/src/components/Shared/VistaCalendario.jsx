@@ -55,7 +55,7 @@ export default function VistaCalendario({ cursos = [], titulo = "Mi Calendario",
     const fechaFin = `${anio}-${String(mes+1).padStart(2,"0")}-31`;
 
     Promise.all(cursos.map(c =>
-      fetch(`${API}/api/horarios?curso_id=${c.id}&fecha_inicio=${fechaIni}&fecha_fin=${fechaFin}`)
+      fetch(`${API}/horarios?curso_id=${c.id}&fecha_inicio=${fechaIni}&fecha_fin=${fechaFin}`)
         .then(r => r.json())
         .then(d => Array.isArray(d) ? d.map(h => ({...h, curso_nombre: c.nombre})) : [])
         .catch(() => [])

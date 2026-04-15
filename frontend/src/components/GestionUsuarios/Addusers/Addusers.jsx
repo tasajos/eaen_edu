@@ -69,7 +69,7 @@ export default function Addusers({ onBack }) {
     try {
       setSubmitting(true);
 
-      const resp = await fetch("http://localhost:5000/api/usuarios", {
+      const resp = await fetch(`${import.meta.env.VITE_API_URL}/usuarios`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -136,6 +136,8 @@ export default function Addusers({ onBack }) {
                 ["My", "My"],
                 ["Tte.Cnl", "Tte.Cnl"],
                 ["Cnl", "Cnl"],
+                ["CN", "CN"],
+                ["CF", "CF"],
                 ["Lic. Administracion Empresas", "Lic. Administracion Empresas"],
                 ["Ing. Civil", "Ing. Civil"],
                 ["Ing. Sistemas", "Ing. Sistemas"],
@@ -294,7 +296,7 @@ export default function Addusers({ onBack }) {
           </div>
 
           <p className="eaen-hint">
-            * Este formulario está conectado al backend Node + MySQL.
+            *
           </p>
         </form>
       </div>
@@ -363,3 +365,6 @@ function StatusModal({ type = "success", title, message, onClose }) {
     </div>
   );
 }
+
+
+

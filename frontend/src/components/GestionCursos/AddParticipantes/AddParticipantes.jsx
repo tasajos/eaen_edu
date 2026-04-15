@@ -6,7 +6,7 @@ import "../subview.css";
 import "./AddParticipantes.css";
 
 // === API ===
-const API = "http://localhost:5000/api";
+const API = import.meta.env.VITE_API_URL;
 
 function fullName(u) {
   return `${u.ap_paterno ?? ""} ${u.ap_materno ?? ""} ${u.nombre ?? ""}`
@@ -686,3 +686,4 @@ export default function AddParticipantes({ onBack }) {
     </section>
   );
 }
+

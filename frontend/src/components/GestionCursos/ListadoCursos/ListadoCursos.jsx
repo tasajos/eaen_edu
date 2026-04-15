@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import "../subview.css";
 import "./ListadoCursos.css";
 
-const API_BASE = import.meta?.env?.VITE_API_BASE || "http://localhost:5000/api";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 function fullNameFromParts(ap, am, nom) {
   return `${ap ?? ""} ${am ?? ""} ${nom ?? ""}`.replace(/\s+/g, " ").trim();
@@ -393,3 +393,4 @@ export default function ListadoCursos({ onBack }) {
     </section>
   );
 }
+

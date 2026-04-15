@@ -21,8 +21,8 @@ export default function ConfigDisciplina({ cursoId, cursoDetalle, session }) {
     setLoading(true);
     try {
       const [mats, cfgs] = await Promise.all([
-        fetch(`${API}/api/cursos/${cursoId}/materias`).then(r=>r.json()),
-        fetch(`${API}/api/disciplina/config/${cursoId}`).then(r=>r.json()),
+        fetch(`${API}/cursos/${cursoId}/materias`).then(r=>r.json()),
+        fetch(`${API}/disciplina/config/${cursoId}`).then(r=>r.json()),
       ]);
       if(Array.isArray(mats)) setMaterias(mats);
       if(Array.isArray(cfgs)){
@@ -39,7 +39,7 @@ export default function ConfigDisciplina({ cursoId, cursoDetalle, session }) {
   const guardar = async (materiaId) => {
     setSaving(p=>({...p,[materiaId]:true}));
     try {
-      const r = await fetch(`${API}/api/disciplina/config`,{
+      const r = await fetch(`${API}/disciplina/config`,{
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
           curso_id:   cursoId,

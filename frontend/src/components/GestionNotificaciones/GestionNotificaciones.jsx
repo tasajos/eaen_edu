@@ -61,7 +61,7 @@ function FormNuevaNotificacion({ onCreated, showToast }) {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API}/api/notificaciones`, {
+      const res = await fetch(`${API}/notificaciones`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ titulo: form.titulo.trim(), mensaje: form.mensaje.trim(), tipo: form.tipo }),
@@ -155,7 +155,7 @@ function DetalleNotificacion({ notif, onDeleted, showToast, onBack }) {
   const handleDelete = async () => {
     setLoading(true);
     try {
-      const res  = await fetch(`${API}/api/notificaciones/${notif.id}`, { method: "DELETE" });
+      const res  = await fetch(`${API}/notificaciones/${notif.id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Error");
       showToast("Notificación eliminada");
@@ -226,7 +226,7 @@ export default function GestionNotificaciones() {
 
   const fetchNotifs = useCallback(async () => {
     try {
-      const res  = await fetch(`${API}/api/notificaciones`);
+      const res  = await fetch(`${API}/notificaciones`);
       const data = await res.json();
       if (Array.isArray(data)) setNotifs(data);
     } catch {
@@ -238,7 +238,7 @@ export default function GestionNotificaciones() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const res  = await fetch(`${API}/api/notificaciones/stats`);
+      const res  = await fetch(`${API}/notificaciones/stats`);
       const data = await res.json();
       if (data?.total !== undefined) setStats(data);
     } catch {}

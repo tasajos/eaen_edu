@@ -30,7 +30,7 @@ function FormEvaluacion({ periodo, evaluado, indicadores, onEnviada, onCancelar 
   const enviar = async () => {
     setEnviando(true); setError("");
     try {
-      const r = await fetch(`${API}/api/eval-inst/responder`,{
+      const r = await fetch(`${API}/eval-inst/responder`,{
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
           periodo_id: periodo.id,
@@ -144,7 +144,7 @@ export default function EvaluacionInstitucional({ usuarioId }){
   const cargar = async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API}/api/eval-inst/pendientes/${usuarioId}`);
+      const r = await fetch(`${API}/eval-inst/pendientes/${usuarioId}`);
       const d = await r.json();
       if(Array.isArray(d)) setPendientes(d);
     } catch{}
@@ -155,7 +155,7 @@ export default function EvaluacionInstitucional({ usuarioId }){
 
   const iniciarEval = async (periodo, evaluado=null) => {
     // Cargar indicadores de la plantilla
-    const r = await fetch(`${API}/api/eval-inst/plantillas/${periodo.plantilla_id}/indicadores`);
+    const r = await fetch(`${API}/eval-inst/plantillas/${periodo.plantilla_id}/indicadores`);
     const d = await r.json();
     setIndicadores(Array.isArray(d)?d:[]);
     setEvaluando({periodo, evaluado});

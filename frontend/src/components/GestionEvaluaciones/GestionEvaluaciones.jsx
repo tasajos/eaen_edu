@@ -23,7 +23,7 @@ function ModalHabilitar({ plantillas, cursos, materias, onClose, onCreated }){
     if(necesitaMateria && !form.materia_id) return setError("Seleccione la materia a evaluar.");
     setSaving(true); setError("");
     try {
-      const r = await fetch(`${API}/api/eval-inst/periodos`, {
+      const r = await fetch(`${API}/eval-inst/periodos`, {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({...form, plantilla_id:Number(form.plantilla_id),
           curso_id:Number(form.curso_id), materia_id:form.materia_id?Number(form.materia_id):null,
@@ -110,9 +110,9 @@ function ModalResultados({ periodoId, tipo, onClose }){
   const [expandido, setExpandido] = useState(null);
 
   useEffect(()=>{
-    const urls = [fetch(`${API}/api/eval-inst/periodos/${periodoId}/resultados`).then(r=>r.json())];
+    const urls = [fetch(`${API}/eval-inst/periodos/${periodoId}/resultados`).then(r=>r.json())];
     if(tipo==="CURSANTE_A_CURSANTE")
-      urls.push(fetch(`${API}/api/eval-inst/periodos/${periodoId}/resultados-cursantes`).then(r=>r.json()));
+      urls.push(fetch(`${API}/eval-inst/periodos/${periodoId}/resultados-cursantes`).then(r=>r.json()));
     Promise.all(urls)
       .then(([d, dc])=>{ setData(d); if(dc) setDataCur(dc); })
       .catch(()=>{})
@@ -270,9 +270,9 @@ export default function GestionEvaluaciones(){
     setLoading(true);
     try {
       const [per,pla,cur] = await Promise.all([
-        fetch(`${API}/api/eval-inst/periodos`).then(r=>r.json()),
-        fetch(`${API}/api/eval-inst/plantillas`).then(r=>r.json()),
-        fetch(`${API}/api/cursos`).then(r=>r.json()),
+        fetch(`${API}/eval-inst/periodos`).then(r=>r.json()),
+        fetch(`${API}/eval-inst/plantillas`).then(r=>r.json()),
+        fetch(`${API}/cursos`).then(r=>r.json()),
       ]);
       if(Array.isArray(per)) setPeriodos(per);
       if(Array.isArray(pla)) setPlantillas(pla);
@@ -281,7 +281,7 @@ export default function GestionEvaluaciones(){
         // cargar materias de todos los cursos
         const mats = [];
         for(const c of cur){
-          const m = await fetch(`${API}/api/cursos/${c.id}/materias`).then(r=>r.json());
+          const m = await fetch(`${API}/cursos/${c.id}/materias`).then(r=>r.json());
           if(Array.isArray(m)) m.forEach(x=>mats.push({...x,curso_id:c.id}));
         }
         setMaterias(mats);
@@ -294,7 +294,7 @@ export default function GestionEvaluaciones(){
 
   const toggleHabilitar = async (id) => {
     try {
-      const r = await fetch(`${API}/api/eval-inst/periodos/${id}/toggle`,{method:"PATCH"});
+      const r = await fetch(`${API}/eval-inst/periodos/${id}/toggle`,{method:"PATCH"});
       const d = await r.json(); if(!r.ok) throw new Error(d.message);
       showToast("✅ Estado actualizado");
       cargar();

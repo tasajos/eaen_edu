@@ -69,7 +69,7 @@ function ModalRegistro({ cursoId, participantes, catalogo, registradoPor, presel
     setError("");
     setGuardando(true);
     try {
-      const r = await fetch(`${API}/api/disciplina/registrar`, {
+      const r = await fetch(`${API}/disciplina/registrar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -207,7 +207,7 @@ function ModalHistorial({ cursoId, participante, onClose, onEliminado }) {
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API}/api/disciplina/historial/${cursoId}/${participante.usuario_id}`);
+      const r = await fetch(`${API}/disciplina/historial/${cursoId}/${participante.usuario_id}`);
       const data = await r.json();
       if (Array.isArray(data)) setHistorial(data);
     } catch {}
@@ -218,7 +218,7 @@ function ModalHistorial({ cursoId, participante, onClose, onEliminado }) {
 
   const eliminar = async (id) => {
     if (!confirm("¿Eliminar este registro?")) return;
-    await fetch(`${API}/api/disciplina/registro/${id}`, { method: "DELETE" });
+    await fetch(`${API}/disciplina/registro/${id}`, { method: "DELETE" });
     onEliminado();
     cargar();
   };
@@ -310,8 +310,8 @@ export default function DisciplinaJefeCurso({ session, cursoId }) {
     setLoading(true);
     try {
       const [rRes, rCat] = await Promise.all([
-        fetch(`${API}/api/disciplina/resumen/${cursoId}`).then(r => r.json()),
-        fetch(`${API}/api/disciplina/catalogo`).then(r => r.json()),
+        fetch(`${API}/disciplina/resumen/${cursoId}`).then(r => r.json()),
+        fetch(`${API}/disciplina/catalogo`).then(r => r.json()),
       ]);
       if (Array.isArray(rRes)) setResumen(rRes);
       if (Array.isArray(rCat)) setCatalogo(rCat);

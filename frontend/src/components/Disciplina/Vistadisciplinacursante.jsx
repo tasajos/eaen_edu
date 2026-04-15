@@ -19,7 +19,7 @@ export default function VistaDisciplinaCursante({ session, cursoId }) {
     if (!session?.id || !cursoId) { setLoading(false); return; }
     setLoading(true);
     // Usa el endpoint historial que ya existe en server.js
-    fetch(`${API}/api/disciplina/historial/${cursoId}/${session.id}`)
+    fetch(`${API}/disciplina/historial/${cursoId}/${session.id}`)
       .then(r => r.json())
       .then(d => { if (Array.isArray(d)) setRegistros(d); })
       .catch(() => {})

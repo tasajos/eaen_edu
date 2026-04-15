@@ -16,7 +16,7 @@ export function useNotificaciones(autoRefreshSeconds = 30) {
   const cargar = useCallback(async () => {
     if (!session?.id) return;
     try {
-      const res  = await fetch(`${API}/api/notificaciones?usuario_id=${session.id}`);
+      const res  = await fetch(`${API}/notificaciones?usuario_id=${session.id}`);
       const data = await res.json();
       // Solo las que NO han sido leídas por este usuario
       setNotifs(Array.isArray(data) ? data.filter(n => !n.leida) : []);
@@ -36,7 +36,7 @@ export function useNotificaciones(autoRefreshSeconds = 30) {
   const marcarLeida = useCallback(async (id) => {
     setNotifs(prev => prev.filter(n => n.id !== id));
     try {
-      await fetch(`${API}/api/notificaciones/${id}/leer`, {
+      await fetch(`${API}/notificaciones/${id}/leer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ usuario_id: session?.id }),
@@ -50,7 +50,7 @@ export function useNotificaciones(autoRefreshSeconds = 30) {
     setNotifs([]);
     try {
       await Promise.all(ids.map(id =>
-        fetch(`${API}/api/notificaciones/${id}/leer`, {
+        fetch(`${API}/notificaciones/${id}/leer`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ usuario_id: session?.id }),

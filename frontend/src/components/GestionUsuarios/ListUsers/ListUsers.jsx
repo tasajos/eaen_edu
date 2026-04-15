@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import "./ListUsers.css";
 
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = import.meta.env.VITE_API_URL;
 
 const USER_TYPES = [
   "Cursante",
@@ -276,3 +276,4 @@ function fmtDateTime(v) {
   const s = String(v).replace("T", " ");
   return s.slice(0, 19);
 }
+

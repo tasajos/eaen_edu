@@ -44,7 +44,7 @@ function VistaAsistencia({ materia, participantes, showToast }) {
   const guardar = async () => {
     setSaving(true);
     try {
-      const r = await fetch(`${API}/api/asistencia`, {
+      const r = await fetch(`${API}/asistencia`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           curso_id: materia.curso_id, materia_id: materia.id, fecha,
@@ -130,11 +130,11 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
 
   const calcularPromedioTareas = async (materiaId) => {
     try {
-      const resumen = await fetch(`${API}/api/tareas/materia/${materiaId}/resumen`).then(r=>r.json());
+      const resumen = await fetch(`${API}/tareas/materia/${materiaId}/resumen`).then(r=>r.json());
       if (!Array.isArray(resumen) || !resumen.length) return {};
       const mapaNotas = {};
       for (const tarea of resumen) {
-        const entregas = await fetch(`${API}/api/tareas/${tarea.id}/entregas/detalle`).then(r=>r.json());
+        const entregas = await fetch(`${API}/tareas/${tarea.id}/entregas/detalle`).then(r=>r.json());
         if (!Array.isArray(entregas)) continue;
         entregas.forEach(e => {
           if (e.nota !== null && e.nota !== undefined) {
@@ -153,7 +153,7 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
 
   useEffect(() => {
     if (!materia?.id) return;
-    fetch(`${API}/api/eval-config/materia/${materia.id}`)
+    fetch(`${API}/eval-config/materia/${materia.id}`)
       .then(r=>r.json()).then(async d => {
         if (!Array.isArray(d)) return;
         setEvals(d);
@@ -162,7 +162,7 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
           setNotasTarea(p);
         }
       }).catch(()=>{});
-    fetch(`${API}/api/calificaciones/materia/${materia.id}`)
+    fetch(`${API}/calificaciones/materia/${materia.id}`)
       .then(r=>r.json()).then(d => {
         if (!d.libro) return;
         const m = {}, bl = {};
@@ -207,7 +207,7 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
       evals.forEach(ev => {
         if (esTareaEval(ev.nombre)) notasCompletas[ev.nombre] = getNotaEval(uid, ev.nombre);
       });
-      const r = await fetch(`${API}/api/calificaciones/usuario`, {
+      const r = await fetch(`${API}/calificaciones/usuario`, {
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
           curso_id: materia.curso_id,
@@ -490,7 +490,7 @@ function VistaTareas({ materia, participantes, showToast }) {
   const cargarResumen = useCallback(async () => {
     if (!materia?.id) return;
     try {
-      const r = await fetch(`${API}/api/tareas/materia/${materia.id}/resumen`);
+      const r = await fetch(`${API}/tareas/materia/${materia.id}/resumen`);
       const d = await r.json();
       if (Array.isArray(d)) setResumen(d);
     } catch {}
@@ -502,7 +502,7 @@ function VistaTareas({ materia, participantes, showToast }) {
     setTareaAct(tarea);
     setSubVista("entregas");
     try {
-      const r = await fetch(`${API}/api/tareas/${tarea.id}/entregas/detalle`);
+      const r = await fetch(`${API}/tareas/${tarea.id}/entregas/detalle`);
       const d = await r.json();
       if (Array.isArray(d)) {
         setEntregas(d);
@@ -517,7 +517,7 @@ function VistaTareas({ materia, participantes, showToast }) {
     if (!form.titulo.trim()) return showToast("❌ El título es requerido", "error");
     setSaving(true);
     try {
-      const r = await fetch(`${API}/api/tareas`, {
+      const r = await fetch(`${API}/tareas`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ curso_id: materia.curso_id, materia_id: materia.id, ...form, creado_por: session?.id })
       });
@@ -537,7 +537,7 @@ function VistaTareas({ materia, participantes, showToast }) {
     if (cf.nota === "" || cf.nota === undefined) return showToast("❌ Ingrese una nota (0–100)", "error");
     setCalSaving(p => ({ ...p, [uid]: true }));
     try {
-      const r = await fetch(`${API}/api/tareas/${tareaAct.id}/entregas/${uid}/calificar`, {
+      const r = await fetch(`${API}/tareas/${tareaAct.id}/entregas/${uid}/calificar`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nota: Number(cf.nota), feedback: cf.feedback || "", calificado_por: session?.id })
       });
@@ -754,14 +754,14 @@ export default function DashboardDocente() {
 
   useEffect(() => {
     if (!session) { navigate("/"); return; }
-    fetch(`${API}/api/cursos`)
+    fetch(`${API}/cursos`)
       .then(r => r.json())
       .then(async cursos => {
         if (!Array.isArray(cursos)) return;
         setTodosLosCursos(cursos);  // guardar todos para el calendario
         const todas = [];
         for (const c of cursos) {
-          const mr = await fetch(`${API}/api/cursos/${c.id}/materias`);
+          const mr = await fetch(`${API}/cursos/${c.id}/materias`);
           const md = await mr.json();
           if (Array.isArray(md))
             md.filter(m => m.docente_id === session.id)
@@ -778,7 +778,7 @@ export default function DashboardDocente() {
     if (!materiaId) return;
     const m = materias.find(x => x.id === materiaId);
     if (!m) return;
-    fetch(`${API}/api/cursos/${m.curso_id}`)
+    fetch(`${API}/cursos/${m.curso_id}`)
       .then(r => r.json())
       .then(d => setParticipantes(Array.isArray(d.participantes) ? d.participantes : []))
       .catch(() => setParticipantes([]));

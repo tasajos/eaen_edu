@@ -31,7 +31,7 @@ export default function DashboardJefeCurso() {
 
   useEffect(()=>{
     if(!session){navigate("/");return;}
-    fetch(`${API}/api/cursos/jefe/${session.id}`).then(r=>r.json()).then(d=>{
+    fetch(`${API}/cursos/jefe/${session.id}`).then(r=>r.json()).then(d=>{
       if(!Array.isArray(d))return;
       setCursos(d);
       if(d.length) setCursoId(d[0].id);
@@ -41,7 +41,7 @@ export default function DashboardJefeCurso() {
   useEffect(()=>{
     if(!cursoId)return;
     setLoadingCurso(true);
-    fetch(`${API}/api/cursos/${cursoId}`).then(r=>r.json())
+    fetch(`${API}/cursos/${cursoId}`).then(r=>r.json())
       .then(d=>setCursoDetalle(d)).catch(()=>{}).finally(()=>setLoadingCurso(false));
   },[cursoId]);
 

@@ -23,7 +23,7 @@ function useCursos() {
   useEffect(()=>{
     (async()=>{
       try {
-        const res  = await fetch(`${API}/api/cursos`);
+        const res  = await fetch(`${API}/cursos`);
         const data = await res.json();
         if(Array.isArray(data)&&data.length){ setCursos(data); setCursoId(data[0].id); }
       } catch{} finally{ setLoading(false); }
@@ -35,7 +35,7 @@ function useCursos() {
     setLoadingP(true);
     (async()=>{
       try {
-        const res  = await fetch(`${API}/api/cursos/${cursoId}`);
+        const res  = await fetch(`${API}/cursos/${cursoId}`);
         const data = await res.json();
         setPart(Array.isArray(data.participantes)?data.participantes:[]);
       } catch{ setPart([]); } finally{ setLoadingP(false); }
@@ -55,7 +55,7 @@ function useMaterias(cursoId) {
     if(!cursoId){ setMaterias([]); setMateriaId(null); return; }
     setLoading(true);
     try {
-      const res  = await fetch(`${API}/api/cursos/${cursoId}/materias`);
+      const res  = await fetch(`${API}/cursos/${cursoId}/materias`);
       const data = await res.json();
       const list = Array.isArray(data)?data:[];
       setMaterias(list);
@@ -120,7 +120,7 @@ function ModuloMaterias({ showToast }) {
   const [saving, setSaving]     = useState(false);
 
   useEffect(()=>{
-    fetch(`${API}/api/usuarios/docentes`).then(r=>r.json()).then(d=>Array.isArray(d)&&setDocentes(d)).catch(()=>{});
+    fetch(`${API}/usuarios/docentes`).then(r=>r.json()).then(d=>Array.isArray(d)&&setDocentes(d)).catch(()=>{});
   },[]);
 
   const resetForm = () => setForm({nombre:"",codigo:"",descripcion:"",horas:"",docente_id:""});
@@ -130,7 +130,7 @@ function ModuloMaterias({ showToast }) {
     if(!cursoId) return showToast("Seleccione un curso","error");
     setSaving(true);
     try {
-      const url    = editId?`${API}/api/materias/${editId}`:`${API}/api/cursos/${cursoId}/materias`;
+      const url    = editId?`${API}/materias/${editId}`:`${API}/cursos/${cursoId}/materias`;
       const method = editId?"PUT":"POST";
       const res    = await fetch(url,{method,headers:{"Content-Type":"application/json"},
         body:JSON.stringify({...form,horas:form.horas?Number(form.horas):null,docente_id:form.docente_id?Number(form.docente_id):null})});
@@ -144,7 +144,7 @@ function ModuloMaterias({ showToast }) {
   const eliminar = async (id) => {
     if(!confirm("¿Eliminar esta materia? Se eliminará toda su asistencia, calificaciones y tareas.")) return;
     try {
-      const res = await fetch(`${API}/api/materias/${id}`,{method:"DELETE"});
+      const res = await fetch(`${API}/materias/${id}`,{method:"DELETE"});
       const data= await res.json();
       if(!res.ok) throw new Error(data.message);
       showToast("Materia eliminada"); reload();
@@ -273,7 +273,7 @@ function ModuloAsistencia({ showToast }) {
   // Cargar historial desde BD cuando cambia materia
   useEffect(()=>{
     if(!materiaId) return;
-    fetch(`${API}/api/asistencia/materia/${materiaId}/resumen`)
+    fetch(`${API}/asistencia/materia/${materiaId}/resumen`)
       .then(r=>r.json()).then(d=>Array.isArray(d)&&setHist(d)).catch(()=>{});
   },[materiaId]);
 
@@ -289,12 +289,12 @@ function ModuloAsistencia({ showToast }) {
     try {
       const payload = {curso_id:cursoId,materia_id:materiaId,fecha,
         registros:participantes.map(p=>({usuario_id:p.id,estado:asist[p.id]||"P"}))};
-      const res  = await fetch(`${API}/api/asistencia`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+      const res  = await fetch(`${API}/asistencia`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
       const data = await res.json();
       if(!res.ok) throw new Error(data.message);
       showToast("Asistencia guardada correctamente");
       // refrescar historial
-      const hr = await fetch(`${API}/api/asistencia/materia/${materiaId}/resumen`);
+      const hr = await fetch(`${API}/asistencia/materia/${materiaId}/resumen`);
       const hd = await hr.json(); if(Array.isArray(hd)) setHist(hd);
     } catch(e){ showToast(e.message||"Error al guardar","error"); } finally{setSaving(false);}
   };
@@ -409,9 +409,9 @@ function ModuloCalificaciones({ showToast }) {
   // Cargar config + notas al cambiar materia
   useEffect(()=>{
     if(!materiaId) return;
-    fetch(`${API}/api/eval-config/materia/${materiaId}`)
+    fetch(`${API}/eval-config/materia/${materiaId}`)
       .then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setEvals(d); }).catch(()=>{});
-    fetch(`${API}/api/calificaciones/materia/${materiaId}`)
+    fetch(`${API}/calificaciones/materia/${materiaId}`)
       .then(r=>r.json()).then(data=>{
         if(data.libro&&Array.isArray(data.libro)){
           const map = {};
@@ -454,7 +454,7 @@ function ModuloCalificaciones({ showToast }) {
         curso_id:cursoId,materia_id:materiaId,
         calificaciones:participantes.map(p=>({usuario_id:p.id,notas:notas[p.id]||{}}))
       };
-      const res  = await fetch(`${API}/api/calificaciones`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+      const res  = await fetch(`${API}/calificaciones`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
       const data = await res.json();
       if(!res.ok) throw new Error(data.message);
       showToast("Calificaciones guardadas");
@@ -541,7 +541,7 @@ function EvalConfigEditor({ materiaId, evals, setEvals, showToast }) {
     if(!materiaId) return showToast("Seleccione una materia","error");
     if(!valid) return showToast(`Suma de pesos debe ser 100. Actual: ${sumaPesos}`,"error");
     try {
-      const res  = await fetch(`${API}/api/eval-config/materia/${materiaId}`,{method:"POST",headers:{"Content-Type":"application/json"},
+      const res  = await fetch(`${API}/eval-config/materia/${materiaId}`,{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({evaluaciones:editing.map((e,i)=>({...e,orden:i+1}))})});
       const data = await res.json();
       if(!res.ok) throw new Error(data.message);
@@ -597,19 +597,19 @@ function ModuloPlanificacion({ showToast }) {
   const [docentes, setDocentes] = useState([]);
 
   useEffect(()=>{
-    fetch(`${API}/api/usuarios/docentes`).then(r=>r.json()).then(d=>Array.isArray(d)&&setDocentes(d)).catch(()=>{});
+    fetch(`${API}/usuarios/docentes`).then(r=>r.json()).then(d=>Array.isArray(d)&&setDocentes(d)).catch(()=>{});
   },[]);
 
   useEffect(()=>{
     if(!materiaId) return;
     setLoadP(true);
-    fetch(`${API}/api/planificacion/materia/${materiaId}`)
+    fetch(`${API}/planificacion/materia/${materiaId}`)
       .then(r=>r.json()).then(d=>Array.isArray(d)&&setPlanes(d)).catch(()=>setPlanes([])).finally(()=>setLoadP(false));
   },[materiaId]);
 
   const cambiarEstado = async (id, estado) => {
     try {
-      const res = await fetch(`${API}/api/planificacion/${id}/estado`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({estado})});
+      const res = await fetch(`${API}/planificacion/${id}/estado`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({estado})});
       const data= await res.json();
       if(!res.ok) throw new Error(data.message);
       showToast(`Planificación ${estado.toLowerCase()}`);
@@ -619,7 +619,7 @@ function ModuloPlanificacion({ showToast }) {
 
   const eliminar = async (id) => {
     try {
-      const res = await fetch(`${API}/api/planificacion/${id}`,{method:"DELETE"});
+      const res = await fetch(`${API}/planificacion/${id}`,{method:"DELETE"});
       if(!res.ok) throw new Error("Error");
       showToast("Planificación eliminada"); setPlanes(prev=>prev.filter(p=>p.id!==id));
     } catch(e){ showToast(e.message,"error"); }
@@ -629,14 +629,14 @@ function ModuloPlanificacion({ showToast }) {
     if(!form.titulo.trim()) return showToast("El título es requerido","error");
     if(!materiaId) return showToast("Seleccione una materia","error");
     try {
-      const res  = await fetch(`${API}/api/planificacion`,{method:"POST",headers:{"Content-Type":"application/json"},
+      const res  = await fetch(`${API}/planificacion`,{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({curso_id:cursoId,materia_id:materiaId,docente_id:form.docente_id||null,titulo:form.titulo,objetivos:form.objetivos})});
       const data = await res.json();
       if(!res.ok) throw new Error(data.message);
       showToast("Planificación subida");
       setForm({titulo:"",objetivos:"",docente_id:""}); setTab("lista");
       // refrescar
-      const lr = await fetch(`${API}/api/planificacion/materia/${materiaId}`);
+      const lr = await fetch(`${API}/planificacion/materia/${materiaId}`);
       const ld = await lr.json(); if(Array.isArray(ld)) setPlanes(ld);
     } catch(e){ showToast(e.message,"error"); }
   };
@@ -731,13 +731,13 @@ function ModuloTareas({ showToast }) {
   useEffect(()=>{
     if(!materiaId) return;
     setLoading(true);
-    fetch(`${API}/api/tareas/materia/${materiaId}`)
+    fetch(`${API}/tareas/materia/${materiaId}`)
       .then(r=>r.json()).then(d=>Array.isArray(d)&&setTareas(d)).catch(()=>setTareas([])).finally(()=>setLoading(false));
   },[materiaId]);
 
   const verEntregas = async (t) => {
     setTareaActiva(t);
-    const res  = await fetch(`${API}/api/tareas/${t.id}/entregas`);
+    const res  = await fetch(`${API}/tareas/${t.id}/entregas`);
     const data = await res.json();
     setEntregas(Array.isArray(data)?data:[]);
     setTab("entregas");
@@ -745,7 +745,7 @@ function ModuloTareas({ showToast }) {
 
   const guardarEntrega = async (tareaId, usuarioId, fields) => {
     try {
-      const res = await fetch(`${API}/api/tareas/${tareaId}/entregas/${usuarioId}`,{
+      const res = await fetch(`${API}/tareas/${tareaId}/entregas/${usuarioId}`,{
         method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(fields)});
       const data= await res.json();
       if(!res.ok) throw new Error(data.message);
@@ -759,13 +759,13 @@ function ModuloTareas({ showToast }) {
     if(!materiaId) return showToast("Seleccione una materia","error");
     setSaving(true);
     try {
-      const res  = await fetch(`${API}/api/tareas`,{method:"POST",headers:{"Content-Type":"application/json"},
+      const res  = await fetch(`${API}/tareas`,{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({curso_id:cursoId,materia_id:materiaId,...form})});
       const data = await res.json();
       if(!res.ok) throw new Error(data.message);
       showToast(`Tarea creada — ${data.entregas_generadas} entregas generadas`);
       setForm({titulo:"",descripcion:"",fecha_limite:""}); setTab("lista");
-      const lr = await fetch(`${API}/api/tareas/materia/${materiaId}`);
+      const lr = await fetch(`${API}/tareas/materia/${materiaId}`);
       const ld = await lr.json(); if(Array.isArray(ld)) setTareas(ld);
     } catch(e){ showToast(e.message,"error"); } finally{setSaving(false);}
   };
@@ -773,7 +773,7 @@ function ModuloTareas({ showToast }) {
   const eliminarTarea = async (id) => {
     if(!confirm("¿Eliminar esta tarea y todas sus entregas?")) return;
     try {
-      const res = await fetch(`${API}/api/tareas/${id}`,{method:"DELETE"});
+      const res = await fetch(`${API}/tareas/${id}`,{method:"DELETE"});
       if(!res.ok) throw new Error("Error");
       showToast("Tarea eliminada"); setTareas(prev=>prev.filter(t=>t.id!==id));
     } catch(e){ showToast(e.message,"error"); }
@@ -940,7 +940,7 @@ function ModuloHorarios({ showToast }) {
       const [y,m] = filtroFecha.split("-");
       const inicio = `${y}-${m}-01`;
       const fin    = `${y}-${m}-31`;
-      const r = await fetch(`${API}/api/horarios?curso_id=${cursoId}&fecha_inicio=${inicio}&fecha_fin=${fin}`);
+      const r = await fetch(`${API}/horarios?curso_id=${cursoId}&fecha_inicio=${inicio}&fecha_fin=${fin}`);
       const d = await r.json();
       if(Array.isArray(d)) setClases(d);
     } catch {}
@@ -968,7 +968,7 @@ function ModuloHorarios({ showToast }) {
     let creadas=0, errores=0;
     try {
       if(modoForm==="unica"){
-        const r = await fetch(`${API}/api/horarios`,{
+        const r = await fetch(`${API}/horarios`,{
           method:"POST", headers:{"Content-Type":"application/json"},
           body: JSON.stringify({...form, curso_id:cursoId,
             materia_id:Number(form.materia_id), creado_por:session?.id})
@@ -988,7 +988,7 @@ function ModuloHorarios({ showToast }) {
         }
         for(const fecha of fechas){
           try {
-            const r = await fetch(`${API}/api/horarios`,{
+            const r = await fetch(`${API}/horarios`,{
               method:"POST", headers:{"Content-Type":"application/json"},
               body: JSON.stringify({...form, fecha, curso_id:cursoId,
                 materia_id:Number(form.materia_id), creado_por:session?.id})
@@ -1008,7 +1008,7 @@ function ModuloHorarios({ showToast }) {
 
   const eliminar = async (id) => {
     try {
-      const r = await fetch(`${API}/api/horarios/${id}`,{method:"DELETE"});
+      const r = await fetch(`${API}/horarios/${id}`,{method:"DELETE"});
       const d = await r.json();
       if(!r.ok) throw new Error(d.message);
       showToast("🗑 Clase eliminada");

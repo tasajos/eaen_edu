@@ -42,12 +42,12 @@ function ConfigDisciplinaWrapper() {
   const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   useEffect(()=>{
-    fetch(`${API}/api/cursos`).then(r=>r.json()).then(d=>{ if(Array.isArray(d)){ setCursos(d); if(d.length) setCursoId(d[0].id); }}).catch(()=>{});
+    fetch(`${API}/cursos`).then(r=>r.json()).then(d=>{ if(Array.isArray(d)){ setCursos(d); if(d.length) setCursoId(d[0].id); }}).catch(()=>{});
   },[]);
 
   useEffect(()=>{
     if(!cursoId) return;
-    fetch(`${API}/api/cursos/${cursoId}`).then(r=>r.json()).then(d=>setCursoDetalle(d)).catch(()=>{});
+    fetch(`${API}/cursos/${cursoId}`).then(r=>r.json()).then(d=>setCursoDetalle(d)).catch(()=>{});
   },[cursoId]);
 
   return (

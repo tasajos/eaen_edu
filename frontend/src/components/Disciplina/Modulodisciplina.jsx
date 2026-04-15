@@ -47,7 +47,7 @@ function ModalRegistro({ cursoId, participantes, catalogo, session, onClose, onG
     if(!form.descripcion.trim()) return setError("La descripción es requerida");
     setSaving(true); setError("");
     try {
-      const r = await fetch(`${API}/api/disciplina/registros`,{
+      const r = await fetch(`${API}/disciplina/registros`,{
         method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({
           curso_id:      cursoId,
@@ -166,14 +166,14 @@ function ModalHistorial({ participante, cursoId, onClose, onEliminar }){
   const [loading,   setLoading]   = useState(true);
 
   useEffect(()=>{
-    fetch(`${API}/api/disciplina/registros?curso_id=${cursoId}&usuario_id=${participante.id}`)
+    fetch(`${API}/disciplina/registros?curso_id=${cursoId}&usuario_id=${participante.id}`)
       .then(r=>r.json()).then(d=>{ if(Array.isArray(d)) setRegistros(d); })
       .finally(()=>setLoading(false));
   },[cursoId, participante.id]);
 
   const eliminar = async (id) => {
     if(!confirm("¿Eliminar este registro?")) return;
-    await fetch(`${API}/api/disciplina/registros/${id}`,{method:"DELETE"});
+    await fetch(`${API}/disciplina/registros/${id}`,{method:"DELETE"});
     setRegistros(prev=>prev.filter(r=>r.id!==id));
     onEliminar();
   };
@@ -296,8 +296,8 @@ export default function ModuloDisciplina({ cursoId, cursoDetalle, session }) {
     setLoading(true);
     try {
       const [res, cat] = await Promise.all([
-        fetch(`${API}/api/disciplina/resumen/${cursoId}`).then(r=>r.json()),
-        fetch(`${API}/api/disciplina/catalogo`).then(r=>r.json()),
+        fetch(`${API}/disciplina/resumen/${cursoId}`).then(r=>r.json()),
+        fetch(`${API}/disciplina/catalogo`).then(r=>r.json()),
       ]);
       if(Array.isArray(res)) setResumen(res);
       if(Array.isArray(cat)) setCatalogo(cat);
