@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "./GestionNotificaciones.css";
+import SidebarJefe from "../Shared/SidebarJefe";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -261,17 +262,7 @@ export default function GestionNotificaciones() {
 
   return (
     <div className="eaen-notif-page">
-      {/* Sidebar */}
-      <nav className={`eaen-sidebar${sidebarOpen ? " open" : ""}`}>
-        <h2>Panel Jefe de Estudios</h2>
-        <ul>
-          <li><button className="eaen-navlink" onClick={() => navigate("/gestion-usuarios")}>👥 Gestión de Usuarios</button></li>
-          <li><button className="eaen-navlink" onClick={() => navigate("/gestion-cursos")}>📚 Gestión de Cursos</button></li>
-          <li><button className="eaen-navlink active">🔔 Gestión de Notificaciones</button></li>
-          <li><button className="eaen-navlink" onClick={() => navigate("/gestion-educativa")}>🎓 Gestión Educativa</button></li>
-        </ul>
-      </nav>
-
+      <SidebarJefe open={sidebarOpen} />
       <button className="eaen-sidebar-toggle" onClick={() => setSidebarOpen((v) => !v)}>☰</button>
 
       {/* Main */}

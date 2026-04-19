@@ -1,78 +1,32 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import "./GestionUsuarios.css";
 import Addusers from "./Addusers/Addusers";
 import ModifyUser from "./ModifyUser/ModifyUser";
 import ListUsers from "./ListUsers/ListUsers";
+import SidebarJefe from "../Shared/SidebarJefe";
 
 
 export default function GestionUsuarios() {
   const navigate = useNavigate();
-  const location = useLocation();
 
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState("home"); // home | add
+  const [view, setView] = useState("home");
 
-  // ✅ Verifica sesión (solo frontend)
   useEffect(() => {
     const session = localStorage.getItem("eaen_session");
     if (!session) navigate("/", { replace: true });
   }, [navigate]);
-
-  const go = (path, label) => {
-    if (!path) return alert(`Navegando a: ${label}`);
-    navigate(path);
-  };
 
   const logout = () => {
     localStorage.removeItem("eaen_session");
     navigate("/", { replace: true });
   };
 
-  const isActive = (path) => location.pathname === path;
-
   return (
     <div className="eaen-users-page">
-      {/* Sidebar */}
-      <nav className={`eaen-sidebar ${open ? "open" : ""}`}>
-        <h2>Panel Jefe de Estudios</h2>
-        <ul>
-          <li>
-            <button
-              className={`eaen-navlink ${isActive("/gestion-usuarios") ? "active" : ""}`}
-              onClick={() => go("/gestion-usuarios", "Gestión de Usuarios")}
-            >
-              <span className="icon">👥</span>Gestión de Usuarios
-            </button>
-          </li>
-
-          <li>
-            <button
-             className={`eaen-navlink ${isActive("/gestion-cursos") ? "active" : ""}`}
-              onClick={() => go("/gestion-cursos", "Gestión de Cursos")}
-                 >
-              <span className="icon">📚</span>Gestión de Cursos
-            </button>
-          </li>
-
-          <li>
-            <button className="eaen-navlink" onClick={() => navigate("/gestion-notificaciones")}>
-              <span className="icon">🔔</span>Gestión de Notificaciones
-            </button>
-          </li>
-
-          <li>
-            <button className="eaen-navlink" onClick={() => navigate("/gestion-educativa")}>
-              <span className="icon">🎓</span>Gestión Educativa
-            </button>
-          </li>
-        </ul>
-      </nav>
-
-      {/* Toggle móvil */}
-      <button className="eaen-sidebar-toggle" onClick={() => setOpen((v) => !v)}>
-        ☰
-      </button>
+      <SidebarJefe open={open} />
+      <button className="eaen-sidebar-toggle" onClick={() => setOpen((v) => !v)}>☰</button>
 
       {/* Contenido principal */}
       <div className="eaen-main">

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "./GestionFinanzas.css";
+import SidebarJefe from "../Shared/SidebarJefe";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const getSession = () => { try{ return JSON.parse(localStorage.getItem("eaen_session")||"null"); }catch{ return null; } };
@@ -266,6 +267,7 @@ function ModalConcepto({ cursoId, onClose, onCreado, creado_por }){
 export default function GestionFinanzas(){
   const navigate  = useNavigate();
   const session   = getSession();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [cursos,      setCursos]      = useState([]);
   const [cursoId,     setCursoId]     = useState(null);
   const [conceptos,   setConceptos]   = useState([]);
@@ -329,10 +331,14 @@ export default function GestionFinanzas(){
   };
 
   return (
-    <div className="gfin-page">
+    <div className="sjefe-page">
+      <SidebarJefe open={sidebarOpen} />
+      <button className="sjefe-toggle" onClick={()=>setSidebarOpen(v=>!v)}>☰</button>
+      <div className="sjefe-main">
+      <div className="gfin-page" style={{minHeight:"unset",flex:1}}>
       {/* Header */}
       <header className="gfin-header">
-        <button className="gfin-back" onClick={()=>navigate("/dashboard-jefe")}>← Volver</button>
+        <button className="gfin-back" onClick={()=>navigate("/dashboard-jefe")}>← Dashboard</button>
         <div style={{flex:1}}>
           <h1>💰 Gestión de Finanzas</h1>
           <p>Control de matrícula, guía y mensualidades por participante.</p>
@@ -560,6 +566,8 @@ export default function GestionFinanzas(){
       {toast && (
         <div className={`gfin-toast ${toast.type==="error"?"gfin-toast-error":""}`}>{toast.msg}</div>
       )}
+      </div>
+      </div>
     </div>
   );
 }

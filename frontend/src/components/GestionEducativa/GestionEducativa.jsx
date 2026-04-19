@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "./GestionEducativa.css";
+import SidebarJefe from "../Shared/SidebarJefe";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -986,17 +987,17 @@ function ModuloHorarios({ showToast }) {
             fechas.push(cur.toISOString().slice(0,10));
           cur.setDate(cur.getDate()+1);
         }
-        for(const fecha of fechas){
-          try {
-            const r = await fetch(`${API}/horarios`,{
+        const resultados = await Promise.allSettled(
+          fechas.map(fecha =>
+            fetch(`${API}/horarios`,{
               method:"POST", headers:{"Content-Type":"application/json"},
               body: JSON.stringify({...form, fecha, curso_id:cursoId,
                 materia_id:Number(form.materia_id), creado_por:session?.id})
-            });
-            const d = await r.json();
-            if(r.ok) creadas++; else errores++;
-          } catch { errores++; }
-        }
+            }).then(r => { if(!r.ok) throw new Error("error"); return r; })
+          )
+        );
+        creadas = resultados.filter(r=>r.status==="fulfilled").length;
+        errores = resultados.filter(r=>r.status==="rejected").length;
       }
       if(creadas>0) showToast(`✅ ${creadas} clase(s) programada(s)${errores>0?` (${errores} duplicadas omitidas)`:""}`);
       else showToast("⚠️ Todas las fechas ya estaban programadas","error");
@@ -1440,15 +1441,7 @@ export default function GestionEducativa() {
 
   return (
     <div className="eaen-edu-page">
-      <nav className={`eaen-sidebar${sidebarOpen?" open":""}`}>
-        <h2>Panel Jefe de Estudios</h2>
-        <ul>
-          <li><button className={`eaen-navlink${isActive("/gestion-usuarios")?" active":""}`} onClick={()=>navigate("/gestion-usuarios")}>👥 Gestión de Usuarios</button></li>
-          <li><button className={`eaen-navlink${isActive("/gestion-cursos")?" active":""}`} onClick={()=>navigate("/gestion-cursos")}>📚 Gestión de Cursos</button></li>
-          <li><button className={`eaen-navlink${isActive("/gestion-notificaciones")?" active":""}`} onClick={()=>navigate("/gestion-notificaciones")}>🔔 Gestión de Notificaciones</button></li>
-          <li><button className={`eaen-navlink${isActive("/gestion-educativa")?" active":""}`} onClick={()=>navigate("/gestion-educativa")}>🎓 Gestión Educativa</button></li>
-        </ul>
-      </nav>
+      <SidebarJefe open={sidebarOpen} />
       <button className="eaen-sidebar-toggle" onClick={()=>setSidebarOpen(v=>!v)}>☰</button>
       <div className="eaen-main">
         <header className="eaen-header">

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "./GestionEvaluaciones.css";
+import SidebarJefe from "../Shared/SidebarJefe";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 function getSession(){ try{ return JSON.parse(localStorage.getItem("eaen_session")||"null"); }catch{ return null; } }
@@ -255,6 +256,7 @@ function ModalResultados({ periodoId, tipo, onClose }){
 export default function GestionEvaluaciones(){
   const navigate   = useNavigate();
   const session    = getSession();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [periodos,    setPeriodos]    = useState([]);
   const [plantillas,  setPlantillas]  = useState([]);
   const [cursos,      setCursos]      = useState([]);
@@ -278,13 +280,15 @@ export default function GestionEvaluaciones(){
       if(Array.isArray(pla)) setPlantillas(pla);
       if(Array.isArray(cur)){
         setCursos(cur);
-        // cargar materias de todos los cursos
-        const mats = [];
-        for(const c of cur){
-          const m = await fetch(`${API}/cursos/${c.id}/materias`).then(r=>r.json());
-          if(Array.isArray(m)) m.forEach(x=>mats.push({...x,curso_id:c.id}));
-        }
-        setMaterias(mats);
+        const resultados = await Promise.all(
+          cur.map(c =>
+            fetch(`${API}/cursos/${c.id}/materias`)
+              .then(r=>r.json())
+              .then(m=>Array.isArray(m)?m.map(x=>({...x,curso_id:c.id})):[])
+              .catch(()=>[])
+          )
+        );
+        setMaterias(resultados.flat());
       }
     } catch{}
     finally { setLoading(false); }
@@ -305,10 +309,14 @@ export default function GestionEvaluaciones(){
   const TIPO_COLOR = { CURSANTE_A_CURSANTE:"#1565c0", CURSANTE_A_DOCENTE:"#6a1b9a" };
 
   return (
-    <div className="gev-page">
+    <div className="sjefe-page">
+      <SidebarJefe open={sidebarOpen} />
+      <button className="sjefe-toggle" onClick={()=>setSidebarOpen(v=>!v)}>☰</button>
+      <div className="sjefe-main">
+      <div className="gev-page" style={{minHeight:"unset",flex:1}}>
       {/* Header */}
       <header className="gev-header">
-        <button className="gev-back" onClick={()=>navigate("/dashboard-jefe")}>← Volver</button>
+        <button className="gev-back" onClick={()=>navigate("/dashboard-jefe")}>← Dashboard</button>
         <div className="gev-header-center">
           <h1>📋 Gestión de Evaluaciones Institucionales</h1>
           <p>Habilite, supervise y analice las evaluaciones entre cursantes y docentes.</p>
@@ -425,6 +433,8 @@ export default function GestionEvaluaciones(){
       )}
       {resId && <ModalResultados periodoId={resId} tipo={periodos.find(p=>p.id===resId)?.tipo||""} onClose={()=>setResId(null)}/>}
       {toast && <div className={`gev-toast ${toast.type==="error"?"gev-toast-error":""}`}>{toast.msg}</div>}
+      </div>
+      </div>
     </div>
   );
 }
