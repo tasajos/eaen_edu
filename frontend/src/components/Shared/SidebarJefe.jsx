@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { path: "/gestion-notificaciones", icon: "🔔", label: "Gestión de Notificaciones" },
   { path: "/gestion-educativa",      icon: "🎓", label: "Gestión Educativa" },
   { path: "/gestion-evaluaciones",   icon: "📋", label: "Evaluaciones Inst." },
+  { path: "/gestion-disciplina",     icon: "⚖️", label: "Disciplina" },
   { path: "/gestion-finanzas",       icon: "💰", label: "Finanzas" },
 ];
 
@@ -18,6 +19,11 @@ export default function SidebarJefe({ open, onMisNotificaciones, noLeidas }) {
   return (
     <nav className={`sjefe-sidebar${open ? " open" : ""}`}>
       <h2>Panel Jefe de Estudios</h2>
+
+      <button className="sjefe-back-btn" onClick={() => navigate("/dashboard-jefe")}>
+        ← Volver al Dashboard
+      </button>
+
       <ul>
         {NAV_ITEMS.map(({ path, icon, label }) => (
           <li key={path}>
