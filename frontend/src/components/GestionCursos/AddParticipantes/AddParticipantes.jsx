@@ -489,7 +489,7 @@ export default function AddParticipantes({ onBack }) {
         <div>
           <h2>Añadir Participantes</h2>
           <p>
-            Seleccione un curso y añada o quite cursantes activos (integrado a Node + MySQL).
+            Seleccione un curso y añada o quite cursantes activos.
           </p>
         </div>
         <button className="eaen-secondary-btn" onClick={onBack}>

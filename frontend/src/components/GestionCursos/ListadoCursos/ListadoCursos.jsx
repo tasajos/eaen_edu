@@ -171,7 +171,7 @@ export default function ListadoCursos({ onBack }) {
       <div className="eaen-subview-head">
         <div>
           <h2>Listado de Cursos</h2>
-          <p>Tabla institucional con conteo de participantes y responsables (desde backend).</p>
+          <p>Tabla institucional.</p>
         </div>
         <button className="eaen-secondary-btn" onClick={onBack}>
           ← Volver

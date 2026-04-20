@@ -274,7 +274,7 @@ export default function CrearCurso({ onBack }) {
       <div className="eaen-subview-head">
         <div>
           <h2>Crear Curso</h2>
-          <p>Defina los datos del curso y asigne cursantes activos. (Conectado a Node + MySQL)</p>
+          <p>Defina los datos del curso y asigne cursantes activos</p>
         </div>
         <button className="eaen-secondary-btn" onClick={onBack}>
           ← Volver

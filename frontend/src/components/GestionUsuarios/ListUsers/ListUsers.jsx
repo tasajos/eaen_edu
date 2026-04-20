@@ -97,7 +97,7 @@ export default function ListUsers({ onBack }) {
         <div>
           <h2 className="eaen-list-title">Listar Usuarios</h2>
           <p className="eaen-list-subtitle">
-            Tabla institucional de usuarios (MySQL). No incluye campos sensibles como password.
+            Tabla institucional de usuarios.
           </p>
         </div>
 

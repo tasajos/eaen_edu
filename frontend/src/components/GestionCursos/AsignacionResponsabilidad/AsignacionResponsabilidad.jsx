@@ -308,7 +308,7 @@ export default function AsignacionResponsabilidad({ onBack }) {
           <h2>Asignación de Responsabilidad</h2>
           <p>
             Seleccione el curso y asigne roles{" "}
-            {isEncargado ? "a cursantes inscritos" : "a personal no cursante"} (backend MySQL).
+            {isEncargado ? "a cursantes inscritos" : "a personal"} .
           </p>
         </div>
         <button className="eaen-secondary-btn" onClick={onBack}>
