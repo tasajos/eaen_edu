@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import mammoth from "mammoth";
 import { useNavigate } from "react-router-dom";
 import { useNotificaciones } from "../../../hooks/useNotificaciones";
 import { NotificacionesPanel, NotifBell } from "../../Shared/NotificacionesPanel";
@@ -474,6 +475,51 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
 }
 
 /* ══════════════════════════════════════════════════════════
+   VISOR DE DOCUMENTO WORD (mammoth)
+══════════════════════════════════════════════════════════ */
+function VisorDocumento({ archivoRuta, archivoNombre, onClose }) {
+  const [html,     setHtml]     = useState("");
+  const [cargando, setCargando] = useState(true);
+  const [error,    setError]    = useState(null);
+
+  useEffect(() => {
+    if (!archivoRuta) return;
+    setCargando(true);
+    setError(null);
+    fetch(`${API}/uploads/tareas/${archivoRuta}`)
+      .then(r => {
+        if (!r.ok) throw new Error("No se pudo cargar el archivo");
+        return r.arrayBuffer();
+      })
+      .then(buf => mammoth.convertToHtml({ arrayBuffer: buf }))
+      .then(result => setHtml(result.value))
+      .catch(e => setError(e.message))
+      .finally(() => setCargando(false));
+  }, [archivoRuta]);
+
+  return (
+    <div className="visor-overlay" onClick={onClose}>
+      <div className="visor-modal" onClick={e => e.stopPropagation()}>
+        <div className="visor-header">
+          <div className="visor-titulo">
+            <span>📄</span>
+            <span>{archivoNombre || "Documento"}</span>
+          </div>
+          <button className="visor-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="visor-body">
+          {cargando && <div className="visor-loading">Cargando documento...</div>}
+          {error   && <div className="visor-error">❌ {error}</div>}
+          {!cargando && !error && (
+            <div className="visor-content" dangerouslySetInnerHTML={{ __html: html }} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
    VISTA TAREAS — DOCENTE
 ══════════════════════════════════════════════════════════ */
 function VistaTareas({ materia, participantes, showToast }) {
@@ -486,6 +532,7 @@ function VistaTareas({ materia, participantes, showToast }) {
   const [form,     setForm]     = useState({ titulo: "", descripcion: "", fecha_limite: "" });
   const [calForm,  setCalForm]  = useState({});
   const [calSaving,setCalSaving]= useState({});
+  const [visor,    setVisor]    = useState(null);
 
   const cargarResumen = useCallback(async () => {
     if (!materia?.id) return;
@@ -686,8 +733,11 @@ function VistaTareas({ materia, participantes, showToast }) {
                         </td>
                         <td className="muted">{fmtFecha(e.entregado_en)}</td>
                         <td>
-                          {entregado && e.respuesta
-                            ? <div className="respuesta-cell" title={e.respuesta}>{e.respuesta.length > 70 ? e.respuesta.slice(0,70) + "…" : e.respuesta}</div>
+                          {entregado && e.archivo_nombre
+                            ? <button className="btn-sm btn-ver-doc"
+                                onClick={() => setVisor({ ruta: e.archivo_ruta, nombre: e.archivo_nombre })}>
+                                📄 Ver documento
+                              </button>
                             : <span className="muted">—</span>}
                         </td>
                         <td style={{textAlign:"center"}}>
@@ -726,6 +776,14 @@ function VistaTareas({ materia, participantes, showToast }) {
             </div>
           )}
         </div>
+      )}
+
+      {visor && (
+        <VisorDocumento
+          archivoRuta={visor.ruta}
+          archivoNombre={visor.nombre}
+          onClose={() => setVisor(null)}
+        />
       )}
     </div>
   );

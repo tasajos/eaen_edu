@@ -3,11 +3,49 @@ import cors from "cors";
 import dotenv from "dotenv";
 import mysql from "mysql2/promise";
 import bcrypt from "bcryptjs";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 
 dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// ── Configuración de uploads ─────────────────────────────────
+const UPLOADS_DIR = path.join(__dirname, "uploads", "tareas");
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+const WORD_MIMETYPES = new Set([
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
+]);
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+  filename: (_req, file, cb) => {
+    const unique = `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    cb(null, `${unique}${path.extname(file.originalname)}`);
+  },
+});
+
+const uploadTarea = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (WORD_MIMETYPES.has(file.mimetype) || ext === ".docx" || ext === ".doc") {
+      cb(null, true);
+    } else {
+      cb(new Error("Solo se permiten archivos Word (.doc / .docx)"));
+    }
+  },
+});
+
+app.use("/api/uploads/tareas", express.static(UPLOADS_DIR));
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST || "localhost",
@@ -1219,21 +1257,33 @@ app.get("/api/eval-inst/periodos/:id/resultados", async (req,res) => {
 // TAREAS — ENDPOINTS EXTENDIDOS
 // ════════════════════════════════════════════════════════════
 
-/** POST /api/tareas/:tareaId/entregar */
-app.post("/api/tareas/:tareaId/entregar", async (req,res) => {
+/** POST /api/tareas/:tareaId/entregar — multipart/form-data: archivo (Word) + usuario_id */
+app.post("/api/tareas/:tareaId/entregar", uploadTarea.single("archivo"), async (req,res) => {
   try {
     const tareaId = Number(req.params.tareaId);
-    const { usuario_id, respuesta } = req.body;
+    const usuario_id = Number(req.body?.usuario_id);
     if(!tareaId)    return res.status(400).json({message:"ID de tarea inválido"});
     if(!usuario_id) return res.status(400).json({message:"Campo requerido: usuario_id"});
-    if(!String(respuesta??"").trim()) return res.status(400).json({message:"Campo requerido: respuesta"});
+    if(!req.file)   return res.status(400).json({message:"Se requiere un archivo Word (.doc / .docx)"});
+
+    const archivoNombre = req.file.originalname;
+    const archivoRuta   = req.file.filename;
+
     const [result] = await pool.execute(
-      `UPDATE tarea_entregas SET estado='ENTREGADO', respuesta=?, entregado_en=NOW()
+      `UPDATE tarea_entregas
+         SET estado='ENTREGADO', archivo_nombre=?, archivo_ruta=?, respuesta=NULL, entregado_en=NOW()
        WHERE tarea_id=? AND usuario_id=? LIMIT 1`,
-      [String(respuesta).trim(), tareaId, usuario_id]);
-    if(result.affectedRows===0) return res.status(404).json({message:"Entrega no encontrada para este alumno"});
-    res.json({message:"Tarea entregada exitosamente"});
-  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+      [archivoNombre, archivoRuta, tareaId, usuario_id]);
+    if(result.affectedRows===0){
+      fs.unlink(path.join(UPLOADS_DIR, archivoRuta), ()=>{});
+      return res.status(404).json({message:"Entrega no encontrada para este alumno"});
+    }
+    res.json({message:"Tarea entregada exitosamente", archivo_nombre: archivoNombre});
+  } catch(e){
+    if(req.file) fs.unlink(path.join(UPLOADS_DIR, req.file.filename), ()=>{});
+    if(e.message?.includes("Solo se permiten")) return res.status(400).json({message:e.message});
+    res.status(500).json({message:"Error interno",detail:e.message});
+  }
 });
 
 /** GET /api/tareas/:tareaId/mi-entrega/:usuarioId */
@@ -1243,7 +1293,8 @@ app.get("/api/tareas/:tareaId/mi-entrega/:usuarioId", async (req,res) => {
     const usuarioId = Number(req.params.usuarioId);
     if(!tareaId||!usuarioId) return res.status(400).json({message:"IDs inválidos"});
     const [r] = await pool.execute(
-      `SELECT te.id, te.estado, te.respuesta, te.nota, te.feedback, te.entregado_en,
+      `SELECT te.id, te.estado, te.respuesta, te.archivo_nombre, te.archivo_ruta,
+              te.nota, te.feedback, te.entregado_en,
               t.titulo, t.descripcion, t.fecha_limite
        FROM tarea_entregas te INNER JOIN tareas t ON t.id=te.tarea_id
        WHERE te.tarea_id=? AND te.usuario_id=? LIMIT 1`,
@@ -1279,8 +1330,8 @@ app.get("/api/tareas/:tareaId/entregas/detalle", async (req,res) => {
     const tareaId = Number(req.params.tareaId);
     if(!tareaId) return res.status(400).json({message:"ID inválido"});
     const [r] = await pool.execute(
-      `SELECT te.id, te.usuario_id, te.estado, te.respuesta, te.nota, te.feedback,
-              te.entregado_en, te.actualizado_en,
+      `SELECT te.id, te.usuario_id, te.estado, te.respuesta, te.archivo_nombre, te.archivo_ruta,
+              te.nota, te.feedback, te.entregado_en, te.actualizado_en,
               u.nombre, u.ap_paterno, u.ap_materno, u.ci,
               t.titulo AS tarea_titulo, t.fecha_limite, t.descripcion AS tarea_desc
        FROM tarea_entregas te
@@ -1791,6 +1842,15 @@ app.post("/api/auth/login", async (req, res) => {
     console.error("[auth/login]", e);
     return res.status(500).json({ message: "Error interno del servidor.", detail: e.message });
   }
+});
+
+// ── Manejador de errores de multer ───────────────────────────
+app.use((err, _req, res, _next) => {
+  if (err?.code === "LIMIT_FILE_SIZE")
+    return res.status(400).json({ message: "El archivo supera el límite de 5 MB" });
+  if (err?.message)
+    return res.status(400).json({ message: err.message });
+  res.status(500).json({ message: "Error interno" });
 });
 
 // ════════════════════════════════════════════════════════════

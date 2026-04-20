@@ -36,7 +36,7 @@ function Spinner() { return <div className="cur-spinner"><div className="spin-ri
 function VistaTareasCursante({ materia, session, showToast }) {
   const [tareas,   setTareas]   = useState([]);
   const [entregas, setEntregas] = useState({});
-  const [respForm, setRespForm] = useState({});
+  const [archivos, setArchivos] = useState({});
   const [enviando, setEnviando] = useState({});
   const [abierta,  setAbierta]  = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -62,22 +62,35 @@ function VistaTareasCursante({ materia, session, showToast }) {
       .finally(() => setCargando(false));
   }, [materia?.id, session?.id]);
 
+  const onArchivoChange = (tareaId, file) => {
+    if (!file) return;
+    const ext = file.name.split(".").pop().toLowerCase();
+    if (ext !== "doc" && ext !== "docx") {
+      showToast("❌ Solo se permiten archivos Word (.doc / .docx)", "error");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast("❌ El archivo supera el límite de 5 MB", "error");
+      return;
+    }
+    setArchivos(p => ({ ...p, [tareaId]: file }));
+  };
+
   const entregar = async (tareaId) => {
-    const resp = (respForm[tareaId] || "").trim();
-    if (!resp) return showToast("❌ Escribe tu respuesta antes de enviar", "error");
+    const archivo = archivos[tareaId];
+    if (!archivo) return showToast("❌ Selecciona un archivo Word antes de enviar", "error");
     setEnviando(p => ({ ...p, [tareaId]: true }));
     try {
-      const r = await fetch(`${API}/tareas/${tareaId}/entregar`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ usuario_id: session.id, respuesta: resp })
-      });
+      const form = new FormData();
+      form.append("archivo", archivo);
+      form.append("usuario_id", session.id);
+      const r = await fetch(`${API}/tareas/${tareaId}/entregar`, { method: "POST", body: form });
       const d = await r.json();
       if (!r.ok) throw new Error(d.message);
       showToast("✅ Tarea entregada exitosamente");
-      // Actualizar estado local
       const er = await fetch(`${API}/tareas/${tareaId}/mi-entrega/${session.id}`);
       if (er.ok) { const ed = await er.json(); setEntregas(p => ({ ...p, [tareaId]: ed })); }
-      setRespForm(p => ({ ...p, [tareaId]: "" }));
+      setArchivos(p => ({ ...p, [tareaId]: null }));
     } catch(e) { showToast(`❌ ${e.message}`, "error"); }
     finally { setEnviando(p => ({ ...p, [tareaId]: false })); }
   };
@@ -93,14 +106,14 @@ function VistaTareasCursante({ materia, session, showToast }) {
         const ent     = entregas[t.id];
         const enviada = ent?.estado === "ENTREGADO";
         const calif   = ent?.nota !== null && ent?.nota !== undefined;
-        // Comparar solo YYYY-MM-DD
         const limiteStr = t.fecha_limite ? t.fecha_limite.slice(0, 10) : null;
         const vencida   = limiteStr && limiteStr < hoy && !enviada;
         const isAbierta = abierta === t.id;
+        const archivoSelec = archivos[t.id];
 
         return (
           <div key={t.id} className={`tarea-card-cur ${enviada ? "tc-enviada" : vencida ? "tc-vencida" : "tc-pendiente"}`}>
-            {/* ── Header (siempre visible) ── */}
+            {/* ── Header ── */}
             <div className="tca-header" onClick={() => setAbierta(isAbierta ? null : t.id)}>
               <div className="tca-left">
                 <span className="tca-icon">{enviada ? "✅" : vencida ? "⚠️" : "📝"}</span>
@@ -124,7 +137,6 @@ function VistaTareasCursante({ materia, session, showToast }) {
             {/* ── Cuerpo expandido ── */}
             {isAbierta && (
               <div className="tca-body">
-                {/* Consigna */}
                 {t.descripcion && (
                   <div className="tca-consigna">
                     <div className="tca-consigna-label">📋 Consigna del docente</div>
@@ -135,8 +147,11 @@ function VistaTareasCursante({ materia, session, showToast }) {
                 {/* ── YA ENTREGADA ── */}
                 {enviada ? (
                   <div className="tca-entregado">
-                    <div className="tca-resp-label">📤 Tu respuesta enviada</div>
-                    <div className="tca-resp-text">{ent.respuesta}</div>
+                    <div className="tca-resp-label">📤 Archivo entregado</div>
+                    <div className="tca-archivo-info">
+                      <span className="tca-archivo-icon">📄</span>
+                      <span className="tca-archivo-nombre">{ent.archivo_nombre || "Archivo Word"}</span>
+                    </div>
                     <div className="tca-resp-fecha">Enviado el: {fmtFecha(ent.entregado_en)}</div>
 
                     {calif ? (
@@ -163,21 +178,34 @@ function VistaTareasCursante({ materia, session, showToast }) {
                 ) : (
                   /* ── FORMULARIO DE ENTREGA ── */
                   <div className="tca-form">
-                    <label className="tca-form-label">✏️ Escribe tu respuesta</label>
-                    <textarea
-                      rows={5}
-                      placeholder="Desarrolla aquí tu respuesta a la tarea..."
-                      value={respForm[t.id] || ""}
-                      onChange={e => setRespForm(p => ({ ...p, [t.id]: e.target.value }))}
-                      disabled={vencida}
-                    />
+                    <label className="tca-form-label">📎 Adjunta tu tarea en formato Word</label>
+                    <div className="tca-upload-area">
+                      <label className={`tca-file-label ${vencida ? "tca-file-disabled" : ""}`}>
+                        <input
+                          type="file"
+                          accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                          disabled={vencida}
+                          onChange={e => onArchivoChange(t.id, e.target.files[0])}
+                          style={{display:"none"}}
+                        />
+                        {archivoSelec
+                          ? <><span className="tca-file-icon">📄</span> {archivoSelec.name}</>
+                          : <><span className="tca-file-icon">📂</span> Seleccionar archivo Word (máx. 5 MB)</>}
+                      </label>
+                      {archivoSelec && (
+                        <span className="tca-file-size">
+                          {(archivoSelec.size / 1024).toFixed(0)} KB
+                        </span>
+                      )}
+                    </div>
+                    <p className="tca-file-hint">Solo archivos .doc / .docx — máximo 5 MB</p>
                     {vencida ? (
                       <p className="tca-vencida-msg">⚠️ El plazo de entrega venció el {fmtFecha(limiteStr)}. No se pueden aceptar más entregas.</p>
                     ) : (
                       <button
                         className="btn-entregar"
                         onClick={() => entregar(t.id)}
-                        disabled={enviando[t.id]}
+                        disabled={enviando[t.id] || !archivoSelec}
                       >
                         {enviando[t.id] ? "Enviando..." : "📤 Enviar tarea"}
                       </button>

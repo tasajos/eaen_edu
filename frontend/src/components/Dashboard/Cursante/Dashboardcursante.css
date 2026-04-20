@@ -387,3 +387,28 @@
   font-size: 10px; font-weight: 700;
   padding: 2px 7px; border-radius: 10px;
 }
+/* ── Subida de archivo de tarea ──────────────────────────── */
+.tca-upload-area {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.tca-file-label {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: #f0f4f8; border: 2px dashed #90a4ae;
+  color: #37474f; border-radius: 10px;
+  padding: 10px 18px; cursor: pointer; font-size: 13px; font-weight: 600;
+  transition: background 0.18s, border-color 0.18s;
+  min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tca-file-label:hover:not(.tca-file-disabled) { background: #e3f2fd; border-color: #1565c0; color: #1565c0; }
+.tca-file-disabled { opacity: 0.55; cursor: not-allowed; }
+.tca-file-icon { font-size: 17px; flex-shrink: 0; }
+.tca-file-size { font-size: 11px; color: #78909c; white-space: nowrap; }
+.tca-file-hint { font-size: 11px; color: #90a4ae; margin: 0 0 10px; }
+.tca-archivo-info {
+  display: flex; align-items: center; gap: 8px;
+  background: #e8f5e9; border-radius: 8px; padding: 8px 14px;
+  font-size: 13px; font-weight: 600; color: #2e7d32; margin-bottom: 6px;
+}
+.tca-archivo-icon { font-size: 18px; }
+.tca-archivo-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

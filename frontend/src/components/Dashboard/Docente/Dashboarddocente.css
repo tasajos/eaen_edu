@@ -380,3 +380,45 @@
   font-size: 10px; font-weight: 700;
   padding: 2px 7px; border-radius: 10px;
 }
+/* ── Botón Ver documento ─────────────────────────────────── */
+.btn-ver-doc { background: #e3f2fd; color: #0d47a1; border-color: #90caf9; }
+.btn-ver-doc:hover { background: #0d47a1; color: #fff; }
+
+/* ── Visor de documento Word ─────────────────────────────── */
+.visor-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+  z-index: 10000; display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.visor-modal {
+  background: #fff; border-radius: 14px;
+  width: 100%; max-width: 860px; max-height: 88vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.28);
+  overflow: hidden;
+}
+.visor-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; background: #1a237e; color: #fff;
+  gap: 12px; flex-shrink: 0;
+}
+.visor-titulo {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.visor-close {
+  background: none; border: none; color: #fff; font-size: 20px;
+  cursor: pointer; line-height: 1; padding: 0 4px; flex-shrink: 0;
+  opacity: 0.8; transition: opacity 0.15s;
+}
+.visor-close:hover { opacity: 1; }
+.visor-body {
+  flex: 1; overflow-y: auto; padding: 28px 32px;
+  font-family: "Georgia", serif; font-size: 14px; line-height: 1.7; color: #212121;
+}
+.visor-loading { text-align: center; color: #78909c; padding: 40px; font-size: 14px; }
+.visor-error   { text-align: center; color: #c62828; padding: 40px; font-size: 14px; }
+.visor-content h1,.visor-content h2,.visor-content h3 { color: #1a237e; margin-top: 1.2em; }
+.visor-content p  { margin: 0.5em 0; }
+.visor-content table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+.visor-content td,.visor-content th { border: 1px solid #ccc; padding: 6px 10px; }
