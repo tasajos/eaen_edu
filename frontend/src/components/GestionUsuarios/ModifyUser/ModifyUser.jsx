@@ -9,6 +9,8 @@ const GRADO_OPTIONS = [
   ["My", "My"],
   ["Tte.Cnl", "Tte.Cnl"],
   ["Cnl", "Cnl"],
+  ["CN", "CN"],
+  ["CF", "CF"],
   ["Lic. Administracion Empresas", "Lic. Administracion Empresas"],
   ["Ing. Civil", "Ing. Civil"],
   ["Ing. Sistemas", "Ing. Sistemas"],
