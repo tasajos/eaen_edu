@@ -1915,10 +1915,15 @@ pool.execute(`
     c2 DECIMAL(5,2) NOT NULL DEFAULT 0 COMMENT 'Aprecia los hechos objetivamente',
     c3 DECIMAL(5,2) NOT NULL DEFAULT 0 COMMENT 'Decide con Acierto',
     c4 DECIMAL(5,2) NOT NULL DEFAULT 0 COMMENT 'Sostiene criterios con seguridad',
+    bloqueado TINYINT(1) NOT NULL DEFAULT 0,
     actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uniq_fac (materia_id, cursante_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 `).catch(e => console.warn("[eval_facilitador] tabla ya existe o error:", e.message));
+pool.execute(`
+  ALTER TABLE eval_facilitador
+    ADD COLUMN IF NOT EXISTS bloqueado TINYINT(1) NOT NULL DEFAULT 0 AFTER c4
+`).catch(e => console.warn("[eval_facilitador] columna bloqueado ya existe o error:", e.message));
 
 /** GET /api/eval-facilitador/materia/:materiaId
  *  Devuelve los valores en escala 1-10 tal como fueron ingresados por el docente.
@@ -1928,7 +1933,7 @@ app.get("/api/eval-facilitador/materia/:materiaId", async (req, res) => {
     const materiaId = Number(req.params.materiaId);
     if (!materiaId) return res.status(400).json({ message: "ID inválido" });
     const [rows] = await pool.execute(
-      `SELECT cursante_id, c1, c2, c3, c4,
+      `SELECT cursante_id, c1, c2, c3, c4, bloqueado,
               ROUND((c1+c2+c3+c4)/4, 2) AS promedio,
               ROUND((c1+c2+c3+c4)/4/10*2.5, 3) AS ponderaje,
               actualizado_en
@@ -1944,25 +1949,37 @@ app.get("/api/eval-facilitador/materia/:materiaId", async (req, res) => {
 app.post("/api/eval-facilitador", async (req, res) => {
   const conn = await pool.getConnection();
   try {
-    const { curso_id, materia_id, evaluaciones, registrado_por } = req.body;
+    const { curso_id, materia_id, evaluaciones, registrado_por, bloquear } = req.body;
     if (!curso_id || !materia_id || !registrado_por || !Array.isArray(evaluaciones))
       return res.status(400).json({ message: "Faltan campos requeridos" });
 
     await conn.beginTransaction();
+    let guardadas = 0;
+    let omitidas = 0;
     for (const ev of evaluaciones) {
       const { cursante_id, c1, c2, c3, c4 } = ev;
       if (!cursante_id) continue;
+      const [[actual]] = await conn.execute(
+        `SELECT bloqueado FROM eval_facilitador WHERE materia_id=? AND cursante_id=? LIMIT 1`,
+        [materia_id, cursante_id]
+      );
+      if (actual?.bloqueado) {
+        omitidas++;
+        continue;
+      }
       const norm = [c1,c2,c3,c4].map(v => Math.min(10, Math.max(0, Number(v) || 0)));
       await conn.execute(
-        `INSERT INTO eval_facilitador (curso_id, materia_id, cursante_id, registrado_por, c1, c2, c3, c4)
-         VALUES (?,?,?,?,?,?,?,?)
+        `INSERT INTO eval_facilitador (curso_id, materia_id, cursante_id, registrado_por, c1, c2, c3, c4, bloqueado)
+         VALUES (?,?,?,?,?,?,?,?,?)
          ON DUPLICATE KEY UPDATE c1=VALUES(c1),c2=VALUES(c2),c3=VALUES(c3),c4=VALUES(c4),
+           bloqueado=GREATEST(bloqueado, VALUES(bloqueado)),
            registrado_por=VALUES(registrado_por), actualizado_en=NOW()`,
-        [curso_id, materia_id, cursante_id, registrado_por, ...norm]
+        [curso_id, materia_id, cursante_id, registrado_por, ...norm, bloquear ? 1 : 0]
       );
+      guardadas++;
     }
     await conn.commit();
-    res.json({ message: "Evaluaciones guardadas", guardadas: evaluaciones.length });
+    res.json({ message: "Evaluaciones guardadas", guardadas, omitidas, bloqueado: !!bloquear });
   } catch(e) { try{await conn.rollback();}catch{}res.status(500).json({ message: "Error interno", detail: e.message }); }
   finally { conn.release(); }
 });
@@ -2076,11 +2093,12 @@ app.get("/api/nota-final/materia/:materiaId", async (req, res) => {
       const promFacilitador = facMap[p.id] ?? null;
       const promCursantes   = peerMap[p.id] ?? null;
       const notaDisciplina  = discMap[p.id] ?? 100;
+      const ponderajeFacilitador = promFacilitador !== null ? promFacilitador * 0.025 : null;
 
       // nota_final = catedrático(0-90) + facilitador(0-2.5) + cursantes(0-5) + disciplina(0-2.5) = 0-100
       const notaFinal =
         promCatedratico +
-        (promFacilitador ?? 0) * 0.025 +
+        (ponderajeFacilitador ?? 0) +
         (promCursantes   ?? 0) * 0.05  +
         notaDisciplina          * 0.025;
 
@@ -2092,6 +2110,7 @@ app.get("/api/nota-final/materia/:materiaId", async (req, res) => {
         ci:               p.ci,
         prom_catedratico: Number(promCatedratico.toFixed(2)),
         prom_facilitador: promFacilitador !== null ? Number(promFacilitador.toFixed(2)) : null,
+        ponderaje_facilitador: ponderajeFacilitador !== null ? Number(ponderajeFacilitador.toFixed(2)) : null,
         prom_cursantes:   promCursantes   !== null ? Number(promCursantes.toFixed(2))   : null,
         nota_disciplina:  Number(notaDisciplina.toFixed(2)),
         nota_final:       Number(notaFinal.toFixed(2)),

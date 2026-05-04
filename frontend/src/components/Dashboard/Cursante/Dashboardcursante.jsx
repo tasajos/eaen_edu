@@ -77,10 +77,40 @@ function calcularPromedioEvaluaciones(notas, evaluaciones, fallback = 0) {
   return Math.round((suma / 100) * 100) / 100;
 }
 
+function aporteFacilitador(final) {
+  if (!final || final.prom_facilitador === null || final.prom_facilitador === undefined) return null;
+  return Number(final.ponderaje_facilitador ?? (Number(final.prom_facilitador) * 0.025));
+}
+
+function resumenComponentes(final) {
+  if (!final) return null;
+  const catedratico = Number(final.prom_catedratico || 0);
+  const facilitador = aporteFacilitador(final);
+  const cursantes = final.prom_cursantes !== null && final.prom_cursantes !== undefined
+    ? Number(final.prom_cursantes) * 0.05
+    : null;
+  const disciplinaBase = final.nota_disciplina !== null && final.nota_disciplina !== undefined
+    ? Number(final.nota_disciplina)
+    : 100;
+  const disciplina = disciplinaBase * 0.025;
+  const acumulado = catedratico + (facilitador ?? 0) + (cursantes ?? 0) + disciplina;
+  return {
+    catedratico,
+    facilitador,
+    facilitadorPromedio: final.prom_facilitador !== null && final.prom_facilitador !== undefined
+      ? Number(final.prom_facilitador) / 10
+      : null,
+    cursantes,
+    disciplina,
+    acumulado: Number(acumulado.toFixed(2)),
+  };
+}
+
 function NotaAcademicaResumen({ notas, onVerDetalle }) {
   if (!notas) return null;
   const final = notas.notaFinal;
-  const promedio = Number(notas.promedio || 0);
+  const componentes = resumenComponentes(final);
+  const promedio = componentes ? componentes.acumulado : Number(notas.promedio || 0);
   const aprobado = notas.estado === "aprobado";
   return (
     <div className="nota-resumen nota-resumen-acceso">
@@ -88,15 +118,16 @@ function NotaAcademicaResumen({ notas, onVerDetalle }) {
         {promedio.toFixed(1)}
       </div>
       <div className="nota-resumen-info">
-        <div className="promedio-label">{final ? "Nota final compuesta" : "Promedio registrado"}</div>
+        <div className="promedio-label">{final ? "Acumulado hasta el momento" : "Promedio registrado"}</div>
         <span className={`estado-badge ${aprobado ? "badge-ap" : "badge-rp"}`}>
           {aprobado ? "‚úÖ Aprobado" : "‚ùå Reprobado"}
         </span>
         {final && (
           <div className="nota-resumen-detalle">
-            Catedr√°tico: {Number(final.prom_catedratico).toFixed(1)}
-            {final.prom_facilitador !== null && ` ¬∑ Facilitador: ${Number(final.prom_facilitador).toFixed(1)}`}
-            {final.prom_cursantes !== null && ` ¬∑ Cursantes: ${Number(final.prom_cursantes).toFixed(1)}`}
+            Catedr·tico: {componentes.catedratico.toFixed(1)}
+            {componentes.facilitador !== null && ` ∑ Facilitador: ${componentes.facilitador.toFixed(2)}`}
+            {componentes.cursantes !== null && ` ∑ Cursantes: ${componentes.cursantes.toFixed(2)}`}
+            {` ∑ Disciplina: ${componentes.disciplina.toFixed(2)}`}
           </div>
         )}
       </div>
@@ -378,13 +409,15 @@ export default function DashboardCursante() {
         const final = finales.find(p => Number(p.usuario_id) === Number(session.id));
         const notasMezcladas = mezclarNotaTarea(e?.notas || {}, evaluaciones, promedioTareas);
         const promedioEvaluaciones = calcularPromedioEvaluaciones(notasMezcladas, evaluaciones, e?.promedio || 0);
+        const aporteFac = aporteFacilitador(final);
         const notaFinalAjustada = final
           ? {
               ...final,
               prom_catedratico: promedioEvaluaciones,
+              ponderaje_facilitador: aporteFac,
               nota_final: Number((
                 promedioEvaluaciones +
-                (final.prom_facilitador ?? 0) * 0.025 +
+                (aporteFac ?? 0) +
                 (final.prom_cursantes ?? 0) * 0.05 +
                 Number(final.nota_disciplina ?? 100) * 0.025
               ).toFixed(2)),
@@ -597,26 +630,50 @@ export default function DashboardCursante() {
                         ? <p className="empty-msg">A√∫n no hay calificaciones registradas para esta materia.</p>
                         : <div>
                             <NotaAcademicaResumen notas={notas} />
-                            {notas.notaFinal && (
-                              <div className="nota-componentes">
-                                <div className="nota-component-card">
-                                  <span>Catedr√°tico</span>
-                                  <strong>{Number(notas.notaFinal.prom_catedratico).toFixed(1)}</strong>
-                                </div>
-                                <div className="nota-component-card">
-                                  <span>Facilitador</span>
-                                  <strong>{notas.notaFinal.prom_facilitador !== null ? Number(notas.notaFinal.prom_facilitador).toFixed(1) : "Pendiente"}</strong>
-                                </div>
-                                <div className="nota-component-card">
-                                  <span>Cursantes</span>
-                                  <strong>{notas.notaFinal.prom_cursantes !== null ? Number(notas.notaFinal.prom_cursantes).toFixed(1) : "Pendiente"}</strong>
-                                </div>
-                                <div className="nota-component-card">
-                                  <span>Disciplina</span>
-                                  <strong>{Number(notas.notaFinal.nota_disciplina).toFixed(1)}</strong>
-                                </div>
-                              </div>
-                            )}
+                            {notas.notaFinal && (() => {
+                              const comp = resumenComponentes(notas.notaFinal);
+                              return (
+                                <>
+                                  <div className={`facilitador-detalle-card ${comp.facilitador === null ? "pendiente" : "listo"}`}>
+                                    <div>
+                                      <span>Facilitador</span>
+                                      <strong>{comp.facilitador === null ? "Pendiente" : `${comp.facilitador.toFixed(2)} / 2.5`}</strong>
+                                    </div>
+                                    <div>
+                                      <span>Promedio registrado</span>
+                                      <strong>{comp.facilitadorPromedio === null ? "Pendiente" : `${comp.facilitadorPromedio.toFixed(1)} / 10`}</strong>
+                                    </div>
+                                    <div>
+                                      <span>Estado</span>
+                                      <strong>{comp.facilitador === null ? "Sin calificar" : "Calificado"}</strong>
+                                    </div>
+                                  </div>
+
+                                  <div className="nota-componentes nota-componentes-detalle">
+                                    <div className="nota-component-card">
+                                      <span>Catedratico (/90)</span>
+                                      <strong>{comp.catedratico.toFixed(1)}</strong>
+                                    </div>
+                                    <div className="nota-component-card">
+                                      <span>Facilitador (/2.5)</span>
+                                      <strong>{comp.facilitador !== null ? comp.facilitador.toFixed(2) : "Pendiente"}</strong>
+                                    </div>
+                                    <div className="nota-component-card">
+                                      <span>Cursantes (/5)</span>
+                                      <strong>{comp.cursantes !== null ? comp.cursantes.toFixed(2) : "Pendiente"}</strong>
+                                    </div>
+                                    <div className="nota-component-card">
+                                      <span>Disciplina (/2.5)</span>
+                                      <strong>{comp.disciplina.toFixed(2)}</strong>
+                                    </div>
+                                    <div className="nota-component-card nota-component-total">
+                                      <span>Acumulado actual (/100)</span>
+                                      <strong>{comp.acumulado.toFixed(1)}</strong>
+                                    </div>
+                                  </div>
+                                </>
+                              );
+                            })()}
                             {/*
                               <div className={`promedio-grande ${Number(notas.promedio) >= 70 ? "ap" : "rp"}`}>
                                 {Number(notas.promedio).toFixed(1)}

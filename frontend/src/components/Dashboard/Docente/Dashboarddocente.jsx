@@ -566,7 +566,8 @@ const OPCIONES_FAC = [1,2,3,4,5,6,7,8,9,10];
 function VistaFacilitador({ materia, participantes, showToast }) {
   const session  = getSession();
   const [datos,   setDatos]   = useState({});
-  const [saving,  setSaving]  = useState(false);
+  const [saving,  setSaving]  = useState({});
+  const [bloqueados, setBloqueados] = useState({});
   const [cargado, setCargado] = useState(false);
 
   useEffect(() => {
@@ -576,44 +577,64 @@ function VistaFacilitador({ materia, participantes, showToast }) {
       .then(d => {
         if (!Array.isArray(d)) return;
         const m = {};
-        d.forEach(ev => { m[ev.cursante_id] = { c1: ev.c1, c2: ev.c2, c3: ev.c3, c4: ev.c4 }; });
+        const bl = {};
+        d.forEach(ev => {
+          m[ev.cursante_id] = { c1: ev.c1, c2: ev.c2, c3: ev.c3, c4: ev.c4 };
+          if (ev.bloqueado) bl[ev.cursante_id] = true;
+        });
         setDatos(m);
+        setBloqueados(bl);
         setCargado(true);
       }).catch(() => setCargado(true));
   }, [materia?.id]);
 
   const set = (uid, key, val) => {
+    if (bloqueados[uid]) return;
     setDatos(prev => ({ ...prev, [uid]: { ...prev[uid], [key]: Number(val) } }));
   };
 
+  const valores = (uid) => {
+    const d = datos[uid] || {};
+    return CRITERIOS_FACILITADOR.map(c => Number(d[c.key] || 0));
+  };
+
+  const completa = (uid) => valores(uid).every(v => v >= 1 && v <= 10);
+
   // promedio 1-10
   const promCriterios = (uid) => {
-    const d = datos[uid] || {};
-    const vals = CRITERIOS_FACILITADOR.map(c => Number(d[c.key] || 0));
+    if (!completa(uid)) return null;
+    const vals = valores(uid);
     return vals.reduce((a,b)=>a+b,0) / 4;
   };
 
-  // ponderaje = (promedio/10) * 2.5 → valor 0 a 2.5 sobre la nota final
-  const ponderaje = (uid) => (promCriterios(uid) / 10 * 2.5).toFixed(2);
+  // ponderaje = (promedio/10) * 2.5 -> valor 0 a 2.5 sobre la nota final
+  const ponderaje = (uid) => {
+    const pr = promCriterios(uid);
+    return pr === null ? null : (pr / 10 * 2.5).toFixed(2);
+  };
 
-  const guardar = async () => {
-    setSaving(true);
+  const guardarUsuario = async (uid) => {
+    if (!completa(uid)) return showToast("Complete los 4 criterios antes de bloquear", "error");
+    setSaving(p => ({ ...p, [uid]: true }));
     try {
-      const evaluaciones = participantes.map(p => ({
-        cursante_id: p.id,
-        ...(datos[p.id] || { c1: 0, c2: 0, c3: 0, c4: 0 }),
-      }));
+      const evaluaciones = [{ cursante_id: uid, ...datos[uid] }];
       const r = await fetch(`${API}/eval-facilitador`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ curso_id: materia.curso_id, materia_id: materia.id, evaluaciones, registrado_por: session?.id }),
+        body: JSON.stringify({
+          curso_id: materia.curso_id,
+          materia_id: materia.id,
+          evaluaciones,
+          registrado_por: session?.id,
+          bloquear: true,
+        }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.message);
-      showToast(`✅ Evaluación facilitador guardada — ${d.guardadas} cursantes`);
-    } catch(e) { showToast(`❌ ${e.message}`, "error"); }
-    finally { setSaving(false); }
+      setBloqueados(p => ({ ...p, [uid]: true }));
+      showToast("Evaluacion del facilitador guardada y bloqueada");
+    } catch(e) { showToast(`${e.message}`, "error"); }
+    finally { setSaving(p => ({ ...p, [uid]: false })); }
   };
-
   if (!cargado) return <div className="doc-spinner"><div className="spin-ring"/></div>;
 
   return (
@@ -638,6 +659,7 @@ function VistaFacilitador({ materia, participantes, showToast }) {
               <th style={{ textAlign:"center", background:"#003366", color:"#fff" }}>
                 Ponderaje<br/><span style={{fontSize:10,fontWeight:400}}>(/ 2.5 pts)</span>
               </th>
+              <th style={{ textAlign:"center" }}>Accion</th>
             </tr>
           </thead>
           <tbody>
@@ -645,6 +667,7 @@ function VistaFacilitador({ materia, participantes, showToast }) {
               const d   = datos[p.id] || {};
               const pr  = promCriterios(p.id);
               const pnd = ponderaje(p.id);
+              const locked = bloqueados[p.id] || false;
               return (
                 <tr key={p.id}>
                   <td className="muted">{i+1}</td>
@@ -653,9 +676,10 @@ function VistaFacilitador({ materia, participantes, showToast }) {
                     <td key={c.key} style={{ textAlign:"center" }}>
                       <select
                         value={d[c.key] ?? ""}
+                        disabled={locked}
                         onChange={e => set(p.id, c.key, e.target.value)}
                         style={{ padding:"5px 8px", borderRadius:7, border:"1.5px solid #ccd6e8",
-                                 fontSize:13, cursor:"pointer", background:"#fff" }}
+                                 fontSize:13, cursor:locked ? "not-allowed" : "pointer", background:locked ? "#f3f4f6" : "#fff" }}
                       >
                         <option value="">—</option>
                         {OPCIONES_FAC.map(n => (
@@ -665,24 +689,31 @@ function VistaFacilitador({ materia, participantes, showToast }) {
                     </td>
                   ))}
                   <td style={{ textAlign:"center", fontWeight:700, color:"#003366", fontSize:14 }}>
-                    {pr > 0 ? pr.toFixed(1) : "—"}
+                    {pr !== null ? pr.toFixed(1) : "—"}
                   </td>
                   <td style={{ textAlign:"center", fontWeight:800, fontSize:15,
-                               color: pr >= 7 ? "#2e7d32" : pr >= 5 ? "#e65100" : "#c62828",
+                               color: pr === null ? "#c62828" : pr >= 7 ? "#2e7d32" : pr >= 5 ? "#e65100" : "#c62828",
                                background: "#f0f4ff" }}>
-                    {pr > 0 ? pnd : "—"}
+                    {pnd !== null ? pnd : "—"}
+                  </td>
+                  <td style={{ textAlign:"center" }}>
+                    {locked ? (
+                      <span style={{ color:"#7b1fa2", fontWeight:800, fontSize:12 }}>Bloqueado</span>
+                    ) : (
+                      <button
+                        className="btn-sm btn-guardar"
+                        onClick={() => guardarUsuario(p.id)}
+                        disabled={saving[p.id] || !completa(p.id)}
+                      >
+                        {saving[p.id] ? "Guardando..." : "Guardar y bloquear"}
+                      </button>
+                    )}
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
-      </div>
-
-      <div className="vista-footer">
-        <button className="btn-primary" onClick={guardar} disabled={saving}>
-          {saving ? "Guardando..." : "💾 Guardar evaluación facilitador"}
-        </button>
       </div>
     </div>
   );

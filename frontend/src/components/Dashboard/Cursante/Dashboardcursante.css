@@ -189,6 +189,9 @@
   gap: 12px;
   margin: -10px 0 22px;
 }
+.nota-componentes-detalle {
+  margin-top: 0;
+}
 .nota-component-card {
   border: 2px solid #e8ecf2;
   background: #fff;
@@ -205,6 +208,49 @@
   margin-bottom: 5px;
 }
 .nota-component-card strong {
+  color: #1b4332;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 20px;
+}
+.nota-component-total {
+  border-color: #1b4332;
+  background: #f1f8e9;
+}
+.nota-component-total span,
+.nota-component-total strong {
+  color: #1b4332;
+}
+.facilitador-detalle-card {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  gap: 12px;
+  margin: -10px 0 22px;
+  padding: 14px;
+  border: 2px solid #d7e3f4;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+.facilitador-detalle-card.listo {
+  border-color: #a5d6a7;
+  background: #f6fbf3;
+}
+.facilitador-detalle-card.pendiente {
+  border-color: #ffd8a8;
+  background: #fffaf3;
+}
+.facilitador-detalle-card div {
+  min-width: 0;
+}
+.facilitador-detalle-card span {
+  display: block;
+  color: #6b7a90;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.facilitador-detalle-card strong {
   color: #1b4332;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 20px;
