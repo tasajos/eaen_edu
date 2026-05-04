@@ -62,6 +62,15 @@ const ROLES_RESP   = new Set(["ENCARGADO_CURSO","PERSONAL_APOYO","FACILITADOR","
 const ROLES_SINGLE = new Set(["ENCARGADO_CURSO","JEFE_CURSO"]);
 
 function normRol(v) { return String(v||"").trim().toUpperCase().replace(/\s+/g,"_"); }
+function isMissingTableError(e) { return e?.code === "ER_NO_SUCH_TABLE"; }
+function isTareaEval(nombre) {
+  const value = String(nombre || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return /^(tarea|trabajo|practica)$/.test(value);
+}
 
 async function assertCursoExists(c, id) {
   const [r] = await c.execute(`SELECT id, jefe_curso_id FROM cursos WHERE id=? LIMIT 1`,[id]);
@@ -827,6 +836,26 @@ app.get("/api/calificaciones/materia/:materiaId", async (req,res) => {
       if(n.bloqueado) bloqueadoMap[n.usuario_id] = true;
     }
 
+    const tareaEvalNames = evalRows.filter(ev => isTareaEval(ev.nombre)).map(ev => ev.nombre);
+    if (tareaEvalNames.length) {
+      try {
+        const [tareaRows] = await pool.execute(
+          `SELECT te.usuario_id, ROUND(AVG(te.nota),2) AS promedio_tarea
+           FROM tareas t
+           JOIN tarea_entregas te ON te.tarea_id=t.id
+           WHERE t.materia_id=? AND te.nota IS NOT NULL
+           GROUP BY te.usuario_id`, [materiaId]);
+        for (const row of tareaRows) {
+          if(!notasMap[row.usuario_id]) notasMap[row.usuario_id]={};
+          for (const evalName of tareaEvalNames) {
+            notasMap[row.usuario_id][evalName] = Number(row.promedio_tarea);
+          }
+        }
+      } catch(e) {
+        if (!isMissingTableError(e)) throw e;
+      }
+    }
+
     const notaMinApro = evalRows.length?Number(evalRows[0].nota_min_apro):70;
 
     const libro = partRows.map(p=>{
@@ -1144,7 +1173,10 @@ app.get("/api/eval-inst/pendientes/:usuarioId", async (req,res) => {
       }
     }
     res.json(result);
-  } catch(e){ res.status(500).json({message:e.message}); }
+  } catch(e){
+    if (isMissingTableError(e)) return res.json([]);
+    res.status(500).json({message:e.message});
+  }
 });
 
 /**
@@ -1268,15 +1300,17 @@ app.post("/api/tareas/:tareaId/entregar", uploadTarea.single("archivo"), async (
     const archivoNombre = req.file.originalname;
     const archivoRuta   = req.file.filename;
 
-    const [result] = await pool.execute(
-      `UPDATE tarea_entregas
-         SET estado='ENTREGADO', archivo_nombre=?, archivo_ruta=?, respuesta=NULL, entregado_en=NOW()
-       WHERE tarea_id=? AND usuario_id=? LIMIT 1`,
-      [archivoNombre, archivoRuta, tareaId, usuario_id]);
-    if(result.affectedRows===0){
-      fs.unlink(path.join(UPLOADS_DIR, archivoRuta), ()=>{});
-      return res.status(404).json({message:"Entrega no encontrada para este alumno"});
-    }
+    await pool.execute(
+      `INSERT INTO tarea_entregas (tarea_id,usuario_id,estado,respuesta,archivo_nombre,archivo_ruta,entregado_en)
+       VALUES (?,?,'ENTREGADO',NULL,?,?,NOW())
+       ON DUPLICATE KEY UPDATE
+         estado='ENTREGADO',
+         respuesta=NULL,
+         archivo_nombre=VALUES(archivo_nombre),
+         archivo_ruta=VALUES(archivo_ruta),
+         entregado_en=NOW(),
+         actualizado_en=NOW()`,
+      [tareaId, usuario_id, archivoNombre, archivoRuta]);
     res.json({message:"Tarea entregada exitosamente", archivo_nombre: archivoNombre});
   } catch(e){
     if(req.file) fs.unlink(path.join(UPLOADS_DIR, req.file.filename), ()=>{});
@@ -1607,7 +1641,10 @@ app.get("/api/finanzas/estado/:usuarioId", async (req,res) => {
     const deudas = [...mora, ...vencidas];
 
     res.json({bloqueado, deudas, total_deuda: deudas.reduce((s,d)=>s+Number(d.monto),0)});
-  } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
+  } catch(e){
+    if (isMissingTableError(e)) return res.json({bloqueado:false,deudas:[],total_deuda:0});
+    res.status(500).json({message:"Error interno",detail:e.message});
+  }
 });
 
 /**
@@ -1956,6 +1993,26 @@ app.get("/api/nota-final/materia/:materiaId", async (req, res) => {
       notasMap[n.usuario_id][n.eval_nombre] = Number(n.nota);
     }
 
+    const tareaEvalNames = evalRows.filter(ev => isTareaEval(ev.nombre)).map(ev => ev.nombre);
+    if (tareaEvalNames.length) {
+      try {
+        const [tareaRows] = await pool.execute(
+          `SELECT te.usuario_id, ROUND(AVG(te.nota),2) AS promedio_tarea
+           FROM tareas t
+           JOIN tarea_entregas te ON te.tarea_id=t.id
+           WHERE t.materia_id=? AND te.nota IS NOT NULL
+           GROUP BY te.usuario_id`, [materiaId]);
+        for (const row of tareaRows) {
+          if (!notasMap[row.usuario_id]) notasMap[row.usuario_id] = {};
+          for (const evalName of tareaEvalNames) {
+            notasMap[row.usuario_id][evalName] = Number(row.promedio_tarea);
+          }
+        }
+      } catch(e) {
+        if (!isMissingTableError(e)) throw e;
+      }
+    }
+
     // ── 2. Facilitador (2.5%) — escala 1-10, se convierte a 0-100 multiplicando ×10 ──
     const [facRows] = await pool.execute(
       `SELECT cursante_id, ROUND((c1+c2+c3+c4)/4,2) AS promedio_10
@@ -1964,30 +2021,39 @@ app.get("/api/nota-final/materia/:materiaId", async (req, res) => {
     const facMap = Object.fromEntries(facRows.map(r => [r.cursante_id, Number(r.promedio_10) * 10]));
 
     // ── 3. Cursantes (5%) — período activo/más reciente para esta materia ──
-    const [periodoRows] = await pool.execute(
-      `SELECT id FROM eval_inst_periodos WHERE materia_id=? ORDER BY creado_en DESC LIMIT 1`,
-      [materiaId]);
     const peerMap = {};
-    if (periodoRows.length) {
-      const [peerRows] = await pool.execute(
-        `SELECT er.evaluado_id,
-                ROUND(AVG(ev.valor), 2) AS promedio
-         FROM eval_inst_respuestas er
-         JOIN eval_inst_valoraciones ev ON ev.respuesta_id = er.id
-         WHERE er.periodo_id = ? AND er.completada = 1
-         GROUP BY er.evaluado_id`, [periodoRows[0].id]);
-      for (const r of peerRows) peerMap[r.evaluado_id] = Number(r.promedio);
+    try {
+      const [periodoRows] = await pool.execute(
+        `SELECT id FROM eval_inst_periodos WHERE materia_id=? ORDER BY creado_en DESC LIMIT 1`,
+        [materiaId]);
+      if (periodoRows.length) {
+        const [peerRows] = await pool.execute(
+          `SELECT er.evaluado_id,
+                  ROUND(AVG(ev.valor), 2) AS promedio
+           FROM eval_inst_respuestas er
+           JOIN eval_inst_valoraciones ev ON ev.respuesta_id = er.id
+           WHERE er.periodo_id = ? AND er.completada = 1
+           GROUP BY er.evaluado_id`, [periodoRows[0].id]);
+        for (const r of peerRows) peerMap[r.evaluado_id] = Number(r.promedio);
+      }
+    } catch(e) {
+      if (!isMissingTableError(e)) throw e;
     }
 
     // ── 4. Disciplina (2.5%) — saldo de méritos/deméritos del curso ─────
-    const [discRows] = await pool.execute(
-      `SELECT usuario_id,
-         COALESCE(SUM(CASE WHEN tipo='MERITO'   THEN puntos ELSE 0 END),0) -
-         COALESCE(SUM(CASE WHEN tipo='DEMERITO' THEN puntos ELSE 0 END),0) AS saldo
-       FROM disciplina_registros WHERE curso_id=? GROUP BY usuario_id`, [cursoId]);
-    const discMap = Object.fromEntries(
-      discRows.map(r => [r.usuario_id, Math.max(0, Math.min(100, 100 + Number(r.saldo)))])
-    );
+    let discMap = {};
+    try {
+      const [discRows] = await pool.execute(
+        `SELECT usuario_id,
+           COALESCE(SUM(CASE WHEN tipo='MERITO'   THEN puntos ELSE 0 END),0) -
+           COALESCE(SUM(CASE WHEN tipo='DEMERITO' THEN puntos ELSE 0 END),0) AS saldo
+         FROM disciplina_registros WHERE curso_id=? GROUP BY usuario_id`, [cursoId]);
+      discMap = Object.fromEntries(
+        discRows.map(r => [r.usuario_id, Math.max(0, Math.min(100, 100 + Number(r.saldo)))])
+      );
+    } catch(e) {
+      if (!isMissingTableError(e)) throw e;
+    }
 
     // ── Participantes ─────────────────────────────────────────
     const [partRows] = await pool.execute(

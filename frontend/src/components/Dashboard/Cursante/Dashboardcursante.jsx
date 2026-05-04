@@ -30,6 +30,53 @@ function fmtFecha(f) {
 
 function Spinner() { return <div className="cur-spinner"><div className="spin-ring"/></div>; }
 
+function esTareaEval(nombre) {
+  const value = String(nombre || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return /^(tarea|trabajo|practica)$/.test(value);
+}
+
+async function calcularMiPromedioTareas(materiaId, usuarioId) {
+  try {
+    const tareas = await fetch(`${API}/tareas/materia/${materiaId}`).then(r => r.json());
+    if (!Array.isArray(tareas) || !tareas.length) return null;
+    const notas = [];
+    for (const tarea of tareas) {
+      try {
+        const r = await fetch(`${API}/tareas/${tarea.id}/mi-entrega/${usuarioId}`);
+        if (!r.ok) continue;
+        const entrega = await r.json();
+        if (entrega.nota !== null && entrega.nota !== undefined) notas.push(Number(entrega.nota));
+      } catch {}
+    }
+    if (!notas.length) return null;
+    return Math.round((notas.reduce((a, b) => a + b, 0) / notas.length) * 10) / 10;
+  } catch {
+    return null;
+  }
+}
+
+function mezclarNotaTarea(notasBase, evaluaciones, promedioTareas) {
+  const notas = { ...(notasBase || {}) };
+  if (promedioTareas === null || promedioTareas === undefined) return notas;
+  evaluaciones.forEach(ev => {
+    if (esTareaEval(ev.nombre)) notas[ev.nombre] = promedioTareas;
+  });
+  return notas;
+}
+
+function calcularPromedioEvaluaciones(notas, evaluaciones, fallback = 0) {
+  if (!Array.isArray(evaluaciones) || !evaluaciones.length) return Number(fallback || 0);
+  const suma = evaluaciones.reduce((acc, ev) => {
+    const nota = Object.prototype.hasOwnProperty.call(notas || {}, ev.nombre) ? Number(notas[ev.nombre] || 0) : 0;
+    return acc + nota * Number(ev.peso || 0);
+  }, 0);
+  return Math.round((suma / 100) * 100) / 100;
+}
+
 function NotaAcademicaResumen({ notas, onVerDetalle }) {
   if (!notas) return null;
   const final = notas.notaFinal;
@@ -321,13 +368,34 @@ export default function DashboardCursante() {
     Promise.all([
       fetch(`${API}/calificaciones/materia/${materiaId}`).then(r => r.json()).catch(() => null),
       fetch(`${API}/nota-final/materia/${materiaId}`).then(r => r.json()).catch(() => null),
+      calcularMiPromedioTareas(materiaId, session.id),
     ])
-      .then(([calif, finalData]) => {
+      .then(([calif, finalData, promedioTareas]) => {
         const libro = Array.isArray(calif?.libro) ? calif.libro : [];
         const finales = Array.isArray(finalData?.resultado) ? finalData.resultado : [];
+        const evaluaciones = Array.isArray(calif?.evaluaciones) ? calif.evaluaciones : [];
         const e = libro.find(p => Number(p.usuario_id) === Number(session.id));
         const final = finales.find(p => Number(p.usuario_id) === Number(session.id));
-        const tieneNotas = e && Object.keys(e.notas || {}).length > 0;
+        const notasMezcladas = mezclarNotaTarea(e?.notas || {}, evaluaciones, promedioTareas);
+        const promedioEvaluaciones = calcularPromedioEvaluaciones(notasMezcladas, evaluaciones, e?.promedio || 0);
+        const notaFinalAjustada = final
+          ? {
+              ...final,
+              prom_catedratico: promedioEvaluaciones,
+              nota_final: Number((
+                promedioEvaluaciones +
+                (final.prom_facilitador ?? 0) * 0.025 +
+                (final.prom_cursantes ?? 0) * 0.05 +
+                Number(final.nota_disciplina ?? 100) * 0.025
+              ).toFixed(2)),
+            }
+          : null;
+        if (notaFinalAjustada) {
+          notaFinalAjustada.estado = notaFinalAjustada.nota_final >= Number(finalData?.nota_min_apro || 70)
+            ? "aprobado"
+            : "reprobado";
+        }
+        const tieneNotas = Object.keys(notasMezcladas).length > 0;
         const tienePromedioFinal = final && Number(final.prom_catedratico || 0) > 0;
 
         if (!tieneNotas && !tienePromedioFinal) {
@@ -337,10 +405,11 @@ export default function DashboardCursante() {
 
         setNotas({
           ...(e || { usuario_id: session.id, notas: {}, bloqueado: false }),
-          evaluaciones: Array.isArray(calif?.evaluaciones) ? calif.evaluaciones : [],
-          promedio: final ? Number(final.nota_final) : Number(e?.promedio || 0),
-          estado: final?.estado || e?.estado || "reprobado",
-          notaFinal: final || null,
+          notas: notasMezcladas,
+          evaluaciones,
+          promedio: notaFinalAjustada ? Number(notaFinalAjustada.nota_final) : promedioEvaluaciones,
+          estado: notaFinalAjustada?.estado || e?.estado || (promedioEvaluaciones >= Number(finalData?.nota_min_apro || 70) ? "aprobado" : "reprobado"),
+          notaFinal: notaFinalAjustada || null,
           pesos: finalData?.pesos || null,
           notaMinApro: finalData?.nota_min_apro || 70,
         });

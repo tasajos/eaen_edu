@@ -136,8 +136,15 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
   // Siempre hay columnas: las del servidor o las por defecto (Examen + Tarea)
   const activeEvals = evals.length ? evals : DEFAULT_EVALS;
 
-  // Solo "Trabajo" y "Práctica" se auto-calculan desde tareas; "Tarea" se ingresa manualmente
-  const esTareaEval = nombre => /^trabajo$|^práctica$|^practica$/i.test(nombre.trim());
+  // Las evaluaciones de tareas se auto-calculan desde las entregas calificadas.
+  const esTareaEval = nombre => {
+    const value = String(nombre || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    return /^(tarea|trabajo|practica)$/.test(value);
+  };
 
   const calcularPromedioTareas = async (materiaId) => {
     try {
@@ -167,16 +174,15 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
     setLoadingEvals(true);
     fetch(`${API}/eval-config/materia/${materia.id}`)
       .then(r=>r.json()).then(async d => {
-        if (Array.isArray(d) && d.length) {
-          setEvals(d);
-          if (d.some(ev => esTareaEval(ev.nombre))) {
-            const p = await calcularPromedioTareas(materia.id);
-            setNotasTarea(p);
-          }
+        const rows = Array.isArray(d) && d.length ? d : DEFAULT_EVALS;
+        setEvals(Array.isArray(d) && d.length ? d : []);
+        if (rows.some(ev => esTareaEval(ev.nombre))) {
+          const p = await calcularPromedioTareas(materia.id);
+          setNotasTarea(p);
         } else {
-          setEvals([]); // usará DEFAULT_EVALS via activeEvals
+          setNotasTarea({});
         }
-      }).catch(()=>{ setEvals([]); })
+      }).catch(()=>{ setEvals([]); setNotasTarea({}); })
       .finally(()=>setLoadingEvals(false));
     fetch(`${API}/calificaciones/materia/${materia.id}`)
       .then(r=>r.json()).then(d => {
