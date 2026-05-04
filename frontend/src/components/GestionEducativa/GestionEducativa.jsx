@@ -470,7 +470,7 @@ function ModuloCalificaciones({ showToast }) {
     <div>
       <div className="edu-tabs">
         <button className={`edu-tab${tab==="libro"?" active":""}`} onClick={()=>setTab("libro")}>📊 Libro de notas</button>
-        <button className={`edu-tab${tab==="config"?" active":""}`} onClick={()=>setTab("config")}>⚙️ Evaluaciones</button>
+        <button className={`edu-tab${tab==="nota-final"?" active":""}`} onClick={()=>setTab("nota-final")}>🏆 Nota Final</button>
       </div>
       <div style={{padding:"0 26px 26px"}}>
         <SelectorBar cursos={cursos} cursoId={cursoId} setCursoId={setCursoId} loadingCursos={loadingC}
@@ -523,9 +523,131 @@ function ModuloCalificaciones({ showToast }) {
           )
         )}
 
-        {tab==="config" && (
-          <EvalConfigEditor materiaId={materiaId} evals={evals} setEvals={setEvals} showToast={showToast}/>
+        {tab==="nota-final" && (
+          <NotaFinalView materiaId={materiaId}/>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Vista Nota Final ─────────────────────────────────────────
+function NotaFinalView({ materiaId }) {
+  const [data,    setData]    = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(()=>{
+    if(!materiaId){ setData(null); return; }
+    setLoading(true);
+    fetch(`${API}/nota-final/materia/${materiaId}`)
+      .then(r=>r.json())
+      .then(d=>setData(d))
+      .catch(()=>setData(null))
+      .finally(()=>setLoading(false));
+  },[materiaId]);
+
+  if(!materiaId) return <Empty icon="🏆" msg="Seleccione una materia para ver la nota final"/>;
+  if(loading)    return <Spinner/>;
+  if(!data?.resultado) return <Empty icon="📭" msg="Sin datos"/>;
+
+  const { resultado, pesos, nota_min_apro } = data;
+  const aprobados = resultado.filter(r=>r.nota_final >= nota_min_apro).length;
+
+  const colorNota = (n, min) => n === null ? "#aaa" : n >= min ? "#2e7d32" : "#c62828";
+  const fmt = (v) => v === null ? <span style={{color:"#aaa",fontSize:11}}>Pendiente</span> : Number(v).toFixed(1);
+
+  return (
+    <div>
+      {/* Banner fórmula */}
+      <div style={{background:"#003366",color:"#fff",borderRadius:12,padding:"12px 20px",marginBottom:18,
+                   display:"flex",flexWrap:"wrap",gap:10,alignItems:"center",fontSize:13}}>
+        <span style={{fontWeight:700,fontSize:14}}>🏆 Fórmula nota final (fija):</span>
+        <span style={{background:"rgba(255,255,255,.15)",padding:"3px 10px",borderRadius:20}}>
+          Catedrático <strong>{pesos.catedratico}%</strong>
+        </span>
+        <span style={{background:"rgba(255,255,255,.15)",padding:"3px 10px",borderRadius:20}}>
+          Facilitador <strong>{pesos.facilitador}%</strong>
+        </span>
+        <span style={{background:"rgba(255,255,255,.15)",padding:"3px 10px",borderRadius:20}}>
+          Cursantes <strong>{pesos.cursantes}%</strong>
+        </span>
+        <span style={{background:"rgba(255,255,255,.15)",padding:"3px 10px",borderRadius:20}}>
+          Disciplina <strong>{pesos.disciplina}%</strong>
+        </span>
+      </div>
+
+      {/* Stats rápidas */}
+      <div className="edu-stats-row" style={{marginBottom:18}}>
+        <div className="edu-stat-mini"><span className="sn">{resultado.length}</span><span className="sl">Cursantes</span></div>
+        <div className="edu-stat-mini green"><span className="sn">{aprobados}</span><span className="sl">Aprobados</span></div>
+        <div className="edu-stat-mini red"><span className="sn">{resultado.length-aprobados}</span><span className="sl">Reprobados</span></div>
+        <div className="edu-stat-mini orange">
+          <span className="sn">{resultado.length?(resultado.reduce((s,r)=>s+r.nota_final,0)/resultado.length).toFixed(1):"—"}</span>
+          <span className="sl">Promedio gral.</span>
+        </div>
+      </div>
+
+      <div className="edu-table-wrap" style={{overflowX:"auto"}}>
+        <table className="edu-table" style={{minWidth:750}}>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Cursante</th>
+              <th style={{textAlign:"center"}}>
+                Catedrático<br/>
+                <span style={{fontSize:10,fontWeight:400,color:"#888"}}>{pesos.catedratico}%</span>
+              </th>
+              <th style={{textAlign:"center"}}>
+                Facilitador<br/>
+                <span style={{fontSize:10,fontWeight:400,color:"#888"}}>{pesos.facilitador}%</span>
+              </th>
+              <th style={{textAlign:"center"}}>
+                Cursantes<br/>
+                <span style={{fontSize:10,fontWeight:400,color:"#888"}}>{pesos.cursantes}%</span>
+              </th>
+              <th style={{textAlign:"center"}}>
+                Disciplina<br/>
+                <span style={{fontSize:10,fontWeight:400,color:"#888"}}>{pesos.disciplina}%</span>
+              </th>
+              <th style={{textAlign:"center",background:"#003366",color:"#fff"}}>Nota Final</th>
+              <th style={{textAlign:"center"}}>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {resultado.map((r,i)=>{
+              const ap = r.nota_final >= nota_min_apro;
+              return (
+                <tr key={r.usuario_id}>
+                  <td style={{color:"#888"}}>{i+1}</td>
+                  <td style={{fontWeight:700}}>{r.ap_paterno} {r.ap_materno}, {r.nombre}</td>
+                  <td style={{textAlign:"center",color:colorNota(r.prom_catedratico, nota_min_apro)}}>
+                    {Number(r.prom_catedratico).toFixed(1)}
+                  </td>
+                  <td style={{textAlign:"center",color:colorNota(r.prom_facilitador, 0)}}>
+                    {fmt(r.prom_facilitador)}
+                    {r.facilitador_pendiente && <div style={{fontSize:9,color:"#e65100"}}>Sin calificar</div>}
+                  </td>
+                  <td style={{textAlign:"center",color:colorNota(r.prom_cursantes, 0)}}>
+                    {fmt(r.prom_cursantes)}
+                    {r.cursantes_pendiente && <div style={{fontSize:9,color:"#e65100"}}>Sin evaluación</div>}
+                  </td>
+                  <td style={{textAlign:"center",color:colorNota(r.nota_disciplina, 0)}}>
+                    {Number(r.nota_disciplina).toFixed(1)}
+                  </td>
+                  <td style={{textAlign:"center",fontWeight:800,fontSize:16,
+                               color:ap?"#2e7d32":"#c62828",background:ap?"#e8f5e9":"#ffebee"}}>
+                    {Number(r.nota_final).toFixed(2)}
+                  </td>
+                  <td style={{textAlign:"center"}}>
+                    <span className={`edu-badge ${ap?"badge-aprobado":"badge-reprobado"}`}>
+                      {ap?"Aprobado":"Reprobado"}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );

@@ -119,15 +119,25 @@ function VistaAsistencia({ materia, participantes, showToast }) {
 /* ══════════════════════════════════════════════════════════
    VISTA CALIFICACIONES
 ══════════════════════════════════════════════════════════ */
+const DEFAULT_EVALS = [
+  { id: null, nombre: "Examen", peso: 70, orden: 1, nota_min_apro: 70, nota_max: 100 },
+  { id: null, nombre: "Tarea",  peso: 20, orden: 2, nota_min_apro: 70, nota_max: 100 },
+];
+
 function VistaCalificaciones({ materia, participantes, showToast }) {
   const [evals,       setEvals]       = useState([]);
+  const [loadingEvals,setLoadingEvals]= useState(true);
   const [notas,       setNotas]       = useState({});
   const [notasTarea,  setNotasTarea]  = useState({});
-  const [bloqueados,  setBloqueados]  = useState({}); // { usuario_id: true }
-  const [saving,      setSaving]      = useState({}); // { usuario_id: true }
-  const [confirmUid,  setConfirmUid]  = useState(null); // uid del modal abierto
+  const [bloqueados,  setBloqueados]  = useState({});
+  const [saving,      setSaving]      = useState({});
+  const [confirmUid,  setConfirmUid]  = useState(null);
 
-  const esTareaEval = nombre => /trabajo|tarea|practic/i.test(nombre);
+  // Siempre hay columnas: las del servidor o las por defecto (Examen + Tarea)
+  const activeEvals = evals.length ? evals : DEFAULT_EVALS;
+
+  // Solo "Trabajo" y "Práctica" se auto-calculan desde tareas; "Tarea" se ingresa manualmente
+  const esTareaEval = nombre => /^trabajo$|^práctica$|^practica$/i.test(nombre.trim());
 
   const calcularPromedioTareas = async (materiaId) => {
     try {
@@ -154,15 +164,20 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
 
   useEffect(() => {
     if (!materia?.id) return;
+    setLoadingEvals(true);
     fetch(`${API}/eval-config/materia/${materia.id}`)
       .then(r=>r.json()).then(async d => {
-        if (!Array.isArray(d)) return;
-        setEvals(d);
-        if (d.some(ev => esTareaEval(ev.nombre))) {
-          const p = await calcularPromedioTareas(materia.id);
-          setNotasTarea(p);
+        if (Array.isArray(d) && d.length) {
+          setEvals(d);
+          if (d.some(ev => esTareaEval(ev.nombre))) {
+            const p = await calcularPromedioTareas(materia.id);
+            setNotasTarea(p);
+          }
+        } else {
+          setEvals([]); // usará DEFAULT_EVALS via activeEvals
         }
-      }).catch(()=>{});
+      }).catch(()=>{ setEvals([]); })
+      .finally(()=>setLoadingEvals(false));
     fetch(`${API}/calificaciones/materia/${materia.id}`)
       .then(r=>r.json()).then(d => {
         if (!d.libro) return;
@@ -177,27 +192,28 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
   }, [materia?.id]);
 
   useEffect(() => {
-    if (participantes.length && evals.length) {
+    if (participantes.length && !loadingEvals) {
       setNotas(prev => {
         const n = {...prev};
         participantes.forEach(p => {
-          if (!n[p.id]) n[p.id] = Object.fromEntries(evals.map(ev=>[ev.nombre,0]));
+          if (!n[p.id]) n[p.id] = Object.fromEntries(activeEvals.map(ev=>[ev.nombre,0]));
         });
         return n;
       });
     }
-  }, [participantes, evals]);
+  }, [participantes, loadingEvals]); // eslint-disable-line
 
   const getNotaEval = (uid, evNombre) => {
     if (esTareaEval(evNombre)) return notasTarea[uid] ?? 0;
     return notas[uid]?.[evNombre] ?? 0;
   };
 
+  // Promedio = contribución directa al 90% (escala 0-90)
+  // exam=100, tarea=0 → 100*70/100 = 70 | exam=100, tarea=100 → 90
   const prom = uid => {
-    if (!evals.length) return 0;
-    let sp=0, sn=0;
-    evals.forEach(ev => { sn += getNotaEval(uid, ev.nombre)*Number(ev.peso); sp += Number(ev.peso); });
-    return sp>0 ? sn/sp : 0;
+    let sn = 0;
+    activeEvals.forEach(ev => { sn += getNotaEval(uid, ev.nombre) * Number(ev.peso); });
+    return sn / 100;
   };
 
   // Guardar y bloquear notas de UN cursante
@@ -205,7 +221,7 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
     setSaving(p=>({...p,[uid]:true}));
     try {
       const notasCompletas = {...notas[uid]};
-      evals.forEach(ev => {
+      activeEvals.forEach(ev => {
         if (esTareaEval(ev.nombre)) notasCompletas[ev.nombre] = getNotaEval(uid, ev.nombre);
       });
       const r = await fetch(`${API}/calificaciones/usuario`, {
@@ -226,7 +242,7 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
     finally { setSaving(p=>({...p,[uid]:false})); setConfirmUid(null); }
   };
 
-  const min = evals.length ? Number(evals[0].nota_min_apro) : 70;
+  const min = 63; // umbral aprobatorio del catedrático: 70% de los 90pts = 63
   const conTareas = Object.values(notasTarea).length;
   const confirmParticipante = participantes.find(p=>p.id===confirmUid);
   const totalBloqueados = Object.keys(bloqueados).length;
@@ -269,7 +285,7 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
               width:"100%", background:"#f7f9fc", borderRadius:12,
               padding:"14px 18px", textAlign:"left", border:"1.5px solid #eef2f7"
             }}>
-              {evals.map(ev => {
+              {activeEvals.map(ev => {
                 const nota = getNotaEval(confirmUid, ev.nombre);
                 const esAuto = esTareaEval(ev.nombre);
                 return (
@@ -329,14 +345,24 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
         </div>
       )}
 
-      {!evals.length ? (
-        <div className="empty-msg">
-          <p>No hay evaluaciones configuradas para esta materia.</p>
-          <p style={{fontSize:12,marginTop:6}}>Configure las evaluaciones en Gestión Educativa → Calificaciones.</p>
-        </div>
+      {/* Banner fijo — pesos del sistema */}
+      <div style={{
+        display:"flex", flexWrap:"wrap", gap:8, marginBottom:16,
+        background:"#f0f4ff", borderRadius:10, padding:"10px 16px",
+        fontSize:12, color:"#003366", border:"1.5px solid #c5cae9"
+      }}>
+        <span style={{fontWeight:700, marginRight:4}}>Sistema de calificación:</span>
+        <span style={{background:"#003366",color:"#fff",padding:"2px 10px",borderRadius:20}}>📝 Catedrático <strong>90%</strong> <span style={{opacity:.75,fontSize:11}}>(Examen 70% + Tarea 20%)</span></span>
+        <span style={{background:"#ff6600",color:"#fff",padding:"2px 10px",borderRadius:20}}>🎯 Facilitador <strong>2.5%</strong></span>
+        <span style={{background:"#1565c0",color:"#fff",padding:"2px 10px",borderRadius:20}}>👥 Cursantes <strong>5%</strong></span>
+        <span style={{background:"#2e7d32",color:"#fff",padding:"2px 10px",borderRadius:20}}>⚖️ Disciplina <strong>2.5%</strong></span>
+      </div>
+
+      {loadingEvals ? (
+        <div className="doc-spinner"><div className="spin-ring"/></div>
       ) : (<>
         {/* Info tareas automáticas */}
-        {evals.some(ev => esTareaEval(ev.nombre)) && (
+        {activeEvals.some(ev => esTareaEval(ev.nombre)) && (
           <div style={{
             display:"flex", alignItems:"center", gap:10,
             background:"#e3f2fd", border:"1.5px solid #90caf9",
@@ -371,7 +397,7 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
                 <th>#</th>
                 <th>Participante</th>
                 <th>CI</th>
-                {evals.map(ev => (
+                {activeEvals.map(ev => (
                   <th key={ev.nombre} style={{textAlign:"center"}}>
                     {ev.nombre}
                     {esTareaEval(ev.nombre) && <span title="Auto" style={{marginLeft:3}}>🔄</span>}
@@ -395,7 +421,7 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
                     <td className="muted">{i+1}</td>
                     <td className="bold">{p.ap_paterno} {p.ap_materno}, {p.nombre}</td>
                     <td className="muted">{p.ci}</td>
-                    {evals.map(ev => {
+                    {activeEvals.map(ev => {
                       const nota   = getNotaEval(p.id, ev.nombre);
                       const esAuto = esTareaEval(ev.nombre);
                       return (
@@ -514,6 +540,143 @@ function VisorDocumento({ archivoRuta, archivoNombre, onClose }) {
             <div className="visor-content" dangerouslySetInnerHTML={{ __html: html }} />
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
+   VISTA FACILITADOR — El docente evalúa a cada cursante en 4 criterios fijos
+   Peso fijo: 2.5% de la nota final
+══════════════════════════════════════════════════════════ */
+const CRITERIOS_FACILITADOR = [
+  { key: "c1", label: "Aporte de información" },
+  { key: "c2", label: "Aprecia los hechos objetivamente" },
+  { key: "c3", label: "Decide con Acierto" },
+  { key: "c4", label: "Sostiene criterios con seguridad" },
+];
+const OPCIONES_FAC = [1,2,3,4,5,6,7,8,9,10];
+
+function VistaFacilitador({ materia, participantes, showToast }) {
+  const session  = getSession();
+  const [datos,   setDatos]   = useState({});
+  const [saving,  setSaving]  = useState(false);
+  const [cargado, setCargado] = useState(false);
+
+  useEffect(() => {
+    if (!materia?.id) return;
+    fetch(`${API}/eval-facilitador/materia/${materia.id}`)
+      .then(r => r.json())
+      .then(d => {
+        if (!Array.isArray(d)) return;
+        const m = {};
+        d.forEach(ev => { m[ev.cursante_id] = { c1: ev.c1, c2: ev.c2, c3: ev.c3, c4: ev.c4 }; });
+        setDatos(m);
+        setCargado(true);
+      }).catch(() => setCargado(true));
+  }, [materia?.id]);
+
+  const set = (uid, key, val) => {
+    setDatos(prev => ({ ...prev, [uid]: { ...prev[uid], [key]: Number(val) } }));
+  };
+
+  // promedio 1-10
+  const promCriterios = (uid) => {
+    const d = datos[uid] || {};
+    const vals = CRITERIOS_FACILITADOR.map(c => Number(d[c.key] || 0));
+    return vals.reduce((a,b)=>a+b,0) / 4;
+  };
+
+  // ponderaje = (promedio/10) * 2.5 → valor 0 a 2.5 sobre la nota final
+  const ponderaje = (uid) => (promCriterios(uid) / 10 * 2.5).toFixed(2);
+
+  const guardar = async () => {
+    setSaving(true);
+    try {
+      const evaluaciones = participantes.map(p => ({
+        cursante_id: p.id,
+        ...(datos[p.id] || { c1: 0, c2: 0, c3: 0, c4: 0 }),
+      }));
+      const r = await fetch(`${API}/eval-facilitador`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ curso_id: materia.curso_id, materia_id: materia.id, evaluaciones, registrado_por: session?.id }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.message);
+      showToast(`✅ Evaluación facilitador guardada — ${d.guardadas} cursantes`);
+    } catch(e) { showToast(`❌ ${e.message}`, "error"); }
+    finally { setSaving(false); }
+  };
+
+  if (!cargado) return <div className="doc-spinner"><div className="spin-ring"/></div>;
+
+  return (
+    <div>
+      <div style={{ background:"#f0f4ff", borderRadius:10, padding:"12px 18px", marginBottom:18, fontSize:13, color:"#003366" }}>
+        <strong>Evaluación del Facilitador — 2.5% de la nota final</strong>
+        <div style={{ marginTop:4, color:"#5a6a80" }}>
+          Califica del <strong>1 al 10</strong> en cada criterio. El ponderaje se calcula sobre 2.5 puntos máximos.
+        </div>
+      </div>
+
+      <div className="doc-table-wrap" style={{ overflowX:"auto" }}>
+        <table className="doc-table" style={{ minWidth:780 }}>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Cursante</th>
+              {CRITERIOS_FACILITADOR.map(c => (
+                <th key={c.key} style={{ textAlign:"center", fontSize:11 }}>{c.label}</th>
+              ))}
+              <th style={{ textAlign:"center" }}>Prom.<br/><span style={{fontSize:10,fontWeight:400}}>(1–10)</span></th>
+              <th style={{ textAlign:"center", background:"#003366", color:"#fff" }}>
+                Ponderaje<br/><span style={{fontSize:10,fontWeight:400}}>(/ 2.5 pts)</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {participantes.map((p, i) => {
+              const d   = datos[p.id] || {};
+              const pr  = promCriterios(p.id);
+              const pnd = ponderaje(p.id);
+              return (
+                <tr key={p.id}>
+                  <td className="muted">{i+1}</td>
+                  <td className="bold">{p.ap_paterno} {p.ap_materno}, {p.nombre}</td>
+                  {CRITERIOS_FACILITADOR.map(c => (
+                    <td key={c.key} style={{ textAlign:"center" }}>
+                      <select
+                        value={d[c.key] ?? ""}
+                        onChange={e => set(p.id, c.key, e.target.value)}
+                        style={{ padding:"5px 8px", borderRadius:7, border:"1.5px solid #ccd6e8",
+                                 fontSize:13, cursor:"pointer", background:"#fff" }}
+                      >
+                        <option value="">—</option>
+                        {OPCIONES_FAC.map(n => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                    </td>
+                  ))}
+                  <td style={{ textAlign:"center", fontWeight:700, color:"#003366", fontSize:14 }}>
+                    {pr > 0 ? pr.toFixed(1) : "—"}
+                  </td>
+                  <td style={{ textAlign:"center", fontWeight:800, fontSize:15,
+                               color: pr >= 7 ? "#2e7d32" : pr >= 5 ? "#e65100" : "#c62828",
+                               background: "#f0f4ff" }}>
+                    {pr > 0 ? pnd : "—"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="vista-footer">
+        <button className="btn-primary" onClick={guardar} disabled={saving}>
+          {saving ? "Guardando..." : "💾 Guardar evaluación facilitador"}
+        </button>
       </div>
     </div>
   );
@@ -854,6 +1017,7 @@ export default function DashboardDocente() {
   const VISTAS = [
     { id:"asistencia",     icon:"📋", label:"Asistencia" },
     { id:"calificaciones", icon:"📊", label:"Calificaciones" },
+    { id:"facilitador",    icon:"🎯", label:"Facilitador" },
     { id:"tareas",         icon:"📤", label:"Tareas" },
     { id:"calendario",     icon:"📅", label:"Calendario" },
     { id:"notificaciones", icon:"🔔", label:"Notificaciones" },
@@ -969,6 +1133,7 @@ export default function DashboardDocente() {
                   <div className="panel-body">
                     {materia && vista === "asistencia"     && <VistaAsistencia     materia={materia} participantes={participantes} showToast={showToast}/>}
                     {materia && vista === "calificaciones" && <VistaCalificaciones materia={materia} participantes={participantes} showToast={showToast}/>}
+                    {materia && vista === "facilitador"    && <VistaFacilitador    materia={materia} participantes={participantes} showToast={showToast}/>}
                     {materia && vista === "tareas"         && <VistaTareas         materia={materia} participantes={participantes} showToast={showToast}/>}
                     {vista === "calendario" && (
                       <VistaCalendario

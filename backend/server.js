@@ -646,11 +646,8 @@ app.get("/api/eval-config/materia/:materiaId", async (req,res) => {
       `SELECT id,nombre,peso,orden,nota_min_apro,nota_max FROM eval_config WHERE materia_id=? ORDER BY orden ASC`,[materiaId]);
     if(!r.length){
       return res.json([
-        {id:null,nombre:"Eval. 1",peso:20,orden:1,nota_min_apro:70,nota_max:100},
-        {id:null,nombre:"Eval. 2",peso:20,orden:2,nota_min_apro:70,nota_max:100},
-        {id:null,nombre:"Eval. 3",peso:20,orden:3,nota_min_apro:70,nota_max:100},
-        {id:null,nombre:"Trabajo",peso:20,orden:4,nota_min_apro:70,nota_max:100},
-        {id:null,nombre:"Final",  peso:20,orden:5,nota_min_apro:70,nota_max:100},
+        {id:null,nombre:"Examen",peso:70,orden:1,nota_min_apro:70,nota_max:100},
+        {id:null,nombre:"Tarea", peso:30,orden:2,nota_min_apro:70,nota_max:100},
       ]);
     }
     res.json(r);
@@ -710,8 +707,9 @@ app.post("/api/calificaciones", async (req,res) => {
     if(!evalRows.length){
       const nombresEval = Object.keys(calificaciones[0]?.notas||{});
       if(!nombresEval.length){await conn.rollback();return res.status(400).json({message:"No hay configuración de evaluaciones para esta materia"});}
-      const peso = (100/nombresEval.length).toFixed(2);
+      const PESOS_FIJOS = { 'Examen': 70, 'Tarea': 20 };
       for(const [i,nombre] of nombresEval.entries()){
+        const peso = PESOS_FIJOS[nombre] ?? (90/nombresEval.length).toFixed(2);
         await conn.execute(`INSERT IGNORE INTO eval_config (curso_id,materia_id,nombre,peso,orden) VALUES (?,?,?,?,?)`,[curso_id,materia_id,nombre,peso,i+1]);
       }
       [evalRows] = await conn.execute(`SELECT id,nombre FROM eval_config WHERE materia_id=? ORDER BY orden ASC`,[materia_id]);
@@ -835,9 +833,10 @@ app.get("/api/calificaciones/materia/:materiaId", async (req,res) => {
       const notas = notasMap[p.id]||{};
       let promedio = 0;
       if(evalRows.length){
-        let sumaPeso=0,sumaNota=0;
-        for(const ev of evalRows){sumaNota+=(notas[ev.nombre]??0)*Number(ev.peso);sumaPeso+=Number(ev.peso);}
-        promedio = sumaPeso>0?sumaNota/sumaPeso:0;
+        // Promedio = contribución directa al 90% (suma nota*peso / 100), escala 0-90
+        let sumaNota=0;
+        for(const ev of evalRows){sumaNota+=(notas[ev.nombre]??0)*Number(ev.peso);}
+        promedio = sumaNota/100;
       } else {
         const v=Object.values(notas);promedio=v.length?v.reduce((a,b)=>a+b,0)/v.length:0;
       }
@@ -1860,6 +1859,190 @@ app.use((err, _req, res, _next) => {
   if (err?.message)
     return res.status(400).json({ message: err.message });
   res.status(500).json({ message: "Error interno" });
+});
+
+// ════════════════════════════════════════════════════════════
+// EVAL FACILITADOR  —  El docente evalúa al cursante en 4 criterios fijos
+// Pesos fijos del sistema: Catedrático 90% | Facilitador 2.5% | Cursantes 5% | Disciplina 2.5%
+// ════════════════════════════════════════════════════════════
+
+// Auto-crear tabla si no existe
+pool.execute(`
+  CREATE TABLE IF NOT EXISTS eval_facilitador (
+    id           INT AUTO_INCREMENT PRIMARY KEY,
+    curso_id     INT NOT NULL,
+    materia_id   INT NOT NULL,
+    cursante_id  INT NOT NULL,
+    registrado_por INT NOT NULL,
+    c1 DECIMAL(5,2) NOT NULL DEFAULT 0 COMMENT 'Aporte de información',
+    c2 DECIMAL(5,2) NOT NULL DEFAULT 0 COMMENT 'Aprecia los hechos objetivamente',
+    c3 DECIMAL(5,2) NOT NULL DEFAULT 0 COMMENT 'Decide con Acierto',
+    c4 DECIMAL(5,2) NOT NULL DEFAULT 0 COMMENT 'Sostiene criterios con seguridad',
+    actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_fac (materia_id, cursante_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+`).catch(e => console.warn("[eval_facilitador] tabla ya existe o error:", e.message));
+
+/** GET /api/eval-facilitador/materia/:materiaId
+ *  Devuelve los valores en escala 1-10 tal como fueron ingresados por el docente.
+ */
+app.get("/api/eval-facilitador/materia/:materiaId", async (req, res) => {
+  try {
+    const materiaId = Number(req.params.materiaId);
+    if (!materiaId) return res.status(400).json({ message: "ID inválido" });
+    const [rows] = await pool.execute(
+      `SELECT cursante_id, c1, c2, c3, c4,
+              ROUND((c1+c2+c3+c4)/4, 2) AS promedio,
+              ROUND((c1+c2+c3+c4)/4/10*2.5, 3) AS ponderaje,
+              actualizado_en
+       FROM eval_facilitador WHERE materia_id = ?`, [materiaId]
+    );
+    res.json(rows);
+  } catch(e) { res.status(500).json({ message: "Error interno", detail: e.message }); }
+});
+
+/** POST /api/eval-facilitador
+ *  body: { curso_id, materia_id, evaluaciones:[{cursante_id, c1, c2, c3, c4}], registrado_por }
+ */
+app.post("/api/eval-facilitador", async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    const { curso_id, materia_id, evaluaciones, registrado_por } = req.body;
+    if (!curso_id || !materia_id || !registrado_por || !Array.isArray(evaluaciones))
+      return res.status(400).json({ message: "Faltan campos requeridos" });
+
+    await conn.beginTransaction();
+    for (const ev of evaluaciones) {
+      const { cursante_id, c1, c2, c3, c4 } = ev;
+      if (!cursante_id) continue;
+      const norm = [c1,c2,c3,c4].map(v => Math.min(10, Math.max(0, Number(v) || 0)));
+      await conn.execute(
+        `INSERT INTO eval_facilitador (curso_id, materia_id, cursante_id, registrado_por, c1, c2, c3, c4)
+         VALUES (?,?,?,?,?,?,?,?)
+         ON DUPLICATE KEY UPDATE c1=VALUES(c1),c2=VALUES(c2),c3=VALUES(c3),c4=VALUES(c4),
+           registrado_por=VALUES(registrado_por), actualizado_en=NOW()`,
+        [curso_id, materia_id, cursante_id, registrado_por, ...norm]
+      );
+    }
+    await conn.commit();
+    res.json({ message: "Evaluaciones guardadas", guardadas: evaluaciones.length });
+  } catch(e) { try{await conn.rollback();}catch{}res.status(500).json({ message: "Error interno", detail: e.message }); }
+  finally { conn.release(); }
+});
+
+/** GET /api/nota-final/materia/:materiaId
+ *  Calcula nota final compuesta (fórmula fija) para todos los cursantes de una materia.
+ *  Fórmula: nota_final = prom_catedratico*0.90 + prom_facilitador*0.025 + prom_cursantes*0.05 + nota_disciplina*0.025
+ */
+app.get("/api/nota-final/materia/:materiaId", async (req, res) => {
+  try {
+    const materiaId = Number(req.params.materiaId);
+    if (!materiaId) return res.status(400).json({ message: "ID inválido" });
+
+    const materia = await assertMateriaExists(pool, materiaId);
+    if (!materia) return res.status(404).json({ message: "Materia no encontrada" });
+    const cursoId = materia.curso_id;
+
+    // ── 1. Catedrático (90%) ─────────────────────────────────
+    const [evalRows] = await pool.execute(
+      `SELECT id, nombre, peso, nota_min_apro FROM eval_config WHERE materia_id=? ORDER BY orden ASC`, [materiaId]);
+    const [notaRows] = await pool.execute(
+      `SELECT c.usuario_id, ec.nombre AS eval_nombre, c.nota
+       FROM calificaciones c INNER JOIN eval_config ec ON ec.id=c.eval_config_id
+       WHERE c.materia_id=?`, [materiaId]);
+    const notasMap = {};
+    for (const n of notaRows) {
+      if (!notasMap[n.usuario_id]) notasMap[n.usuario_id] = {};
+      notasMap[n.usuario_id][n.eval_nombre] = Number(n.nota);
+    }
+
+    // ── 2. Facilitador (2.5%) — escala 1-10, se convierte a 0-100 multiplicando ×10 ──
+    const [facRows] = await pool.execute(
+      `SELECT cursante_id, ROUND((c1+c2+c3+c4)/4,2) AS promedio_10
+       FROM eval_facilitador WHERE materia_id=?`, [materiaId]);
+    // promedio_10 está en escala 1-10 → convertir a 0-100
+    const facMap = Object.fromEntries(facRows.map(r => [r.cursante_id, Number(r.promedio_10) * 10]));
+
+    // ── 3. Cursantes (5%) — período activo/más reciente para esta materia ──
+    const [periodoRows] = await pool.execute(
+      `SELECT id FROM eval_inst_periodos WHERE materia_id=? ORDER BY creado_en DESC LIMIT 1`,
+      [materiaId]);
+    const peerMap = {};
+    if (periodoRows.length) {
+      const [peerRows] = await pool.execute(
+        `SELECT er.evaluado_id,
+                ROUND(AVG(ev.valor), 2) AS promedio
+         FROM eval_inst_respuestas er
+         JOIN eval_inst_valoraciones ev ON ev.respuesta_id = er.id
+         WHERE er.periodo_id = ? AND er.completada = 1
+         GROUP BY er.evaluado_id`, [periodoRows[0].id]);
+      for (const r of peerRows) peerMap[r.evaluado_id] = Number(r.promedio);
+    }
+
+    // ── 4. Disciplina (2.5%) — saldo de méritos/deméritos del curso ─────
+    const [discRows] = await pool.execute(
+      `SELECT usuario_id,
+         COALESCE(SUM(CASE WHEN tipo='MERITO'   THEN puntos ELSE 0 END),0) -
+         COALESCE(SUM(CASE WHEN tipo='DEMERITO' THEN puntos ELSE 0 END),0) AS saldo
+       FROM disciplina_registros WHERE curso_id=? GROUP BY usuario_id`, [cursoId]);
+    const discMap = Object.fromEntries(
+      discRows.map(r => [r.usuario_id, Math.max(0, Math.min(100, 100 + Number(r.saldo)))])
+    );
+
+    // ── Participantes ─────────────────────────────────────────
+    const [partRows] = await pool.execute(
+      `SELECT u.id, u.nombre, u.ap_paterno, u.ap_materno, u.ci
+       FROM curso_participantes cp INNER JOIN usuarios u ON u.id=cp.usuario_id
+       WHERE cp.curso_id=? AND u.tipo_usuario='Cursante'
+       ORDER BY u.ap_paterno, u.ap_materno, u.nombre`, [cursoId]);
+
+    const notaMinApro = evalRows.length ? Number(evalRows[0].nota_min_apro) : 70;
+
+    const resultado = partRows.map(p => {
+      const notas = notasMap[p.id] || {};
+      // promCatedratico: contribución directa 0-90 (suma nota*peso/100)
+      let promCatedratico = 0;
+      if (evalRows.length) {
+        let sn = 0;
+        for (const ev of evalRows) sn += (notas[ev.nombre] ?? 0) * Number(ev.peso);
+        promCatedratico = sn / 100;
+      }
+      const promFacilitador = facMap[p.id] ?? null;
+      const promCursantes   = peerMap[p.id] ?? null;
+      const notaDisciplina  = discMap[p.id] ?? 100;
+
+      // nota_final = catedrático(0-90) + facilitador(0-2.5) + cursantes(0-5) + disciplina(0-2.5) = 0-100
+      const notaFinal =
+        promCatedratico +
+        (promFacilitador ?? 0) * 0.025 +
+        (promCursantes   ?? 0) * 0.05  +
+        notaDisciplina          * 0.025;
+
+      return {
+        usuario_id:       p.id,
+        nombre:           p.nombre,
+        ap_paterno:       p.ap_paterno,
+        ap_materno:       p.ap_materno,
+        ci:               p.ci,
+        prom_catedratico: Number(promCatedratico.toFixed(2)),
+        prom_facilitador: promFacilitador !== null ? Number(promFacilitador.toFixed(2)) : null,
+        prom_cursantes:   promCursantes   !== null ? Number(promCursantes.toFixed(2))   : null,
+        nota_disciplina:  Number(notaDisciplina.toFixed(2)),
+        nota_final:       Number(notaFinal.toFixed(2)),
+        estado:           notaFinal >= notaMinApro ? "aprobado" : "reprobado",
+        facilitador_pendiente: promFacilitador === null,
+        cursantes_pendiente:   promCursantes   === null,
+      };
+    });
+
+    res.json({
+      materia_id:     materiaId,
+      materia_nombre: materia.nombre,
+      pesos: { catedratico: 90, facilitador: 2.5, cursantes: 5, disciplina: 2.5 },
+      nota_min_apro:  notaMinApro,
+      resultado,
+    });
+  } catch(e) { res.status(500).json({ message: "Error interno", detail: e.message }); }
 });
 
 // ════════════════════════════════════════════════════════════
