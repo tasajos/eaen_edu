@@ -46,7 +46,7 @@ export default function DashboardJefe() {
           <div className="profile">
             <div className="avatar" aria-hidden="true">JE</div>
             <span>Jefe de Estudios</span>
-            <button className="logout-btn" onClick={() => { localStorage.removeItem("eaen_session"); navigate("/"); }}>
+            <button className="logout-btn" onClick={() => { localStorage.removeItem("eaen_session"); navigate("/", { replace: true }); }}>
               Logout
             </button>
           </div>

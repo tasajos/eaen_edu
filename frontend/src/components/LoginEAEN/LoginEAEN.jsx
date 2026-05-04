@@ -10,6 +10,7 @@ const DASHBOARD_POR_ROL = {
   DOCENTE:        "/dashboard-docente",
   CURSANTE:       "/dashboard-cursante",
   JEFE_CURSO:     "/dashboard-jefe-curso",
+  ADMIN_FINANZAS: "/gestion-finanzas",
 };
 
 function getDashboard(session) {
@@ -22,6 +23,7 @@ function getDashboard(session) {
   if (rol  === "JEFE_ESTUDIOS") return DASHBOARD_POR_ROL.JEFE_ESTUDIOS;
   if (rol  === "DOCENTE")       return DASHBOARD_POR_ROL.DOCENTE;
   if (rol  === "JEFE_CURSO")    return DASHBOARD_POR_ROL.JEFE_CURSO;
+  if (rol  === "ADMIN_FINANZAS") return DASHBOARD_POR_ROL.ADMIN_FINANZAS;
 
   // fallback a jefe si no hay tipo claro (admin)
   return DASHBOARD_POR_ROL.JEFE_ESTUDIOS;

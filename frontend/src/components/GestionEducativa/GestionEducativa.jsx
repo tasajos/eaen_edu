@@ -1449,7 +1449,7 @@ export default function GestionEducativa() {
           <h1>Gestión Educativa — EAEN Avaroa</h1>
           <div className="eaen-profile">
             <div className="eaen-avatar">JE</div><span>Jefe de Estudios</span>
-            <button className="eaen-logout" onClick={()=>{localStorage.removeItem("eaen_session");navigate("/");}}>Logout</button>
+            <button className="eaen-logout" onClick={()=>{localStorage.removeItem("eaen_session");navigate("/", { replace: true });}}>Logout</button>
           </div>
         </header>
 

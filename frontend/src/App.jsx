@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import LoginEAEN            from "./components/LoginEAEN/LoginEAEN";
 import DashboardJefe        from "./components/Dashboard/Jefeunidad/Dashboardjefe";
 import GestionUsuarios      from "./components/GestionUsuarios/GestionUsuarios";
@@ -35,6 +35,7 @@ function getRolDashboard(session) {
 // ─── Guard: solo si está autenticado ────────────────────────
 // Wrapper para ConfigDisciplina — selecciona curso
 function ConfigDisciplinaWrapper() {
+  const navigate = useNavigate();
   const [cursos, setCursos] = useState([]);
   const [cursoId, setCursoId] = useState(null);
   const [cursoDetalle, setCursoDetalle] = useState(null);
@@ -53,7 +54,7 @@ function ConfigDisciplinaWrapper() {
   return (
     <div style={{minHeight:"100vh",background:"#f0f4f8",padding:"24px 32px",fontFamily:"'IBM Plex Sans',sans-serif"}}>
       <div style={{background:"#003366",color:"#fff",borderRadius:14,padding:"18px 24px",marginBottom:20,display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
-        <button onClick={()=>window.history.back()} style={{background:"rgba(255,255,255,.12)",border:"1.5px solid rgba(255,255,255,.25)",color:"#fff",padding:"7px 16px",borderRadius:9,cursor:"pointer",fontWeight:600,fontSize:13}}>← Volver</button>
+        <button onClick={()=>navigate(getRolDashboard(session), { replace: true })} style={{background:"rgba(255,255,255,.12)",border:"1.5px solid rgba(255,255,255,.25)",color:"#fff",padding:"7px 16px",borderRadius:9,cursor:"pointer",fontWeight:600,fontSize:13}}>← Volver</button>
         <div style={{flex:1}}>
           <div style={{fontSize:20,fontWeight:800}}>⚖️ Configuración de Disciplina</div>
           <div style={{fontSize:12,opacity:.7,marginTop:2}}>Define el porcentaje disciplinario por materia</div>

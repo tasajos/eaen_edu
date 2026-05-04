@@ -368,7 +368,7 @@ export default function GestionFinanzas(){
             </div>
           </div>
           <button
-            onClick={()=>{ localStorage.removeItem("eaen_session"); navigate("/"); }}
+            onClick={()=>{ localStorage.removeItem("eaen_session"); navigate("/", { replace: true }); }}
             style={{
               padding:"8px 16px",borderRadius:9,
               background:"rgba(220,38,38,.25)",

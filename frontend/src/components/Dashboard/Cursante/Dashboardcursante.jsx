@@ -359,7 +359,7 @@ export default function DashboardCursante() {
           ))}
         </nav>
         <div style={{flex:1}}/>
-        <button className="nav-btn logout" onClick={() => { localStorage.removeItem("eaen_session"); navigate("/"); }}>
+        <button className="nav-btn logout" onClick={() => { localStorage.removeItem("eaen_session"); navigate("/", { replace: true }); }}>
           🚪 Cerrar sesión
         </button>
       </aside>

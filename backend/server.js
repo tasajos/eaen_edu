@@ -1845,6 +1845,15 @@ app.post("/api/auth/login", async (req, res) => {
 });
 
 // ── Manejador de errores de multer ───────────────────────────
+// Sirve el frontend construido y reenvia rutas internas a React Router.
+const FRONTEND_DIST = path.join(__dirname, "..", "frontend", "dist");
+if (fs.existsSync(FRONTEND_DIST)) {
+  app.use(express.static(FRONTEND_DIST));
+  app.get(/^\/(?!api(?:\/|$)).*/, (_req, res) => {
+    res.sendFile(path.join(FRONTEND_DIST, "index.html"));
+  });
+}
+
 app.use((err, _req, res, _next) => {
   if (err?.code === "LIMIT_FILE_SIZE")
     return res.status(400).json({ message: "El archivo supera el límite de 5 MB" });

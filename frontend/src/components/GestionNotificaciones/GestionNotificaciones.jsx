@@ -276,7 +276,7 @@ export default function GestionNotificaciones() {
             <span>Jefe de Estudios</span>
             <button
               className="eaen-logout"
-              onClick={() => { localStorage.removeItem("eaen_session"); navigate("/"); }}
+              onClick={() => { localStorage.removeItem("eaen_session"); navigate("/", { replace: true }); }}
             >
               Logout
             </button>

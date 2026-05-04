@@ -86,7 +86,7 @@ export default function DashboardJefeCurso() {
           ))}
         </nav>
         <div style={{flex:1}}/>
-        <button className="nav-btn logout" onClick={()=>{localStorage.removeItem("eaen_session");navigate("/");}}>🚪 Cerrar sesión</button>
+        <button className="nav-btn logout" onClick={()=>{localStorage.removeItem("eaen_session");navigate("/", { replace: true });}}>🚪 Cerrar sesión</button>
       </aside>
 
       <main className="jc-main">
