@@ -817,7 +817,7 @@ app.get("/api/calificaciones/materia/:materiaId", async (req,res) => {
     const [notaRows] = await pool.execute(
       `SELECT c.usuario_id,ec.nombre AS eval_nombre,c.nota,c.bloqueado
        FROM calificaciones c INNER JOIN eval_config ec ON ec.id=c.eval_config_id
-       WHERE c.materia_id=?`,[materiaId]);
+       WHERE c.materia_id=? OR (c.materia_id IS NULL AND ec.materia_id=?)`,[materiaId,materiaId]);
 
     const notasMap = {};
     const bloqueadoMap = {};
@@ -1949,7 +1949,7 @@ app.get("/api/nota-final/materia/:materiaId", async (req, res) => {
     const [notaRows] = await pool.execute(
       `SELECT c.usuario_id, ec.nombre AS eval_nombre, c.nota
        FROM calificaciones c INNER JOIN eval_config ec ON ec.id=c.eval_config_id
-       WHERE c.materia_id=?`, [materiaId]);
+       WHERE c.materia_id=? OR (c.materia_id IS NULL AND ec.materia_id=?)`, [materiaId,materiaId]);
     const notasMap = {};
     for (const n of notaRows) {
       if (!notasMap[n.usuario_id]) notasMap[n.usuario_id] = {};

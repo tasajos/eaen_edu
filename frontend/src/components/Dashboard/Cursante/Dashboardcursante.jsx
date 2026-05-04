@@ -30,6 +30,38 @@ function fmtFecha(f) {
 
 function Spinner() { return <div className="cur-spinner"><div className="spin-ring"/></div>; }
 
+function NotaAcademicaResumen({ notas, onVerDetalle }) {
+  if (!notas) return null;
+  const final = notas.notaFinal;
+  const promedio = Number(notas.promedio || 0);
+  const aprobado = notas.estado === "aprobado";
+  return (
+    <div className="nota-resumen nota-resumen-acceso">
+      <div className={`promedio-grande ${aprobado ? "ap" : "rp"}`}>
+        {promedio.toFixed(1)}
+      </div>
+      <div className="nota-resumen-info">
+        <div className="promedio-label">{final ? "Nota final compuesta" : "Promedio registrado"}</div>
+        <span className={`estado-badge ${aprobado ? "badge-ap" : "badge-rp"}`}>
+          {aprobado ? "✅ Aprobado" : "❌ Reprobado"}
+        </span>
+        {final && (
+          <div className="nota-resumen-detalle">
+            Catedrático: {Number(final.prom_catedratico).toFixed(1)}
+            {final.prom_facilitador !== null && ` · Facilitador: ${Number(final.prom_facilitador).toFixed(1)}`}
+            {final.prom_cursantes !== null && ` · Cursantes: ${Number(final.prom_cursantes).toFixed(1)}`}
+          </div>
+        )}
+      </div>
+      {onVerDetalle && (
+        <button className="btn-ver-notas" type="button" onClick={onVerDetalle}>
+          Ver mis notas
+        </button>
+      )}
+    </div>
+  );
+}
+
 /* ══════════════════════════════════════════════════════════
    VISTA TAREAS — CURSANTE
 ══════════════════════════════════════════════════════════ */
@@ -285,13 +317,33 @@ export default function DashboardCursante() {
 
   useEffect(() => {
     if (!materiaId || !session) return;
-    fetch(`${API}/calificaciones/materia/${materiaId}`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.libro) {
-          const e = d.libro.find(p => p.usuario_id === session.id);
-          setNotas(e ? { ...e, evaluaciones: d.evaluaciones } : null);
+    setNotas(null);
+    Promise.all([
+      fetch(`${API}/calificaciones/materia/${materiaId}`).then(r => r.json()).catch(() => null),
+      fetch(`${API}/nota-final/materia/${materiaId}`).then(r => r.json()).catch(() => null),
+    ])
+      .then(([calif, finalData]) => {
+        const libro = Array.isArray(calif?.libro) ? calif.libro : [];
+        const finales = Array.isArray(finalData?.resultado) ? finalData.resultado : [];
+        const e = libro.find(p => Number(p.usuario_id) === Number(session.id));
+        const final = finales.find(p => Number(p.usuario_id) === Number(session.id));
+        const tieneNotas = e && Object.keys(e.notas || {}).length > 0;
+        const tienePromedioFinal = final && Number(final.prom_catedratico || 0) > 0;
+
+        if (!tieneNotas && !tienePromedioFinal) {
+          setNotas(null);
+          return;
         }
+
+        setNotas({
+          ...(e || { usuario_id: session.id, notas: {}, bloqueado: false }),
+          evaluaciones: Array.isArray(calif?.evaluaciones) ? calif.evaluaciones : [],
+          promedio: final ? Number(final.nota_final) : Number(e?.promedio || 0),
+          estado: final?.estado || e?.estado || "reprobado",
+          notaFinal: final || null,
+          pesos: finalData?.pesos || null,
+          notaMinApro: finalData?.nota_min_apro || 70,
+        });
       }).catch(() => setNotas(null));
     fetch(`${API}/asistencia/materia/${materiaId}?usuario_id=${session.id}`)
       .then(r => r.json())
@@ -440,7 +492,10 @@ export default function DashboardCursante() {
                   <div className="panel-body">
                     {/* EVALUACIONES */}
                     {vista === "evaluaciones" && (
-                      <EvaluacionInstitucional usuarioId={session?.id}/>
+                      <>
+                        <NotaAcademicaResumen notas={notas} onVerDetalle={() => setVista("notas")} />
+                        <EvaluacionInstitucional usuarioId={session?.id}/>
+                      </>
                     )}
 
                     {/* CALENDARIO */}
@@ -472,7 +527,28 @@ export default function DashboardCursante() {
                       !notas
                         ? <p className="empty-msg">Aún no hay calificaciones registradas para esta materia.</p>
                         : <div>
-                            <div className="nota-resumen">
+                            <NotaAcademicaResumen notas={notas} />
+                            {notas.notaFinal && (
+                              <div className="nota-componentes">
+                                <div className="nota-component-card">
+                                  <span>Catedrático</span>
+                                  <strong>{Number(notas.notaFinal.prom_catedratico).toFixed(1)}</strong>
+                                </div>
+                                <div className="nota-component-card">
+                                  <span>Facilitador</span>
+                                  <strong>{notas.notaFinal.prom_facilitador !== null ? Number(notas.notaFinal.prom_facilitador).toFixed(1) : "Pendiente"}</strong>
+                                </div>
+                                <div className="nota-component-card">
+                                  <span>Cursantes</span>
+                                  <strong>{notas.notaFinal.prom_cursantes !== null ? Number(notas.notaFinal.prom_cursantes).toFixed(1) : "Pendiente"}</strong>
+                                </div>
+                                <div className="nota-component-card">
+                                  <span>Disciplina</span>
+                                  <strong>{Number(notas.notaFinal.nota_disciplina).toFixed(1)}</strong>
+                                </div>
+                              </div>
+                            )}
+                            {/*
                               <div className={`promedio-grande ${Number(notas.promedio) >= 70 ? "ap" : "rp"}`}>
                                 {Number(notas.promedio).toFixed(1)}
                               </div>
@@ -482,10 +558,12 @@ export default function DashboardCursante() {
                                   {notas.estado === "aprobado" ? "✅ Aprobado" : "❌ Reprobado"}
                                 </span>
                               </div>
-                            </div>
+                            */}
                             <div className="notas-grid">
                               {(notas.evaluaciones || []).map(ev => {
-                                const n  = notas.notas?.[ev.nombre] ?? null;
+                                const n  = Object.prototype.hasOwnProperty.call(notas.notas || {}, ev.nombre)
+                                  ? notas.notas[ev.nombre]
+                                  : 0;
                                 const ap = n !== null && n >= Number(ev.nota_min_apro);
                                 return (
                                   <div key={ev.nombre} className={`nota-card ${n === null ? "sin-nota" : ap ? "nota-ap" : "nota-rp"}`}>
