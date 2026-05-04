@@ -2092,15 +2092,17 @@ app.get("/api/nota-final/materia/:materiaId", async (req, res) => {
       }
       const promFacilitador = facMap[p.id] ?? null;
       const promCursantes   = peerMap[p.id] ?? null;
-      const notaDisciplina  = discMap[p.id] ?? 100;
+      const tieneDisciplina = Object.prototype.hasOwnProperty.call(discMap, p.id);
+      const notaDisciplina  = tieneDisciplina ? discMap[p.id] : null;
       const ponderajeFacilitador = promFacilitador !== null ? promFacilitador * 0.025 : null;
+      const ponderajeDisciplina  = notaDisciplina !== null ? notaDisciplina * 0.025 : null;
 
       // nota_final = catedrático(0-90) + facilitador(0-2.5) + cursantes(0-5) + disciplina(0-2.5) = 0-100
       const notaFinal =
         promCatedratico +
         (ponderajeFacilitador ?? 0) +
         (promCursantes   ?? 0) * 0.05  +
-        notaDisciplina          * 0.025;
+        (ponderajeDisciplina ?? 0);
 
       return {
         usuario_id:       p.id,
@@ -2112,7 +2114,9 @@ app.get("/api/nota-final/materia/:materiaId", async (req, res) => {
         prom_facilitador: promFacilitador !== null ? Number(promFacilitador.toFixed(2)) : null,
         ponderaje_facilitador: ponderajeFacilitador !== null ? Number(ponderajeFacilitador.toFixed(2)) : null,
         prom_cursantes:   promCursantes   !== null ? Number(promCursantes.toFixed(2))   : null,
-        nota_disciplina:  Number(notaDisciplina.toFixed(2)),
+        nota_disciplina:  notaDisciplina !== null ? Number(notaDisciplina.toFixed(2)) : null,
+        ponderaje_disciplina: ponderajeDisciplina !== null ? Number(ponderajeDisciplina.toFixed(2)) : null,
+        disciplina_registrada: tieneDisciplina,
         nota_final:       Number(notaFinal.toFixed(2)),
         estado:           notaFinal >= notaMinApro ? "aprobado" : "reprobado",
         facilitador_pendiente: promFacilitador === null,

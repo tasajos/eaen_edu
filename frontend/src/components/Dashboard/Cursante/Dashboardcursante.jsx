@@ -89,11 +89,14 @@ function resumenComponentes(final) {
   const cursantes = final.prom_cursantes !== null && final.prom_cursantes !== undefined
     ? Number(final.prom_cursantes) * 0.05
     : null;
-  const disciplinaBase = final.nota_disciplina !== null && final.nota_disciplina !== undefined
-    ? Number(final.nota_disciplina)
-    : 100;
-  const disciplina = disciplinaBase * 0.025;
-  const acumulado = catedratico + (facilitador ?? 0) + (cursantes ?? 0) + disciplina;
+  const disciplina = final.disciplina_registrada === true
+    ? (final.ponderaje_disciplina !== null && final.ponderaje_disciplina !== undefined
+        ? Number(final.ponderaje_disciplina)
+        : Number(final.nota_disciplina || 0) * 0.025)
+    : (final.ponderaje_disciplina !== null && final.ponderaje_disciplina !== undefined
+        ? Number(final.ponderaje_disciplina)
+        : null);
+  const acumulado = catedratico + (facilitador ?? 0) + (cursantes ?? 0) + (disciplina ?? 0);
   return {
     catedratico,
     facilitador,
@@ -127,7 +130,7 @@ function NotaAcademicaResumen({ notas, onVerDetalle }) {
             Catedrático: {componentes.catedratico.toFixed(1)}
             {componentes.facilitador !== null && ` · Facilitador: ${componentes.facilitador.toFixed(2)}`}
             {componentes.cursantes !== null && ` · Cursantes: ${componentes.cursantes.toFixed(2)}`}
-            {` · Disciplina: ${componentes.disciplina.toFixed(2)}`}
+            {componentes.disciplina !== null && ` · Disciplina: ${componentes.disciplina.toFixed(2)}`}
           </div>
         )}
       </div>
@@ -419,7 +422,7 @@ export default function DashboardCursante() {
                 promedioEvaluaciones +
                 (aporteFac ?? 0) +
                 (final.prom_cursantes ?? 0) * 0.05 +
-                Number(final.nota_disciplina ?? 100) * 0.025
+                (resumenComponentes(final)?.disciplina ?? 0)
               ).toFixed(2)),
             }
           : null;
@@ -636,12 +639,12 @@ export default function DashboardCursante() {
                                 <>
                                   <div className={`facilitador-detalle-card ${comp.facilitador === null ? "pendiente" : "listo"}`}>
                                     <div>
-                                      <span>Facilitador</span>
-                                      <strong>{comp.facilitador === null ? "Pendiente" : `${comp.facilitador.toFixed(2)} / 2.5`}</strong>
+                                      <span>Nota del facilitador</span>
+                                      <strong>{comp.facilitadorPromedio === null ? "Pendiente" : `${comp.facilitadorPromedio.toFixed(1)} / 10`}</strong>
                                     </div>
                                     <div>
-                                      <span>Promedio registrado</span>
-                                      <strong>{comp.facilitadorPromedio === null ? "Pendiente" : `${comp.facilitadorPromedio.toFixed(1)} / 10`}</strong>
+                                      <span>Equivale en la nota final</span>
+                                      <strong>{comp.facilitador === null ? "Pendiente" : `${comp.facilitador.toFixed(2)} / 2.5`}</strong>
                                     </div>
                                     <div>
                                       <span>Estado</span>
@@ -664,7 +667,7 @@ export default function DashboardCursante() {
                                     </div>
                                     <div className="nota-component-card">
                                       <span>Disciplina (/2.5)</span>
-                                      <strong>{comp.disciplina.toFixed(2)}</strong>
+                                      <strong>{comp.disciplina !== null ? comp.disciplina.toFixed(2) : "Pendiente"}</strong>
                                     </div>
                                     <div className="nota-component-card nota-component-total">
                                       <span>Acumulado actual (/100)</span>
