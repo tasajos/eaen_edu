@@ -132,6 +132,7 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
   const [bloqueados,  setBloqueados]  = useState({});
   const [saving,      setSaving]      = useState({});
   const [confirmUid,  setConfirmUid]  = useState(null);
+  const [facDatos,    setFacDatos]    = useState({});
 
   // Siempre hay columnas: las del servidor o las por defecto (Examen + Tarea)
   const activeEvals = evals.length ? evals : DEFAULT_EVALS;
@@ -195,6 +196,15 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
         setNotas(m);
         setBloqueados(bl);
       }).catch(()=>{});
+    setFacDatos({});
+    fetch(`${API}/eval-facilitador/materia/${materia.id}`)
+      .then(r => r.json())
+      .then(d => {
+        if (!Array.isArray(d)) return;
+        const m = {};
+        d.forEach(ev => { m[ev.cursante_id] = { promedio: Number(ev.promedio), ponderaje: Number(ev.ponderaje) }; });
+        setFacDatos(m);
+      }).catch(() => {});
   }, [materia?.id]);
 
   useEffect(() => {
@@ -221,6 +231,11 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
     activeEvals.forEach(ev => { sn += getNotaEval(uid, ev.nombre) * Number(ev.peso); });
     return sn / 100;
   };
+
+  const getFacPonderaje = uid => facDatos[uid]?.ponderaje != null ? Number(facDatos[uid].ponderaje) : null;
+  const getFacPromedio  = uid => facDatos[uid]?.promedio  != null ? Number(facDatos[uid].promedio)  : null;
+  // Total catedrático + facilitador (las otras componentes se gestionan en otro módulo)
+  const promTotal = uid => prom(uid) + (getFacPonderaje(uid) ?? 0);
 
   // Guardar y bloquear notas de UN cursante
   const guardarUsuario = async (uid) => {
@@ -411,6 +426,9 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
                     <span style={{fontSize:10,color:"#aaa",fontWeight:400}}>{ev.peso}%</span>
                   </th>
                 ))}
+                <th style={{textAlign:"center", background:"#fff3e0", color:"#e65100"}}>
+                  🎯 Facilitador<br/><span style={{fontSize:10,fontWeight:400}}>(/ 2.5 pts)</span>
+                </th>
                 <th style={{textAlign:"center"}}>Promedio</th>
                 <th style={{textAlign:"center"}}>Estado</th>
                 <th style={{textAlign:"center"}}>Acción</th>
@@ -468,10 +486,26 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
                       );
                     })}
                     <td style={{textAlign:"center"}}>
+                      {(() => {
+                        const fac = getFacPonderaje(p.id);
+                        const facPr = getFacPromedio(p.id);
+                        if (fac === null) return <span style={{color:"#9e9e9e", fontSize:12}}>—</span>;
+                        return (
+                          <div style={{display:"flex", flexDirection:"column", alignItems:"center", gap:2}}>
+                            <strong style={{
+                              fontFamily:"'IBM Plex Mono',monospace", fontSize:14,
+                              color: fac >= 1.75 ? "#2e7d32" : fac >= 1.25 ? "#e65100" : "#c62828"
+                            }}>{fac.toFixed(2)}</strong>
+                            {facPr !== null && <span style={{fontSize:10, color:"#888"}}>({facPr.toFixed(1)}/10)</span>}
+                          </div>
+                        );
+                      })()}
+                    </td>
+                    <td style={{textAlign:"center"}}>
                       <strong style={{
                         color: ap?"#2e7d32":"#c62828",
                         fontFamily:"'IBM Plex Mono',monospace", fontSize:15
-                      }}>{pr.toFixed(1)}</strong>
+                      }}>{promTotal(p.id).toFixed(1)}</strong>
                     </td>
                     <td style={{textAlign:"center"}}>
                       <span className={`badge ${ap?"badge-pres":"badge-aus"}`}>
@@ -637,83 +671,135 @@ function VistaFacilitador({ materia, participantes, showToast }) {
   };
   if (!cargado) return <div className="doc-spinner"><div className="spin-ring"/></div>;
 
+  const totalBloq = Object.keys(bloqueados).length;
+
   return (
     <div>
-      <div style={{ background:"#f0f4ff", borderRadius:10, padding:"12px 18px", marginBottom:18, fontSize:13, color:"#003366" }}>
-        <strong>Evaluación del Facilitador — 2.5% de la nota final</strong>
-        <div style={{ marginTop:4, color:"#5a6a80" }}>
-          Califica del <strong>1 al 10</strong> en cada criterio. El ponderaje se calcula sobre 2.5 puntos máximos.
+      {/* Banner info */}
+      <div style={{ display:"flex", flexWrap:"wrap", alignItems:"center", justifyContent:"space-between",
+        background:"#f0f4ff", borderRadius:10, padding:"10px 16px", marginBottom:16,
+        fontSize:13, color:"#003366", gap:8 }}>
+        <div>
+          <strong>Evaluación del Facilitador — 2.5% de la nota final</strong>
+          <div style={{ marginTop:3, color:"#5a6a80", fontSize:12 }}>
+            Califica del <strong>1 al 10</strong> en cada criterio. El ponderaje se calcula sobre 2.5 puntos máximos.
+          </div>
         </div>
+        {totalBloq > 0 && (
+          <div style={{ background:"#7b1fa2", color:"#fff", padding:"5px 14px", borderRadius:20, fontSize:12, fontWeight:700 }}>
+            🔒 {totalBloq} / {participantes.length} evaluados
+          </div>
+        )}
       </div>
 
-      <div className="doc-table-wrap" style={{ overflowX:"auto" }}>
-        <table className="doc-table" style={{ minWidth:780 }}>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Cursante</th>
-              {CRITERIOS_FACILITADOR.map(c => (
-                <th key={c.key} style={{ textAlign:"center", fontSize:11 }}>{c.label}</th>
-              ))}
-              <th style={{ textAlign:"center" }}>Prom.<br/><span style={{fontSize:10,fontWeight:400}}>(1–10)</span></th>
-              <th style={{ textAlign:"center", background:"#003366", color:"#fff" }}>
-                Ponderaje<br/><span style={{fontSize:10,fontWeight:400}}>(/ 2.5 pts)</span>
-              </th>
-              <th style={{ textAlign:"center" }}>Accion</th>
-            </tr>
-          </thead>
-          <tbody>
-            {participantes.map((p, i) => {
-              const d   = datos[p.id] || {};
-              const pr  = promCriterios(p.id);
-              const pnd = ponderaje(p.id);
-              const locked = bloqueados[p.id] || false;
-              return (
-                <tr key={p.id}>
-                  <td className="muted">{i+1}</td>
-                  <td className="bold">{p.ap_paterno} {p.ap_materno}, {p.nombre}</td>
-                  {CRITERIOS_FACILITADOR.map(c => (
-                    <td key={c.key} style={{ textAlign:"center" }}>
-                      <select
-                        value={d[c.key] ?? ""}
-                        disabled={locked}
-                        onChange={e => set(p.id, c.key, e.target.value)}
-                        style={{ padding:"5px 8px", borderRadius:7, border:"1.5px solid #ccd6e8",
-                                 fontSize:13, cursor:locked ? "not-allowed" : "pointer", background:locked ? "#f3f4f6" : "#fff" }}
-                      >
-                        <option value="">—</option>
-                        {OPCIONES_FAC.map(n => (
-                          <option key={n} value={n}>{n}</option>
-                        ))}
-                      </select>
-                    </td>
-                  ))}
-                  <td style={{ textAlign:"center", fontWeight:700, color:"#003366", fontSize:14 }}>
-                    {pr !== null ? pr.toFixed(1) : "—"}
-                  </td>
-                  <td style={{ textAlign:"center", fontWeight:800, fontSize:15,
-                               color: pr === null ? "#c62828" : pr >= 7 ? "#2e7d32" : pr >= 5 ? "#e65100" : "#c62828",
-                               background: "#f0f4ff" }}>
-                    {pnd !== null ? pnd : "—"}
-                  </td>
-                  <td style={{ textAlign:"center" }}>
-                    {locked ? (
-                      <span style={{ color:"#7b1fa2", fontWeight:800, fontSize:12 }}>Bloqueado</span>
-                    ) : (
-                      <button
-                        className="btn-sm btn-guardar"
-                        onClick={() => guardarUsuario(p.id)}
-                        disabled={saving[p.id] || !completa(p.id)}
-                      >
-                        {saving[p.id] ? "Guardando..." : "Guardar y bloquear"}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      {/* Tarjetas por cursante */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(400px, 1fr))", gap:12 }}>
+        {participantes.map((p, i) => {
+          const d      = datos[p.id] || {};
+          const pr     = promCriterios(p.id);
+          const pnd    = ponderaje(p.id);
+          const locked = bloqueados[p.id] || false;
+          const notaColor = pr === null ? "#9e9e9e" : pr >= 7 ? "#2e7d32" : pr >= 5 ? "#e65100" : "#c62828";
+
+          return (
+            <div key={p.id} style={{
+              border:`2px solid ${locked ? "#ce93d8" : "#c5cae9"}`,
+              borderRadius:12, background: locked ? "#fdf6ff" : "#fff",
+              overflow:"hidden", display:"flex", flexDirection:"column"
+            }}>
+              {/* Cabecera */}
+              <div style={{
+                display:"flex", alignItems:"center", gap:8, flexWrap:"wrap",
+                padding:"10px 14px",
+                background: locked ? "#f3e5f5" : "#f0f4ff",
+                borderBottom:`1.5px solid ${locked ? "#e1bee7" : "#dde5f5"}`
+              }}>
+                <div style={{
+                  width:26, height:26, borderRadius:"50%", flexShrink:0,
+                  background: locked ? "#8e24aa" : "#003366",
+                  color:"#fff", display:"flex", alignItems:"center", justifyContent:"center",
+                  fontWeight:800, fontSize:11
+                }}>{i+1}</div>
+                <div style={{ flex:1, fontWeight:700, fontSize:13, color:"#1a1a2e", minWidth:0 }}>
+                  {p.ap_paterno} {p.ap_materno}, {p.nombre}
+                </div>
+                {pnd !== null && (
+                  <div style={{
+                    background: notaColor, color:"#fff",
+                    padding:"3px 11px", borderRadius:20, fontSize:12, fontWeight:800, flexShrink:0
+                  }}>
+                    🎯 {pnd} / 2.5 pts
+                  </div>
+                )}
+                {locked && <span style={{fontSize:16, flexShrink:0}}>🔒</span>}
+              </div>
+
+              {/* Criterios en cuadrícula 2x2 */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, padding:"12px 14px", flex:1 }}>
+                {CRITERIOS_FACILITADOR.map(c => {
+                  const val = Number(d[c.key] || 0);
+                  const valColor = val >= 7 ? "#2e7d32" : val >= 5 ? "#e65100" : "#c62828";
+                  return (
+                    <div key={c.key} style={{
+                      background:"#f7f9fc", borderRadius:8, padding:"8px 10px",
+                      border:"1.5px solid #eef2f7"
+                    }}>
+                      <div style={{ fontSize:11, color:"#5a6a80", marginBottom:5, lineHeight:1.3 }}>{c.label}</div>
+                      {locked ? (
+                        <div style={{ display:"flex", alignItems:"baseline", gap:3 }}>
+                          <span style={{
+                            fontFamily:"'IBM Plex Mono',monospace", fontSize:22, fontWeight:800,
+                            color: val ? valColor : "#bbb"
+                          }}>{val || "—"}</span>
+                          {val ? <span style={{ fontSize:11, color:"#aaa" }}>/10</span> : null}
+                        </div>
+                      ) : (
+                        <select
+                          value={d[c.key] ?? ""}
+                          onChange={e => set(p.id, c.key, e.target.value)}
+                          style={{
+                            width:"100%", padding:"5px 8px", borderRadius:6,
+                            border:"1.5px solid #c5cae9", fontSize:13, cursor:"pointer", background:"#fff"
+                          }}
+                        >
+                          <option value="">— seleccionar —</option>
+                          {OPCIONES_FAC.map(n => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Pie: promedio + acción */}
+              <div style={{
+                display:"flex", alignItems:"center", justifyContent:"space-between",
+                padding:"8px 14px 12px", borderTop:"1.5px solid #f0f4ff", gap:8, flexWrap:"wrap"
+              }}>
+                <div style={{ fontSize:12, color:"#5a6a80" }}>
+                  Promedio: <strong style={{ fontFamily:"'IBM Plex Mono',monospace", color: notaColor, fontSize:14 }}>
+                    {pr !== null ? `${pr.toFixed(1)} / 10` : "—"}
+                  </strong>
+                </div>
+                {locked ? (
+                  <span style={{
+                    background:"#f3e5f5", color:"#8e24aa", padding:"5px 14px",
+                    borderRadius:20, fontSize:12, fontWeight:700
+                  }}>🔒 Evaluación registrada</span>
+                ) : (
+                  <button
+                    className="btn-sm btn-guardar"
+                    onClick={() => guardarUsuario(p.id)}
+                    disabled={saving[p.id] || !completa(p.id)}
+                    style={{ opacity: !completa(p.id) ? 0.45 : 1 }}
+                  >
+                    {saving[p.id] ? "Guardando..." : "💾 Guardar y bloquear"}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

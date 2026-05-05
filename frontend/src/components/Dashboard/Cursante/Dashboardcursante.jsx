@@ -127,10 +127,10 @@ function NotaAcademicaResumen({ notas, onVerDetalle }) {
         </span>
         {final && (
           <div className="nota-resumen-detalle">
-            Catedrático: {componentes.catedratico.toFixed(1)}
-            {componentes.facilitador !== null && ` · Facilitador: ${componentes.facilitador.toFixed(2)}`}
-            {componentes.cursantes !== null && ` · Cursantes: ${componentes.cursantes.toFixed(2)}`}
-            {componentes.disciplina !== null && ` · Disciplina: ${componentes.disciplina.toFixed(2)}`}
+            Catedrï¿½tico: {componentes.catedratico.toFixed(1)}
+            {componentes.facilitador !== null && ` ï¿½ Facilitador: ${componentes.facilitador.toFixed(2)}`}
+            {componentes.cursantes !== null && ` ï¿½ Cursantes: ${componentes.cursantes.toFixed(2)}`}
+            {componentes.disciplina !== null && ` ï¿½ Disciplina: ${componentes.disciplina.toFixed(2)}`}
           </div>
         )}
       </div>
@@ -432,7 +432,7 @@ export default function DashboardCursante() {
             : "reprobado";
         }
         const tieneNotas = Object.keys(notasMezcladas).length > 0;
-        const tienePromedioFinal = final && Number(final.prom_catedratico || 0) > 0;
+        const tienePromedioFinal = final && (Number(final.prom_catedratico || 0) > 0 || final.prom_facilitador !== null);
 
         if (!tieneNotas && !tienePromedioFinal) {
           setNotas(null);
