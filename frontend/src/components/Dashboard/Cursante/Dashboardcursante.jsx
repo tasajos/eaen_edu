@@ -652,6 +652,25 @@ export default function DashboardCursante() {
                                     </div>
                                   </div>
 
+                                  <div className={`facilitador-detalle-card ${comp.cursantes === null ? "pendiente" : "listo"}`}>
+                                    <div>
+                                      <span>Evaluación entre cursantes</span>
+                                      <strong>
+                                        {notas.notaFinal.prom_cursantes != null
+                                          ? `${Number(notas.notaFinal.prom_cursantes).toFixed(1)} / 100`
+                                          : "Pendiente"}
+                                      </strong>
+                                    </div>
+                                    <div>
+                                      <span>Equivale en la nota final</span>
+                                      <strong>{comp.cursantes === null ? "Pendiente" : `${comp.cursantes.toFixed(2)} / 5.0`}</strong>
+                                    </div>
+                                    <div>
+                                      <span>Estado</span>
+                                      <strong>{comp.cursantes === null ? "Sin evaluación" : "Evaluado"}</strong>
+                                    </div>
+                                  </div>
+
                                   <div className="nota-componentes nota-componentes-detalle">
                                     <div className="nota-component-card">
                                       <span>Catedratico (/90)</span>

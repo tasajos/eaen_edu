@@ -2037,11 +2037,16 @@ app.get("/api/nota-final/materia/:materiaId", async (req, res) => {
     // promedio_10 está en escala 1-10 → convertir a 0-100
     const facMap = Object.fromEntries(facRows.map(r => [r.cursante_id, Number(r.promedio_10) * 10]));
 
-    // ── 3. Cursantes (5%) — período activo/más reciente para esta materia ──
+    // ── 3. Cursantes (5%) — período CURSANTE_A_CURSANTE más reciente de esta materia ──
     const peerMap = {};
     try {
       const [periodoRows] = await pool.execute(
-        `SELECT id FROM eval_inst_periodos WHERE materia_id=? ORDER BY creado_en DESC LIMIT 1`,
+        `SELECT ep.id FROM eval_inst_periodos ep
+         JOIN eval_inst_plantillas pl ON pl.id = ep.plantilla_id
+         WHERE pl.tipo = 'CURSANTE_A_CURSANTE'
+           AND ep.materia_id = ?
+           AND ep.habilitado = 1
+         ORDER BY ep.creado_en DESC LIMIT 1`,
         [materiaId]);
       if (periodoRows.length) {
         const [peerRows] = await pool.execute(
@@ -2049,7 +2054,7 @@ app.get("/api/nota-final/materia/:materiaId", async (req, res) => {
                   ROUND(AVG(ev.valor), 2) AS promedio
            FROM eval_inst_respuestas er
            JOIN eval_inst_valoraciones ev ON ev.respuesta_id = er.id
-           WHERE er.periodo_id = ? AND er.completada = 1
+           WHERE er.periodo_id = ? AND er.completada = 1 AND er.evaluado_id IS NOT NULL
            GROUP BY er.evaluado_id`, [periodoRows[0].id]);
         for (const r of peerRows) peerMap[r.evaluado_id] = Number(r.promedio);
       }

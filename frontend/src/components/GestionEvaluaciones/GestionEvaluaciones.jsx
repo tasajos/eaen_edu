@@ -16,7 +16,7 @@ function ModalHabilitar({ plantillas, cursos, materias, onClose, onCreated }){
   const [error, setError] = useState("");
 
   const plantilla = plantillas.find(p => p.id === Number(form.plantilla_id));
-  const necesitaMateria = plantilla?.tipo === "CURSANTE_A_DOCENTE";
+  const necesitaMateria = !!plantilla; // toda evaluación institucional requiere materia
   const materiasDelCurso = materias.filter(m => m.curso_id === Number(form.curso_id));
 
   const crear = async () => {
