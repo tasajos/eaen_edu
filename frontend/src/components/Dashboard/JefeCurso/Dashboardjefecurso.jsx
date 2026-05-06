@@ -201,6 +201,7 @@ export default function DashboardJefeCurso() {
                       <DisciplinaJefeCurso
                         session={session}
                         cursoId={cursoId}
+                        materias={cursoDetalle?.materias || []}
                       />
                     )}
 

@@ -192,8 +192,8 @@
 
 .eaen-form-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .eaen-form-group label {
@@ -234,9 +234,21 @@
 }
 
 /* Responsive */
-@media (max-width: 720px) {
+@media (max-width: 900px) {
+  .eaen-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .eaen-modal-container > .eaen-form > .eaen-form-grid {
+    padding: 12px 16px 6px;
+  }
+}
+
+@media (max-width: 560px) {
   .eaen-form-grid {
     grid-template-columns: 1fr;
+  }
+  .eaen-form-group[style*="span 3"] {
+    grid-column: span 1 !important;
   }
 }
 
@@ -259,9 +271,13 @@
   width: min(900px, 100%);
   background: #fff;
   border-radius: 18px;
-  padding: 22px 18px;
+  padding: 0;
   box-shadow: 0 25px 60px rgba(0,0,0,.35);
   position: relative;
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .eaen-modal-close{
@@ -273,6 +289,39 @@
   font-size: 28px;
   cursor: pointer;
   line-height: 1;
+  z-index: 2;
+}
+
+/* Cabecera fija del modal de edición */
+.eaen-modal-container > .eaen-modal-title {
+  flex-shrink: 0;
+  padding: 20px 48px 10px 24px;
+  margin: 0;
+  border-bottom: 1.5px solid #e8ecf2;
+}
+
+/* Formulario: la grilla scrollea, los botones quedan fijos abajo */
+.eaen-modal-container > .eaen-form {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.eaen-modal-container > .eaen-form > .eaen-form-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 24px 8px;
+}
+
+.eaen-modal-container > .eaen-form > .eaen-modal-actions {
+  flex-shrink: 0;
+  padding: 12px 24px 18px;
+  border-top: 1.5px solid #e8ecf2;
+  background: #fff;
+  border-radius: 0 0 18px 18px;
 }
 
 .eaen-modal-icon{

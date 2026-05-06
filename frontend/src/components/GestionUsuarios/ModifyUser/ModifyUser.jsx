@@ -418,7 +418,7 @@ export default function ModifyUser({ onBack }) {
             <form onSubmit={handleSave} className="eaen-form">
               <div className="eaen-form-grid">
                 {/* ✅ Rol del Sistema — controla acceso al dashboard */}
-                <div className="eaen-form-group">
+                <div className="eaen-form-group" style={{ gridColumn: "span 3" }}>
                   <label htmlFor="rol" style={{ color: "#003366", fontWeight: 700 }}>
                     🔐 Rol del Sistema:
                   </label>

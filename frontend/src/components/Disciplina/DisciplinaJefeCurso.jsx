@@ -43,7 +43,7 @@ function ModalExito({ tipo, participante, puntos, descripcion, onClose }) {
 }
 
 // ─── Modal Registrar Mérito/Demérito ───────────────────────────────────────
-function ModalRegistro({ cursoId, participantes, catalogo, registradoPor, preselect, tipoInicial, onClose, onGuardado }) {
+function ModalRegistro({ cursoId, materiaId, participantes, catalogo, registradoPor, preselect, tipoInicial, onClose, onGuardado }) {
   const [tipo, setTipo]             = useState(tipoInicial || "MERITO");
   const [usuarioId, setUsuarioId]   = useState(preselect ? preselect.usuario_id : "");
   const [catalogoId, setCatalogoId] = useState("");
@@ -74,6 +74,7 @@ function ModalRegistro({ cursoId, participantes, catalogo, registradoPor, presel
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           curso_id:       Number(cursoId),
+          materia_id:     Number(materiaId),
           usuario_id:     Number(usuarioId),
           catalogo_id:    catalogoId ? Number(catalogoId) : null,
           tipo,
@@ -200,19 +201,20 @@ function ModalRegistro({ cursoId, participantes, catalogo, registradoPor, presel
 }
 
 // ─── Modal Historial ────────────────────────────────────────────────────────
-function ModalHistorial({ cursoId, participante, onClose, onEliminado }) {
+function ModalHistorial({ cursoId, materiaId, participante, onClose, onEliminado }) {
   const [historial, setHistorial] = useState([]);
   const [loading, setLoading]     = useState(true);
 
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API}/disciplina/historial/${cursoId}/${participante.usuario_id}`);
+      const qs = materiaId ? `?materia_id=${materiaId}` : "";
+      const r = await fetch(`${API}/disciplina/historial/${cursoId}/${participante.usuario_id}${qs}`);
       const data = await r.json();
       if (Array.isArray(data)) setHistorial(data);
     } catch {}
     setLoading(false);
-  }, [cursoId, participante.usuario_id]);
+  }, [cursoId, materiaId, participante.usuario_id]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
@@ -295,29 +297,35 @@ function ModalHistorial({ cursoId, participante, onClose, onEliminado }) {
 }
 
 // ─── Componente Principal ──────────────────────────────────────────────────
-export default function DisciplinaJefeCurso({ session, cursoId }) {
+export default function DisciplinaJefeCurso({ session, cursoId, materias = [] }) {
+  const [materiaId, setMateriaId]         = useState("");
   const [resumen, setResumen]             = useState([]);
   const [catalogo, setCatalogo]           = useState([]);
-  const [loading, setLoading]             = useState(true);
+  const [loading, setLoading]             = useState(false);
   const [busqueda, setBusqueda]           = useState("");
   const [filtroTipo, setFiltroTipo]       = useState("TODOS");
   const [modalRegistro, setModalRegistro] = useState(false);
   const [modalHistorial, setModalHistorial] = useState(null);
   const [exito, setExito]                 = useState(null);
 
+  // Seleccionar la primera materia automáticamente
+  useEffect(() => {
+    if (materias.length && !materiaId) setMateriaId(String(materias[0].id));
+  }, [materias]); // eslint-disable-line
+
   const cargar = useCallback(async () => {
-    if (!cursoId) return;
+    if (!cursoId || !materiaId) return;
     setLoading(true);
     try {
       const [rRes, rCat] = await Promise.all([
-        fetch(`${API}/disciplina/resumen/${cursoId}`).then(r => r.json()),
+        fetch(`${API}/disciplina/resumen/${cursoId}?materia_id=${materiaId}`).then(r => r.json()),
         fetch(`${API}/disciplina/catalogo`).then(r => r.json()),
       ]);
       if (Array.isArray(rRes)) setResumen(rRes);
       if (Array.isArray(rCat)) setCatalogo(rCat);
     } catch {}
     setLoading(false);
-  }, [cursoId]);
+  }, [cursoId, materiaId]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
@@ -348,17 +356,59 @@ export default function DisciplinaJefeCurso({ session, cursoId }) {
     );
   }
 
+  const materiaNombre = materias.find(m => String(m.id) === String(materiaId))?.nombre || "—";
+
   return (
     <div className="disc-wrap">
       <div className="disc-topbar">
         <div>
           <h2 className="disc-title">⚖️ Módulo de Disciplina</h2>
-          <p className="disc-subtitle">Registro de méritos y deméritos por cursante — Curso {cursoId}</p>
+          <p className="disc-subtitle">Méritos y deméritos por materia · Ponderaje 2.5 pts</p>
         </div>
-        <button className="disc-btn-primary" onClick={() => setModalRegistro(true)}>
+        <button
+          className="disc-btn-primary"
+          onClick={() => setModalRegistro(true)}
+          disabled={!materiaId}
+        >
           ➕ Registrar Mérito / Demérito
         </button>
       </div>
+
+      {/* Selector de materia */}
+      <div style={{
+        display:"flex", alignItems:"center", gap:12, flexWrap:"wrap",
+        background:"#f0f4ff", borderRadius:10, padding:"10px 16px",
+        marginBottom:14, border:"1.5px solid #c5cae9"
+      }}>
+        <span style={{fontWeight:700, color:"#003366", fontSize:13}}>📚 Materia:</span>
+        <select
+          value={materiaId}
+          onChange={e => { setMateriaId(e.target.value); setBusqueda(""); setFiltroTipo("TODOS"); }}
+          style={{
+            padding:"6px 12px", borderRadius:8, border:"1.5px solid #003366",
+            fontSize:13, fontWeight:600, color:"#003366", background:"#fff", cursor:"pointer"
+          }}
+        >
+          <option value="">— Seleccionar materia —</option>
+          {materias.map(m => (
+            <option key={m.id} value={m.id}>{m.nombre}</option>
+          ))}
+        </select>
+        {materiaId && (
+          <span style={{
+            background:"#003366", color:"#fff", padding:"3px 12px",
+            borderRadius:20, fontSize:12, fontWeight:700
+          }}>
+            Disciplina para: {materiaNombre}
+          </span>
+        )}
+      </div>
+
+      {!materiaId && (
+        <div className="disc-empty" style={{marginTop:8}}>
+          <span>📚</span><p>Selecciona una materia para ver y registrar disciplina.</p>
+        </div>
+      )}
 
       <div className="disc-stats-row">
         <div className="disc-stat-card merito">
@@ -417,12 +467,19 @@ export default function DisciplinaJefeCurso({ session, cursoId }) {
                 <th className="disc-th-center merito-col">🏅 Méritos</th>
                 <th className="disc-th-center demerito-col">⚠️ Deméritos</th>
                 <th className="disc-th-center">Saldo</th>
+                <th className="disc-th-center" style={{background:"#003366", color:"#fff"}}>
+                  Ponderaje<br/><small style={{fontWeight:400, fontSize:10}}>(/ 2.5 pts)</small>
+                </th>
                 <th className="disc-th-center">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {resumenFiltrado.map((p, idx) => {
                 const saldo = Number(p.saldo);
+                const ponderajeNum = Math.max(0, Math.min(2.5, saldo));
+                const ponderaje = ponderajeNum.toFixed(2);
+                const tieneRegistros = Number(p.cant_meritos) > 0 || Number(p.cant_demeritos) > 0;
+                const pndColor = ponderajeNum >= 2.0 ? "#2e7d32" : ponderajeNum >= 1.0 ? "#e65100" : "#c62828";
                 return (
                   <tr key={p.usuario_id} className={idx % 2 === 0 ? "disc-tr-par" : "disc-tr-impar"}>
                     <td className="disc-td-num">{idx + 1}</td>
@@ -444,9 +501,21 @@ export default function DisciplinaJefeCurso({ session, cursoId }) {
                         : <span className="disc-badge none">—</span>}
                     </td>
                     <td className="disc-td-center">
-                      <span className={`disc-saldo ${saldo > 0 ? "positivo" : saldo < 0 ? "negativo" : "neutro"}`}>
-                        {saldo > 0 ? "+" : ""}{saldo.toFixed(1)}
-                      </span>
+                      {tieneRegistros
+                        ? <span className={`disc-saldo ${saldo > 0 ? "positivo" : saldo < 0 ? "negativo" : "neutro"}`}>
+                            {saldo > 0 ? "+" : ""}{saldo.toFixed(1)}
+                          </span>
+                        : <span className="disc-badge none">—</span>}
+                    </td>
+                    <td className="disc-td-center" style={{background:"#f8fbff"}}>
+                      {tieneRegistros ? (
+                        <strong style={{
+                          fontFamily:"'IBM Plex Mono',monospace", fontSize:15,
+                          color: pndColor
+                        }}>{ponderaje}</strong>
+                      ) : (
+                        <span style={{color:"#bbb", fontSize:12}}>—</span>
+                      )}
                     </td>
                     <td className="disc-td-center">
                       <div className="disc-acciones">
@@ -469,6 +538,7 @@ export default function DisciplinaJefeCurso({ session, cursoId }) {
       {modalRegistro && (
         <ModalRegistro
           cursoId={cursoId}
+          materiaId={materiaId}
           participantes={resumen}
           catalogo={catalogo}
           registradoPor={session?.id}
@@ -482,6 +552,7 @@ export default function DisciplinaJefeCurso({ session, cursoId }) {
       {modalHistorial && (
         <ModalHistorial
           cursoId={cursoId}
+          materiaId={materiaId}
           participante={modalHistorial}
           onClose={() => setModalHistorial(null)}
           onEliminado={cargar}

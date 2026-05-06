@@ -1684,65 +1684,136 @@ app.get("/api/disciplina/catalogo", async (req, res) => {
   } catch (e) { res.status(500).json({ message: "Error interno", detail: e.message }); }
 });
 
-// GET /api/disciplina/resumen/:cursoId  — solo cursantes (tipo_usuario = 'Cursante')
+// GET /api/disciplina/resumen/:cursoId?materia_id=  — solo cursantes (tipo_usuario = 'Cursante')
 app.get("/api/disciplina/resumen/:cursoId", async (req, res) => {
+  const { cursoId } = req.params;
+  const materiaId = req.query.materia_id ? Number(req.query.materia_id) : null;
+
+  // 1. Siempre obtenemos los cursantes del curso (query simple, nunca falla)
+  let cursantes = [];
   try {
-    const { cursoId } = req.params;
     const [rows] = await pool.query(
-      `SELECT
-         u.id AS usuario_id,
-         u.nombre, u.ap_paterno, u.ap_materno, u.ci, u.grado,
-         COALESCE(SUM(CASE WHEN dr.tipo='MERITO'   THEN dr.puntos ELSE 0 END), 0) AS meritos,
-         COALESCE(SUM(CASE WHEN dr.tipo='DEMERITO' THEN dr.puntos ELSE 0 END), 0) AS demeritos,
-         COALESCE(SUM(CASE WHEN dr.tipo='MERITO'   THEN dr.puntos ELSE 0 END), 0)
-           - COALESCE(SUM(CASE WHEN dr.tipo='DEMERITO' THEN dr.puntos ELSE 0 END), 0) AS saldo,
-         COUNT(CASE WHEN dr.tipo='MERITO'   THEN 1 END) AS cant_meritos,
-         COUNT(CASE WHEN dr.tipo='DEMERITO' THEN 1 END) AS cant_demeritos
+      `SELECT u.id AS usuario_id, u.nombre, u.ap_paterno, u.ap_materno, u.ci, u.grado
        FROM usuarios u
        JOIN curso_participantes cp ON cp.usuario_id = u.id AND cp.curso_id = ?
-       LEFT JOIN disciplina_registros dr ON dr.usuario_id = u.id AND dr.curso_id = ?
        WHERE u.tipo_usuario = 'Cursante'
-       GROUP BY u.id, u.nombre, u.ap_paterno, u.ap_materno, u.ci, u.grado
        ORDER BY u.ap_paterno, u.ap_materno`,
-      [cursoId, cursoId]
+      [cursoId]
     );
-    res.json(rows);
-  } catch (e) { res.status(500).json({ message: "Error interno", detail: e.message }); }
+    cursantes = rows;
+  } catch (e) {
+    return res.status(500).json({ message: "Error al obtener cursantes", detail: e.message });
+  }
+
+  if (!cursantes.length) return res.json([]);
+
+  // 2. Datos de disciplina: primero intenta filtrar por materia_id,
+  //    si la columna no existe (migración pendiente) cae al query solo por curso_id.
+  const DISC_AGG = `
+    SELECT usuario_id,
+      COALESCE(SUM(CASE WHEN tipo='MERITO'   THEN puntos ELSE 0 END), 0) AS meritos,
+      COALESCE(SUM(CASE WHEN tipo='DEMERITO' THEN puntos ELSE 0 END), 0) AS demeritos,
+      COALESCE(SUM(CASE WHEN tipo='MERITO'   THEN puntos ELSE 0 END), 0)
+        - COALESCE(SUM(CASE WHEN tipo='DEMERITO' THEN puntos ELSE 0 END), 0) AS saldo,
+      COUNT(CASE WHEN tipo='MERITO'   THEN 1 END) AS cant_meritos,
+      COUNT(CASE WHEN tipo='DEMERITO' THEN 1 END) AS cant_demeritos
+    FROM disciplina_registros
+    WHERE curso_id = ?`;
+  let discMap = {};
+  try {
+    // Con materia_id (requiere migración)
+    const [discRows] = await pool.query(
+      `${DISC_AGG} AND materia_id = ? GROUP BY usuario_id`,
+      [cursoId, materiaId || 0]
+    );
+    for (const r of discRows) discMap[r.usuario_id] = r;
+  } catch (_) {
+    // Migración pendiente: muestra registros del curso sin filtro de materia
+    try {
+      const [discRows] = await pool.query(
+        `${DISC_AGG} GROUP BY usuario_id`, [cursoId]
+      );
+      for (const r of discRows) discMap[r.usuario_id] = r;
+    } catch (_2) { /* tabla no existe */ }
+  }
+
+  const resultado = cursantes.map(u => ({
+    ...u,
+    meritos:       Number(discMap[u.usuario_id]?.meritos      ?? 0),
+    demeritos:     Number(discMap[u.usuario_id]?.demeritos     ?? 0),
+    saldo:         Number(discMap[u.usuario_id]?.saldo         ?? 0),
+    cant_meritos:  Number(discMap[u.usuario_id]?.cant_meritos  ?? 0),
+    cant_demeritos:Number(discMap[u.usuario_id]?.cant_demeritos ?? 0),
+  }));
+
+  res.json(resultado);
 });
 
-// GET /api/disciplina/historial/:cursoId/:usuarioId
+// GET /api/disciplina/historial/:cursoId/:usuarioId?materia_id=
 app.get("/api/disciplina/historial/:cursoId/:usuarioId", async (req, res) => {
   try {
     const { cursoId, usuarioId } = req.params;
-    const [rows] = await pool.query(
-      `SELECT dr.id, dr.tipo, dr.descripcion, dr.puntos, dr.fecha, dr.observacion, dr.creado_en,
-              dc.codigo, dc.nombre AS catalogo_nombre,
-              CONCAT(u.ap_paterno,' ',u.ap_materno,' ',u.nombre) AS registrado_por_nombre
-       FROM disciplina_registros dr
-       LEFT JOIN disciplina_catalogo dc ON dc.id = dr.catalogo_id
-       JOIN usuarios u ON u.id = dr.registrado_por
-       WHERE dr.curso_id = ? AND dr.usuario_id = ?
-       ORDER BY dr.fecha DESC, dr.creado_en DESC`,
-      [cursoId, usuarioId]
-    );
-    res.json(rows);
+    const materiaId = req.query.materia_id ? Number(req.query.materia_id) : null;
+    try {
+      const [rows] = await pool.query(
+        `SELECT dr.id, dr.tipo, dr.descripcion, dr.puntos, dr.fecha, dr.observacion, dr.creado_en,
+                dr.materia_id, cm.nombre AS materia_nombre,
+                dc.codigo, dc.nombre AS catalogo_nombre,
+                CONCAT(u.ap_paterno,' ',u.ap_materno,' ',u.nombre) AS registrado_por_nombre
+         FROM disciplina_registros dr
+         LEFT JOIN disciplina_catalogo dc ON dc.id = dr.catalogo_id
+         LEFT JOIN curso_materias cm ON cm.id = dr.materia_id
+         JOIN usuarios u ON u.id = dr.registrado_por
+         WHERE dr.curso_id = ? AND dr.usuario_id = ?
+           AND dr.materia_id = ?
+         ORDER BY dr.fecha DESC, dr.creado_en DESC`,
+        [cursoId, usuarioId, materiaId || 0]
+      );
+      res.json(rows);
+    } catch (_) {
+      // columna materia_id no existe aún — fallback sin filtro de materia
+      const [rows] = await pool.query(
+        `SELECT dr.id, dr.tipo, dr.descripcion, dr.puntos, dr.fecha, dr.observacion, dr.creado_en,
+                dc.codigo, dc.nombre AS catalogo_nombre,
+                CONCAT(u.ap_paterno,' ',u.ap_materno,' ',u.nombre) AS registrado_por_nombre
+         FROM disciplina_registros dr
+         LEFT JOIN disciplina_catalogo dc ON dc.id = dr.catalogo_id
+         JOIN usuarios u ON u.id = dr.registrado_por
+         WHERE dr.curso_id = ? AND dr.usuario_id = ?
+         ORDER BY dr.fecha DESC, dr.creado_en DESC`,
+        [cursoId, usuarioId]
+      );
+      res.json(rows);
+    }
   } catch (e) { res.status(500).json({ message: "Error interno", detail: e.message }); }
 });
 
 // POST /api/disciplina/registrar
 app.post("/api/disciplina/registrar", async (req, res) => {
   try {
-    const { curso_id, usuario_id, catalogo_id, tipo, descripcion, puntos, fecha, registrado_por, observacion } = req.body;
+    const { curso_id, materia_id, usuario_id, catalogo_id, tipo, descripcion, puntos, fecha, registrado_por, observacion } = req.body;
     if (!curso_id || !usuario_id || !tipo || !descripcion || !puntos || !fecha || !registrado_por) {
       return res.status(400).json({ message: "Faltan campos requeridos" });
     }
-    const [result] = await pool.query(
-      `INSERT INTO disciplina_registros
-         (curso_id, usuario_id, catalogo_id, tipo, descripcion, puntos, fecha, registrado_por, observacion)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [curso_id, usuario_id, catalogo_id || null, tipo, descripcion, puntos, fecha, registrado_por, observacion || null]
-    );
-    res.json({ id: result.insertId, message: "Registro guardado" });
+    try {
+      // Intenta insertar con materia_id (requiere migración aplicada)
+      const [result] = await pool.query(
+        `INSERT INTO disciplina_registros
+           (curso_id, materia_id, usuario_id, catalogo_id, tipo, descripcion, puntos, fecha, registrado_por, observacion)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [curso_id, materia_id || null, usuario_id, catalogo_id || null, tipo, descripcion, puntos, fecha, registrado_por, observacion || null]
+      );
+      res.json({ id: result.insertId, message: "Registro guardado" });
+    } catch (_) {
+      // Fallback sin materia_id si la columna no existe aún
+      const [result] = await pool.query(
+        `INSERT INTO disciplina_registros
+           (curso_id, usuario_id, catalogo_id, tipo, descripcion, puntos, fecha, registrado_por, observacion)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [curso_id, usuario_id, catalogo_id || null, tipo, descripcion, puntos, fecha, registrado_por, observacion || null]
+      );
+      res.json({ id: result.insertId, message: "Registro guardado (sin materia — migración pendiente)" });
+    }
   } catch (e) { res.status(500).json({ message: "Error interno", detail: e.message }); }
 });
 
@@ -2062,16 +2133,25 @@ app.get("/api/nota-final/materia/:materiaId", async (req, res) => {
       if (!isMissingTableError(e)) throw e;
     }
 
-    // ── 4. Disciplina (2.5%) — saldo de méritos/deméritos del curso ─────
+    // ── 4. Disciplina (2.5%) — ponderaje = clamp(0, 2.5, meritos − deméritos) ──
     let discMap = {};
     try {
       const [discRows] = await pool.execute(
         `SELECT usuario_id,
+           COALESCE(SUM(CASE WHEN tipo='MERITO'   THEN puntos ELSE 0 END),0) AS total_meritos,
+           COALESCE(SUM(CASE WHEN tipo='DEMERITO' THEN puntos ELSE 0 END),0) AS total_demeritos,
            COALESCE(SUM(CASE WHEN tipo='MERITO'   THEN puntos ELSE 0 END),0) -
            COALESCE(SUM(CASE WHEN tipo='DEMERITO' THEN puntos ELSE 0 END),0) AS saldo
-         FROM disciplina_registros WHERE curso_id=? GROUP BY usuario_id`, [cursoId]);
+         FROM disciplina_registros
+         WHERE curso_id=? AND materia_id=?
+         GROUP BY usuario_id`, [cursoId, materiaId]);
+      // ponderaje directo: cada pt de mérito suma 1, cada pt de demérito resta 1, límite [0, 2.5]
       discMap = Object.fromEntries(
-        discRows.map(r => [r.usuario_id, Math.max(0, Math.min(100, 100 + Number(r.saldo)))])
+        discRows.map(r => ({
+          key: r.usuario_id,
+          saldo: Number(r.saldo),
+          ponderaje: Math.max(0, Math.min(2.5, Number(r.saldo))),
+        })).map(({ key, saldo, ponderaje }) => [key, { saldo, ponderaje }])
       );
     } catch(e) {
       if (!isMissingTableError(e)) throw e;
@@ -2097,10 +2177,10 @@ app.get("/api/nota-final/materia/:materiaId", async (req, res) => {
       }
       const promFacilitador = facMap[p.id] ?? null;
       const promCursantes   = peerMap[p.id] ?? null;
-      const tieneDisciplina = Object.prototype.hasOwnProperty.call(discMap, p.id);
-      const notaDisciplina  = tieneDisciplina ? discMap[p.id] : null;
+      const tieneDisciplina      = Object.prototype.hasOwnProperty.call(discMap, p.id);
+      const saldoDisciplina      = tieneDisciplina ? discMap[p.id].saldo    : null;
       const ponderajeFacilitador = promFacilitador !== null ? promFacilitador * 0.025 : null;
-      const ponderajeDisciplina  = notaDisciplina !== null ? notaDisciplina * 0.025 : null;
+      const ponderajeDisciplina  = tieneDisciplina ? discMap[p.id].ponderaje : null;
 
       // nota_final = catedrático(0-90) + facilitador(0-2.5) + cursantes(0-5) + disciplina(0-2.5) = 0-100
       const notaFinal =
@@ -2119,7 +2199,7 @@ app.get("/api/nota-final/materia/:materiaId", async (req, res) => {
         prom_facilitador: promFacilitador !== null ? Number(promFacilitador.toFixed(2)) : null,
         ponderaje_facilitador: ponderajeFacilitador !== null ? Number(ponderajeFacilitador.toFixed(2)) : null,
         prom_cursantes:   promCursantes   !== null ? Number(promCursantes.toFixed(2))   : null,
-        nota_disciplina:  notaDisciplina !== null ? Number(notaDisciplina.toFixed(2)) : null,
+        nota_disciplina:  saldoDisciplina !== null ? Number(saldoDisciplina.toFixed(2)) : null,
         ponderaje_disciplina: ponderajeDisciplina !== null ? Number(ponderajeDisciplina.toFixed(2)) : null,
         disciplina_registrada: tieneDisciplina,
         nota_final:       Number(notaFinal.toFixed(2)),
