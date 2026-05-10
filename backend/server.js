@@ -1070,9 +1070,172 @@ app.delete("/api/tareas/:id", async (req,res) => {
 // EVALUACIONES INSTITUCIONALES
 // ════════════════════════════════════════════════════════════
 
+async function seedDisciplina() {
+  try {
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS disciplina_catalogo (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        tipo        ENUM('MERITO','DEMERITO') NOT NULL,
+        codigo      VARCHAR(20) DEFAULT NULL,
+        nombre      VARCHAR(200) NOT NULL,
+        descripcion TEXT DEFAULT NULL,
+        puntos      DECIMAL(5,2) NOT NULL DEFAULT 1.00,
+        activo      TINYINT(1) NOT NULL DEFAULT 1,
+        creado_en   DATETIME DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS disciplina_registros (
+        id             INT AUTO_INCREMENT PRIMARY KEY,
+        curso_id       INT NOT NULL,
+        materia_id     INT NULL,
+        usuario_id     INT NOT NULL,
+        catalogo_id    INT DEFAULT NULL,
+        tipo           ENUM('MERITO','DEMERITO') NOT NULL,
+        descripcion    VARCHAR(500) NOT NULL,
+        puntos         DECIMAL(5,2) NOT NULL DEFAULT 1.00,
+        fecha          DATE NOT NULL,
+        registrado_por INT NOT NULL,
+        observacion    VARCHAR(500) DEFAULT NULL,
+        creado_en      DATETIME DEFAULT CURRENT_TIMESTAMP,
+        KEY idx_disc_reg_usuario (usuario_id, curso_id),
+        KEY idx_disc_reg_curso   (curso_id),
+        KEY idx_disc_reg_materia (materia_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS disciplina_config (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        curso_id      INT NOT NULL,
+        materia_id    INT NOT NULL,
+        porcentaje    DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+        activo        TINYINT(1) NOT NULL DEFAULT 1,
+        creado_por    INT DEFAULT NULL,
+        creado_en     DATETIME DEFAULT CURRENT_TIMESTAMP,
+        actualizado_en DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_disc_config (curso_id, materia_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
+    await pool.execute(`
+      INSERT IGNORE INTO disciplina_catalogo (id,tipo,codigo,nombre,puntos,activo) VALUES
+      (1,'MERITO',  'M-01','Participación destacada en clase',          1.00, 1),
+      (2,'MERITO',  'M-02','Trabajo sobresaliente',                     2.00, 1),
+      (3,'MERITO',  'M-03','Puntualidad ejemplar (mes completo)',        1.00, 1),
+      (4,'MERITO',  'M-04','Apoyo a compañeros',                        1.00, 1),
+      (5,'MERITO',  'M-05','Iniciativa y liderazgo',                    2.00, 1),
+      (6,'DEMERITO','D-01','Tardanza injustificada',                     1.00, 1),
+      (7,'DEMERITO','D-02','Falta de respeto',                          3.00, 1),
+      (8,'DEMERITO','D-03','Incumplimiento de tareas reiterativo',       2.00, 1),
+      (9,'DEMERITO','D-04','Uso indebido de dispositivos en clase',      1.00, 1),
+      (10,'DEMERITO','D-05','Conducta inapropiada',                     3.00, 1)`);
+
+    console.log("✅ disciplina: tablas y catálogo listos");
+  } catch(e) {
+    console.warn("⚠️  seedDisciplina:", e.message);
+  }
+}
+
+async function seedEvalInstPlantillas() {
+  try {
+    // 1. Crear tablas si no existen
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS eval_inst_plantillas (
+        id         INT AUTO_INCREMENT PRIMARY KEY,
+        tipo       ENUM('CURSANTE_A_CURSANTE','CURSANTE_A_DOCENTE') NOT NULL,
+        titulo     VARCHAR(200) NOT NULL,
+        descripcion TEXT,
+        activa     TINYINT(1) DEFAULT 1,
+        creado_en  DATETIME DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS eval_inst_indicadores (
+        id           INT AUTO_INCREMENT PRIMARY KEY,
+        plantilla_id INT NOT NULL,
+        orden        INT DEFAULT 0,
+        texto        TEXT NOT NULL,
+        KEY (plantilla_id),
+        CONSTRAINT fk_eii_plantilla FOREIGN KEY (plantilla_id)
+          REFERENCES eval_inst_plantillas(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS eval_inst_periodos (
+        id           INT AUTO_INCREMENT PRIMARY KEY,
+        plantilla_id INT NOT NULL,
+        curso_id     INT NOT NULL,
+        materia_id   INT DEFAULT NULL,
+        titulo       VARCHAR(200) DEFAULT NULL,
+        habilitado   TINYINT(1) DEFAULT 1,
+        fecha_inicio DATETIME DEFAULT CURRENT_TIMESTAMP,
+        fecha_fin    DATETIME DEFAULT NULL,
+        creado_por   INT DEFAULT NULL,
+        creado_en    DATETIME DEFAULT CURRENT_TIMESTAMP,
+        KEY (plantilla_id), KEY (curso_id),
+        CONSTRAINT fk_eip_plantilla FOREIGN KEY (plantilla_id) REFERENCES eval_inst_plantillas(id),
+        CONSTRAINT fk_eip_curso     FOREIGN KEY (curso_id)     REFERENCES cursos(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS eval_inst_respuestas (
+        id           INT AUTO_INCREMENT PRIMARY KEY,
+        periodo_id   INT NOT NULL,
+        evaluador_id INT NOT NULL,
+        evaluado_id  INT DEFAULT NULL,
+        completada   TINYINT(1) DEFAULT 0,
+        enviado_en   DATETIME DEFAULT NULL,
+        UNIQUE KEY uq_resp (periodo_id, evaluador_id, evaluado_id),
+        CONSTRAINT fk_eir_periodo FOREIGN KEY (periodo_id) REFERENCES eval_inst_periodos(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS eval_inst_valoraciones (
+        id           INT AUTO_INCREMENT PRIMARY KEY,
+        respuesta_id INT NOT NULL,
+        indicador_id INT NOT NULL,
+        valor        TINYINT(4) NOT NULL DEFAULT 100,
+        UNIQUE KEY uq_val (respuesta_id, indicador_id),
+        KEY (indicador_id),
+        CONSTRAINT fk_eiv_respuesta  FOREIGN KEY (respuesta_id) REFERENCES eval_inst_respuestas(id)  ON DELETE CASCADE,
+        CONSTRAINT fk_eiv_indicador  FOREIGN KEY (indicador_id) REFERENCES eval_inst_indicadores(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
+    // 2. Insertar datos semilla (INSERT IGNORE: seguro de correr múltiples veces)
+    await pool.execute(`
+      INSERT IGNORE INTO eval_inst_plantillas (id,tipo,titulo,descripcion,activa) VALUES
+      (1,'CURSANTE_A_CURSANTE','Evaluación de Conducta entre Cursantes','Evaluación del comportamiento y actitudes de los cursantes por sus pares.',1),
+      (2,'CURSANTE_A_DOCENTE','Evaluación Docente por Cursantes','Evaluación del desempeño docente realizada por los cursantes de cada materia.',1)`);
+
+    await pool.execute(`
+      INSERT IGNORE INTO eval_inst_indicadores (id,plantilla_id,orden,texto) VALUES
+      (1,1,1,'Procede con las normas institucionales'),
+      (2,1,2,'Asume sus decisiones y/o responde por sus acciones'),
+      (3,1,3,'Trata a las personas con dignidad y controla sus emociones'),
+      (4,1,4,'Participa, contribuye y comparte en la investigación y la difusión del conocimiento'),
+      (5,2,1,'El Docente elabora y presenta el programa de la asignatura al inicio del módulo'),
+      (6,2,2,'Cumple con el programa de la asignatura de acuerdo a lo planificado'),
+      (7,2,3,'Desarrolla con claridad los temas y relaciona la teoría con la práctica'),
+      (8,2,4,'Promueve la participación activa del cursante en el desarrollo de la clase'),
+      (9,2,5,'Utiliza un tono adecuado de voz y lenguaje claro y técnico'),
+      (10,2,6,'El trato al cursante es respetuoso dentro y fuera del aula'),
+      (11,2,7,'Absuelve las dudas de los cursantes de manera oportuna y clara'),
+      (12,2,8,'Desarrolla sus clases de manera amena y estimulante'),
+      (13,2,9,'Transmite confianza al cursante para que participe y realice preguntas'),
+      (14,2,10,'Evalúa las tareas asignadas de manera oportuna y dentro del plazo establecido'),
+      (15,2,11,'Existe relación entre las preguntas de los exámenes y los temas avanzados'),
+      (16,2,12,'Cumple con los horarios establecidos con puntualidad'),
+      (17,2,13,'Demuestra compromiso con su labor y formación del cursante')`);
+
+    console.log("✅ eval_inst: tablas y datos semilla listos");
+  } catch(e) {
+    console.warn("⚠️  seedEvalInstPlantillas:", e.message);
+  }
+}
+
 /** GET /api/eval-inst/plantillas */
 app.get("/api/eval-inst/plantillas", async (req,res) => {
   try {
+    await seedEvalInstPlantillas();
     const [rows] = await pool.execute(
       `SELECT p.*, COUNT(i.id) AS total_indicadores
        FROM eval_inst_plantillas p
@@ -1677,6 +1840,7 @@ app.get("/api/finanzas/resumen/:usuarioId", async (req,res) => {
 // GET /api/disciplina/catalogo
 app.get("/api/disciplina/catalogo", async (req, res) => {
   try {
+    await seedDisciplina();
     const [rows] = await pool.query(
       `SELECT * FROM disciplina_catalogo WHERE activo=1 ORDER BY tipo, puntos DESC`
     );
@@ -2055,9 +2219,11 @@ app.post("/api/eval-facilitador", async (req, res) => {
   finally { conn.release(); }
 });
 
+const SHD_PESOS = { SABER: 0.30, HACER: 0.40, DECIDIR: 0.20 }; // suman 0.90
+
 /** GET /api/nota-final/materia/:materiaId
- *  Calcula nota final compuesta (fórmula fija) para todos los cursantes de una materia.
- *  Fórmula: nota_final = prom_catedratico*0.90 + prom_facilitador*0.025 + prom_cursantes*0.05 + nota_disciplina*0.025
+ *  Fórmula: nota_final = prom_catedratico(0-90) + facilitador(0-2.5) + cursantes(0-5) + disciplina(0-2.5)
+ *  Catedrático: usa SHD si hay datos; fallback a eval_config legacy.
  */
 app.get("/api/nota-final/materia/:materiaId", async (req, res) => {
   try {
@@ -2068,38 +2234,87 @@ app.get("/api/nota-final/materia/:materiaId", async (req, res) => {
     if (!materia) return res.status(404).json({ message: "Materia no encontrada" });
     const cursoId = materia.curso_id;
 
-    // ── 1. Catedrático (90%) ─────────────────────────────────
-    const [evalRows] = await pool.execute(
-      `SELECT id, nombre, peso, nota_min_apro FROM eval_config WHERE materia_id=? ORDER BY orden ASC`, [materiaId]);
-    const [notaRows] = await pool.execute(
-      `SELECT c.usuario_id, ec.nombre AS eval_nombre, c.nota
-       FROM calificaciones c INNER JOIN eval_config ec ON ec.id=c.eval_config_id
-       WHERE c.materia_id=? OR (c.materia_id IS NULL AND ec.materia_id=?)`, [materiaId,materiaId]);
-    const notasMap = {};
-    for (const n of notaRows) {
-      if (!notasMap[n.usuario_id]) notasMap[n.usuario_id] = {};
-      notasMap[n.usuario_id][n.eval_nombre] = Number(n.nota);
+    // ── 1. Catedrático (90%) — SHD si hay datos, eval_config como fallback ──────
+    let usaSHD = false;
+    let promCatedraticoMap = {};    // { usuario_id → 0-90 }
+    let shdDimMap = {};             // { usuario_id → { SABER, HACER, DECIDIR } 0-100 }
+    let notaMinApro = 70;
+
+    try {
+      const [shdIndicadores] = await pool.execute(
+        `SELECT id, dimension FROM shd_indicadores ORDER BY orden ASC`);
+      const [shdNotaRows] = await pool.execute(
+        `SELECT usuario_id, indicador_id, nota FROM shd_notas WHERE materia_id=?`, [materiaId]);
+
+      if (shdNotaRows.length) {
+        usaSHD = true;
+        const indDim = Object.fromEntries(shdIndicadores.map(i => [i.id, i.dimension]));
+        const userDimNotas = {};
+        for (const n of shdNotaRows) {
+          const dim = indDim[n.indicador_id];
+          if (!dim) continue;
+          if (!userDimNotas[n.usuario_id]) userDimNotas[n.usuario_id] = { SABER: [], HACER: [], DECIDIR: [] };
+          if (n.nota !== null && n.nota !== undefined) userDimNotas[n.usuario_id][dim].push(Number(n.nota));
+        }
+        for (const [uid, dimNotas] of Object.entries(userDimNotas)) {
+          const dimAvg = {};
+          let total = 0;
+          for (const [dim, peso] of Object.entries(SHD_PESOS)) {
+            const arr = dimNotas[dim] || [];
+            const avg = arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
+            dimAvg[dim] = Number(avg.toFixed(2));
+            total += avg * peso;
+          }
+          promCatedraticoMap[Number(uid)] = Number(total.toFixed(2));
+          shdDimMap[Number(uid)] = dimAvg;
+        }
+      }
+    } catch(e) {
+      if (!isMissingTableError(e)) throw e;
     }
 
-    const tareaEvalNames = evalRows.filter(ev => isTareaEval(ev.nombre)).map(ev => ev.nombre);
-    if (tareaEvalNames.length) {
-      try {
-        const [tareaRows] = await pool.execute(
-          `SELECT te.usuario_id, ROUND(AVG(te.nota),2) AS promedio_tarea
-           FROM tareas t
-           JOIN tarea_entregas te ON te.tarea_id=t.id
-           WHERE t.materia_id=? AND te.nota IS NOT NULL
-           GROUP BY te.usuario_id`, [materiaId]);
-        for (const row of tareaRows) {
-          if (!notasMap[row.usuario_id]) notasMap[row.usuario_id] = {};
-          for (const evalName of tareaEvalNames) {
-            notasMap[row.usuario_id][evalName] = Number(row.promedio_tarea);
+    // Fallback eval_config cuando no hay SHD
+    const evalRows = [];
+    if (!usaSHD) {
+      const [er] = await pool.execute(
+        `SELECT id, nombre, peso, nota_min_apro FROM eval_config WHERE materia_id=? ORDER BY orden ASC`, [materiaId]);
+      evalRows.push(...er);
+
+      const [notaRows] = await pool.execute(
+        `SELECT c.usuario_id, ec.nombre AS eval_nombre, c.nota
+         FROM calificaciones c INNER JOIN eval_config ec ON ec.id=c.eval_config_id
+         WHERE c.materia_id=? OR (c.materia_id IS NULL AND ec.materia_id=?)`, [materiaId, materiaId]);
+      const notasMap = {};
+      for (const n of notaRows) {
+        if (!notasMap[n.usuario_id]) notasMap[n.usuario_id] = {};
+        notasMap[n.usuario_id][n.eval_nombre] = Number(n.nota);
+      }
+
+      const tareaEvalNames = evalRows.filter(ev => isTareaEval(ev.nombre)).map(ev => ev.nombre);
+      if (tareaEvalNames.length) {
+        try {
+          const [tareaRows] = await pool.execute(
+            `SELECT te.usuario_id, ROUND(AVG(te.nota),2) AS promedio_tarea
+             FROM tareas t JOIN tarea_entregas te ON te.tarea_id=t.id
+             WHERE t.materia_id=? AND te.nota IS NOT NULL
+             GROUP BY te.usuario_id`, [materiaId]);
+          for (const row of tareaRows) {
+            if (!notasMap[row.usuario_id]) notasMap[row.usuario_id] = {};
+            for (const evalName of tareaEvalNames)
+              notasMap[row.usuario_id][evalName] = Number(row.promedio_tarea);
           }
-        }
-      } catch(e) {
-        if (!isMissingTableError(e)) throw e;
+        } catch(e) { if (!isMissingTableError(e)) throw e; }
+      }
+
+      // Calcular prom_catedratico desde eval_config
+      for (const [uid, notas] of Object.entries(notasMap)) {
+        let sn = 0;
+        for (const ev of evalRows) sn += (notas[ev.nombre] ?? 0) * Number(ev.peso);
+        promCatedraticoMap[Number(uid)] = Number((sn / 100).toFixed(2));
       }
     }
+
+    if (evalRows.length) notaMinApro = Number(evalRows[0].nota_min_apro);
 
     // ── 2. Facilitador (2.5%) — escala 1-10, se convierte a 0-100 multiplicando ×10 ──
     const [facRows] = await pool.execute(
@@ -2108,17 +2323,20 @@ app.get("/api/nota-final/materia/:materiaId", async (req, res) => {
     // promedio_10 está en escala 1-10 → convertir a 0-100
     const facMap = Object.fromEntries(facRows.map(r => [r.cursante_id, Number(r.promedio_10) * 10]));
 
-    // ── 3. Cursantes (5%) — período CURSANTE_A_CURSANTE más reciente de esta materia ──
+    // ── 3. Cursantes (5%) — período CURSANTE_A_CURSANTE más reciente (materia o curso) ──
     const peerMap = {};
     try {
+      // Busca primero por materia_id exacto, luego por curso sin materia (NULL)
       const [periodoRows] = await pool.execute(
         `SELECT ep.id FROM eval_inst_periodos ep
          JOIN eval_inst_plantillas pl ON pl.id = ep.plantilla_id
          WHERE pl.tipo = 'CURSANTE_A_CURSANTE'
-           AND ep.materia_id = ?
            AND ep.habilitado = 1
-         ORDER BY ep.creado_en DESC LIMIT 1`,
-        [materiaId]);
+           AND ep.curso_id = ?
+           AND (ep.materia_id = ? OR ep.materia_id IS NULL)
+         ORDER BY (ep.materia_id = ?) DESC, ep.creado_en DESC
+         LIMIT 1`,
+        [cursoId, materiaId, materiaId]);
       if (periodoRows.length) {
         const [peerRows] = await pool.execute(
           `SELECT er.evaluado_id,
@@ -2164,46 +2382,42 @@ app.get("/api/nota-final/materia/:materiaId", async (req, res) => {
        WHERE cp.curso_id=? AND u.tipo_usuario='Cursante'
        ORDER BY u.ap_paterno, u.ap_materno, u.nombre`, [cursoId]);
 
-    const notaMinApro = evalRows.length ? Number(evalRows[0].nota_min_apro) : 70;
-
     const resultado = partRows.map(p => {
-      const notas = notasMap[p.id] || {};
-      // promCatedratico: contribución directa 0-90 (suma nota*peso/100)
-      let promCatedratico = 0;
-      if (evalRows.length) {
-        let sn = 0;
-        for (const ev of evalRows) sn += (notas[ev.nombre] ?? 0) * Number(ev.peso);
-        promCatedratico = sn / 100;
-      }
+      const promCatedratico = promCatedraticoMap[p.id] ?? 0;
       const promFacilitador = facMap[p.id] ?? null;
       const promCursantes   = peerMap[p.id] ?? null;
       const tieneDisciplina      = Object.prototype.hasOwnProperty.call(discMap, p.id);
-      const saldoDisciplina      = tieneDisciplina ? discMap[p.id].saldo    : null;
+      const saldoDisciplina      = tieneDisciplina ? discMap[p.id].saldo     : null;
       const ponderajeFacilitador = promFacilitador !== null ? promFacilitador * 0.025 : null;
       const ponderajeDisciplina  = tieneDisciplina ? discMap[p.id].ponderaje : null;
+      const dimShd               = shdDimMap[p.id] ?? null;
 
-      // nota_final = catedrático(0-90) + facilitador(0-2.5) + cursantes(0-5) + disciplina(0-2.5) = 0-100
       const notaFinal =
         promCatedratico +
         (ponderajeFacilitador ?? 0) +
-        (promCursantes   ?? 0) * 0.05  +
+        (promCursantes ?? 0) * 0.05 +
         (ponderajeDisciplina ?? 0);
 
       return {
-        usuario_id:       p.id,
-        nombre:           p.nombre,
-        ap_paterno:       p.ap_paterno,
-        ap_materno:       p.ap_materno,
-        ci:               p.ci,
-        prom_catedratico: Number(promCatedratico.toFixed(2)),
-        prom_facilitador: promFacilitador !== null ? Number(promFacilitador.toFixed(2)) : null,
+        usuario_id:   p.id,
+        nombre:       p.nombre,
+        ap_paterno:   p.ap_paterno,
+        ap_materno:   p.ap_materno,
+        ci:           p.ci,
+        prom_catedratico:      Number(promCatedratico.toFixed(2)),
+        ...(usaSHD && dimShd ? {
+          prom_saber:   dimShd.SABER,
+          prom_hacer:   dimShd.HACER,
+          prom_decidir: dimShd.DECIDIR,
+        } : {}),
+        prom_facilitador:      promFacilitador !== null ? Number(promFacilitador.toFixed(2)) : null,
         ponderaje_facilitador: ponderajeFacilitador !== null ? Number(ponderajeFacilitador.toFixed(2)) : null,
-        prom_cursantes:   promCursantes   !== null ? Number(promCursantes.toFixed(2))   : null,
-        nota_disciplina:  saldoDisciplina !== null ? Number(saldoDisciplina.toFixed(2)) : null,
-        ponderaje_disciplina: ponderajeDisciplina !== null ? Number(ponderajeDisciplina.toFixed(2)) : null,
+        prom_cursantes:        promCursantes !== null ? Number(promCursantes.toFixed(2)) : null,
+        nota_disciplina:       saldoDisciplina !== null ? Number(saldoDisciplina.toFixed(2)) : null,
+        ponderaje_disciplina:  ponderajeDisciplina !== null ? Number(ponderajeDisciplina.toFixed(2)) : null,
         disciplina_registrada: tieneDisciplina,
-        nota_final:       Number(notaFinal.toFixed(2)),
-        estado:           notaFinal >= notaMinApro ? "aprobado" : "reprobado",
+        nota_final:            Number(notaFinal.toFixed(2)),
+        estado:                notaFinal >= notaMinApro ? "aprobado" : "reprobado",
         facilitador_pendiente: promFacilitador === null,
         cursantes_pendiente:   promCursantes   === null,
       };
@@ -2212,7 +2426,9 @@ app.get("/api/nota-final/materia/:materiaId", async (req, res) => {
     res.json({
       materia_id:     materiaId,
       materia_nombre: materia.nombre,
+      usa_shd:        usaSHD,
       pesos: { catedratico: 90, facilitador: 2.5, cursantes: 5, disciplina: 2.5 },
+      shd_pesos: { saber: 30, hacer: 40, decidir: 20 },
       nota_min_apro:  notaMinApro,
       resultado,
     });
@@ -2220,7 +2436,102 @@ app.get("/api/nota-final/materia/:materiaId", async (req, res) => {
 });
 
 // ════════════════════════════════════════════════════════════
+// SABER / HACER / DECIDIR (SHD) — Sistema de calificación por dimensiones
+// ════════════════════════════════════════════════════════════
+
+/** GET /api/shd/indicadores — Catálogo de indicadores SHD */
+app.get("/api/shd/indicadores", async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT id, dimension, seccion, codigo, nombre, orden
+       FROM shd_indicadores ORDER BY orden ASC`);
+    res.json(rows);
+  } catch(e) { res.status(500).json({ message: "Error interno", detail: e.message }); }
+});
+
+/** GET /api/shd/notas/materia/:materiaId — Libro SHD por materia */
+app.get("/api/shd/notas/materia/:materiaId", async (req, res) => {
+  try {
+    const materiaId = Number(req.params.materiaId);
+    if (!materiaId) return res.status(400).json({ message: "ID inválido" });
+    const materia = await assertMateriaExists(pool, materiaId);
+    if (!materia) return res.status(404).json({ message: "Materia no encontrada" });
+
+    const [indicadores] = await pool.execute(
+      `SELECT id, dimension, seccion, codigo, nombre, orden FROM shd_indicadores ORDER BY orden ASC`);
+
+    const [participantes] = await pool.execute(
+      `SELECT u.id, u.nombre, u.ap_paterno, u.ap_materno, u.ci
+       FROM curso_participantes cp INNER JOIN usuarios u ON u.id=cp.usuario_id
+       WHERE cp.curso_id=? ORDER BY u.ap_paterno, u.ap_materno, u.nombre`, [materia.curso_id]);
+
+    const [notaRows] = await pool.execute(
+      `SELECT usuario_id, indicador_id, nota, bloqueado FROM shd_notas WHERE materia_id=?`, [materiaId]);
+
+    const notasMap = {}, bloqueadoMap = {};
+    for (const n of notaRows) {
+      if (!notasMap[n.usuario_id]) notasMap[n.usuario_id] = {};
+      notasMap[n.usuario_id][n.indicador_id] = Number(n.nota);
+      if (n.bloqueado) bloqueadoMap[n.usuario_id] = true;
+    }
+
+    res.json({
+      materia_id: materiaId,
+      indicadores,
+      libro: participantes.map(p => ({
+        usuario_id: p.id, nombre: p.nombre, ap_paterno: p.ap_paterno,
+        ap_materno: p.ap_materno, ci: p.ci,
+        notas: notasMap[p.id] || {}, bloqueado: !!bloqueadoMap[p.id],
+      })),
+    });
+  } catch(e) { res.status(500).json({ message: "Error interno", detail: e.message }); }
+});
+
+/**
+ * POST /api/shd/notas/usuario — Guardar (y opcionalmente bloquear) notas SHD de UN cursante
+ * body: { curso_id, materia_id, usuario_id, notas:{indicador_id:nota,...}, bloquear, registrado_por }
+ */
+app.post("/api/shd/notas/usuario", async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    const { curso_id, materia_id, usuario_id, notas, bloquear, registrado_por } = req.body;
+    if (!curso_id)   return res.status(400).json({ message: "Campo requerido: curso_id" });
+    if (!materia_id) return res.status(400).json({ message: "Campo requerido: materia_id" });
+    if (!usuario_id) return res.status(400).json({ message: "Campo requerido: usuario_id" });
+    if (!notas)      return res.status(400).json({ message: "Campo requerido: notas" });
+
+    const materia = await assertMateriaExists(conn, materia_id);
+    if (!materia) return res.status(404).json({ message: "Materia no encontrada" });
+
+    const [chk] = await conn.execute(
+      `SELECT 1 FROM shd_notas WHERE materia_id=? AND usuario_id=? AND bloqueado=1 LIMIT 1`,
+      [materia_id, usuario_id]);
+    if (chk.length)
+      return res.status(409).json({ message: "Las calificaciones de este cursante ya están bloqueadas." });
+
+    const bloqueadoVal = bloquear ? 1 : 0;
+    await conn.beginTransaction();
+    for (const [indicadorId, nota] of Object.entries(notas)) {
+      const notaNum = Math.min(100, Math.max(0, Number(nota) || 0));
+      await conn.execute(
+        `INSERT INTO shd_notas (materia_id, curso_id, usuario_id, indicador_id, nota, bloqueado, registrado_por)
+         VALUES (?,?,?,?,?,?,?)
+         ON DUPLICATE KEY UPDATE nota=VALUES(nota), bloqueado=VALUES(bloqueado),
+           registrado_por=VALUES(registrado_por), actualizado_en=NOW()`,
+        [materia_id, curso_id, usuario_id, Number(indicadorId), notaNum, bloqueadoVal, registrado_por ?? null]);
+    }
+    await conn.commit();
+    res.json({ message: "Calificaciones SHD guardadas", usuario_id, bloqueado: bloqueadoVal === 1 });
+  } catch(e) { try { await conn.rollback(); } catch {} res.status(500).json({ message: "Error interno", detail: e.message }); }
+  finally { conn.release(); }
+});
+
+// ════════════════════════════════════════════════════════════
 // START
 // ════════════════════════════════════════════════════════════
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`✅ API EAEN corriendo en http://localhost:${PORT}`));
+app.listen(PORT, async () => {
+  console.log(`✅ API EAEN corriendo en http://localhost:${PORT}`);
+  await seedDisciplina();
+  await seedEvalInstPlantillas();
+});

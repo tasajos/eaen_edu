@@ -117,160 +117,175 @@ function VistaAsistencia({ materia, participantes, showToast }) {
 }
 
 /* ══════════════════════════════════════════════════════════
-   VISTA CALIFICACIONES
+   VISTA CALIFICACIONES — Sistema SHD (Saber / Hacer / Decidir)
 ══════════════════════════════════════════════════════════ */
-const DEFAULT_EVALS = [
-  { id: null, nombre: "Examen", peso: 70, orden: 1, nota_min_apro: 70, nota_max: 100 },
-  { id: null, nombre: "Tarea",  peso: 20, orden: 2, nota_min_apro: 70, nota_max: 100 },
+
+const SHD_CONFIG = [
+  {
+    dim: "SABER", peso: 30, color: "#1565c0", bg: "#e3f2fd", border: "#90caf9",
+    secciones: [
+      { nombre: "RESOLUCIÓN DE PROBLEMAS", indicadores: [
+        { codigo:"a", nombre:"Investigación con Profundidad y acierto" },
+        { codigo:"b", nombre:"Capacidad de Análisis" },
+        { codigo:"c", nombre:"Acierto en la comprensión y solución" },
+      ]},
+      { nombre: "EXPRESIÓN ESCRITA", indicadores: [
+        { codigo:"a", nombre:"Calidad y precisión en la redacción" },
+        { codigo:"b", nombre:"Ortografía" },
+        { codigo:"c", nombre:"Hecho coherente y con objetividad" },
+      ]},
+    ],
+  },
+  {
+    dim: "HACER", peso: 40, color: "#6a1b9a", bg: "#f3e5f5", border: "#ce93d8",
+    secciones: [
+      { nombre: "EXPRESIÓN ORAL", indicadores: [
+        { codigo:"a", nombre:"Expone sus ideas en forma clara" },
+        { codigo:"b", nombre:"Coherente en el razonamiento" },
+        { codigo:"c", nombre:"Capacidad de síntesis" },
+        { codigo:"d", nombre:"Uso correcto de terminología" },
+        { codigo:"e", nombre:"Uso correcto de recursos técnicos" },
+        { codigo:"f", nombre:"Sostiene sus criterios con seguridad" },
+        { codigo:"g", nombre:"Prueba o sustentación oral individual" },
+      ]},
+    ],
+  },
+  {
+    dim: "DECIDIR", peso: 20, color: "#2e7d32", bg: "#e8f5e9", border: "#a5d6a7",
+    secciones: [
+      { nombre: "ACTUACIÓN EN GRUPOS", indicadores: [
+        { codigo:"a", nombre:"Aporte de Información" },
+        { codigo:"b", nombre:"Dominio de técnicas de dinámica de grupo" },
+        { codigo:"c", nombre:"Capacidad de Organización" },
+      ]},
+      { nombre: "TOMA DE DECISIONES", indicadores: [
+        { codigo:"a", nombre:"Aprecia los hechos objetivamente" },
+        { codigo:"b", nombre:"Decide con acierto" },
+      ]},
+    ],
+  },
 ];
 
 function VistaCalificaciones({ materia, participantes, showToast }) {
-  const [evals,       setEvals]       = useState([]);
-  const [loadingEvals,setLoadingEvals]= useState(true);
+  const [indicadores, setIndicadores] = useState([]);
   const [notas,       setNotas]       = useState({});
-  const [notasTarea,  setNotasTarea]  = useState({});
   const [bloqueados,  setBloqueados]  = useState({});
-  const [saving,      setSaving]      = useState({});
-  const [confirmUid,  setConfirmUid]  = useState(null);
+  const [saving,         setSaving]         = useState({});
+  const [savingBorrador, setSavingBorrador] = useState({});
+  const [confirmUid,     setConfirmUid]     = useState(null);
+  const [dimActiva,   setDimActiva]   = useState("SABER");
   const [facDatos,    setFacDatos]    = useState({});
-
-  // Siempre hay columnas: las del servidor o las por defecto (Examen + Tarea)
-  const activeEvals = evals.length ? evals : DEFAULT_EVALS;
-
-  // Las evaluaciones de tareas se auto-calculan desde las entregas calificadas.
-  const esTareaEval = nombre => {
-    const value = String(nombre || "")
-      .trim()
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
-    return /^(tarea|trabajo|practica)$/.test(value);
-  };
-
-  const calcularPromedioTareas = async (materiaId) => {
-    try {
-      const resumen = await fetch(`${API}/tareas/materia/${materiaId}/resumen`).then(r=>r.json());
-      if (!Array.isArray(resumen) || !resumen.length) return {};
-      const mapaNotas = {};
-      for (const tarea of resumen) {
-        const entregas = await fetch(`${API}/tareas/${tarea.id}/entregas/detalle`).then(r=>r.json());
-        if (!Array.isArray(entregas)) continue;
-        entregas.forEach(e => {
-          if (e.nota !== null && e.nota !== undefined) {
-            if (!mapaNotas[e.usuario_id]) mapaNotas[e.usuario_id] = [];
-            mapaNotas[e.usuario_id].push(Number(e.nota));
-          }
-        });
-      }
-      const res = {};
-      Object.entries(mapaNotas).forEach(([uid, ns]) => {
-        res[Number(uid)] = Math.round(ns.reduce((a,b)=>a+b,0)/ns.length*10)/10;
-      });
-      return res;
-    } catch { return {}; }
-  };
+  const [loading,     setLoading]     = useState(true);
 
   useEffect(() => {
     if (!materia?.id) return;
-    setLoadingEvals(true);
-    fetch(`${API}/eval-config/materia/${materia.id}`)
-      .then(r=>r.json()).then(async d => {
-        const rows = Array.isArray(d) && d.length ? d : DEFAULT_EVALS;
-        setEvals(Array.isArray(d) && d.length ? d : []);
-        if (rows.some(ev => esTareaEval(ev.nombre))) {
-          const p = await calcularPromedioTareas(materia.id);
-          setNotasTarea(p);
-        } else {
-          setNotasTarea({});
-        }
-      }).catch(()=>{ setEvals([]); setNotasTarea({}); })
-      .finally(()=>setLoadingEvals(false));
-    fetch(`${API}/calificaciones/materia/${materia.id}`)
-      .then(r=>r.json()).then(d => {
-        if (!d.libro) return;
+    setLoading(true);
+    Promise.all([
+      fetch(`${API}/shd/indicadores`).then(r => r.json()).catch(() => []),
+      fetch(`${API}/shd/notas/materia/${materia.id}`).then(r => r.json()).catch(() => null),
+      fetch(`${API}/eval-facilitador/materia/${materia.id}`).then(r => r.json()).catch(() => []),
+    ]).then(([inds, libro, fac]) => {
+      setIndicadores(Array.isArray(inds) ? inds : []);
+      if (libro?.libro) {
         const m = {}, bl = {};
-        d.libro.forEach(p => {
+        libro.libro.forEach(p => {
           m[p.usuario_id] = p.notas || {};
           if (p.bloqueado) bl[p.usuario_id] = true;
         });
         setNotas(m);
         setBloqueados(bl);
-      }).catch(()=>{});
-    setFacDatos({});
-    fetch(`${API}/eval-facilitador/materia/${materia.id}`)
-      .then(r => r.json())
-      .then(d => {
-        if (!Array.isArray(d)) return;
-        const m = {};
-        d.forEach(ev => { m[ev.cursante_id] = { promedio: Number(ev.promedio), ponderaje: Number(ev.ponderaje) }; });
-        setFacDatos(m);
-      }).catch(() => {});
+      }
+      if (Array.isArray(fac)) {
+        const mf = {};
+        fac.forEach(ev => { mf[ev.cursante_id] = { promedio: Number(ev.promedio), ponderaje: Number(ev.ponderaje) }; });
+        setFacDatos(mf);
+      }
+    }).finally(() => setLoading(false));
   }, [materia?.id]);
 
-  useEffect(() => {
-    if (participantes.length && !loadingEvals) {
-      setNotas(prev => {
-        const n = {...prev};
-        participantes.forEach(p => {
-          if (!n[p.id]) n[p.id] = Object.fromEntries(activeEvals.map(ev=>[ev.nombre,0]));
-        });
-        return n;
-      });
-    }
-  }, [participantes, loadingEvals]); // eslint-disable-line
-
-  const getNotaEval = (uid, evNombre) => {
-    if (esTareaEval(evNombre)) return notasTarea[uid] ?? 0;
-    return notas[uid]?.[evNombre] ?? 0;
+  // Busca el id del indicador en el catálogo del servidor
+  const getIndicadorId = (dim, codigo, nombre) => {
+    const ind = indicadores.find(i =>
+      i.dimension === dim && i.codigo === codigo &&
+      i.nombre.toLowerCase().trim() === nombre.toLowerCase().trim()
+    ) || indicadores.find(i => i.dimension === dim && i.codigo === codigo);
+    return ind?.id ?? `${dim}_${codigo}`;
   };
 
-  // Promedio = contribución directa al 90% (escala 0-90)
-  // exam=100, tarea=0 → 100*70/100 = 70 | exam=100, tarea=100 → 90
-  const prom = uid => {
-    let sn = 0;
-    activeEvals.forEach(ev => { sn += getNotaEval(uid, ev.nombre) * Number(ev.peso); });
-    return sn / 100;
+  const getNota = (uid, indId) => Number(notas[uid]?.[indId] ?? 0);
+
+  const setNota = (uid, indId, val) => {
+    setNotas(prev => ({
+      ...prev,
+      [uid]: { ...prev[uid], [indId]: Math.min(100, Math.max(0, Number(val) || 0)) }
+    }));
   };
+
+  // Promedio de una dimensión para un cursante (0-100)
+  const promDim = (uid, dim) => {
+    const inds = indicadores.filter(i => i.dimension === dim);
+    if (!inds.length) return 0;
+    return inds.reduce((a, i) => a + getNota(uid, i.id), 0) / inds.length;
+  };
+
+  // Aporte de la dimensión a los 90 pts
+  const aporteDim = (uid, dim) => {
+    const cfg = SHD_CONFIG.find(c => c.dim === dim);
+    return promDim(uid, dim) * (cfg?.peso ?? 0) / 100;
+  };
+
+  // Total catedrático (SABER+HACER+DECIDIR) → 0-90
+  const promCatedratico = uid =>
+    aporteDim(uid, "SABER") + aporteDim(uid, "HACER") + aporteDim(uid, "DECIDIR");
 
   const getFacPonderaje = uid => facDatos[uid]?.ponderaje != null ? Number(facDatos[uid].ponderaje) : null;
   const getFacPromedio  = uid => facDatos[uid]?.promedio  != null ? Number(facDatos[uid].promedio)  : null;
-  // Total catedrático + facilitador (las otras componentes se gestionan en otro módulo)
-  const promTotal = uid => prom(uid) + (getFacPonderaje(uid) ?? 0);
 
-  // Guardar y bloquear notas de UN cursante
-  const guardarUsuario = async (uid) => {
-    setSaving(p=>({...p,[uid]:true}));
-    try {
-      const notasCompletas = {...notas[uid]};
-      activeEvals.forEach(ev => {
-        if (esTareaEval(ev.nombre)) notasCompletas[ev.nombre] = getNotaEval(uid, ev.nombre);
-      });
-      const r = await fetch(`${API}/calificaciones/usuario`, {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({
-          curso_id: materia.curso_id,
-          materia_id: materia.id,
-          usuario_id: uid,
-          notas: notasCompletas,
-          bloquear: true
-        })
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.message);
-      setBloqueados(p=>({...p,[uid]:true}));
-      showToast("✅ Calificaciones registradas y bloqueadas");
-    } catch(e) { showToast(`❌ ${e.message}`, "error"); }
-    finally { setSaving(p=>({...p,[uid]:false})); setConfirmUid(null); }
+  const postNotas = async (uid, bloquear) => {
+    const r = await fetch(`${API}/shd/notas/usuario`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        curso_id:   materia.curso_id,
+        materia_id: materia.id,
+        usuario_id: uid,
+        notas:      notas[uid] || {},
+        bloquear,
+      }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.message);
+    return d;
   };
 
-  const min = 63; // umbral aprobatorio del catedrático: 70% de los 90pts = 63
-  const conTareas = Object.values(notasTarea).length;
-  const confirmParticipante = participantes.find(p=>p.id===confirmUid);
+  // Guardar borrador (sin bloquear) — disponible en cualquier tab
+  const guardarBorrador = async (uid) => {
+    setSavingBorrador(p => ({ ...p, [uid]: true }));
+    try {
+      await postNotas(uid, false);
+      showToast("💾 Borrador guardado");
+    } catch(e) { showToast(`❌ ${e.message}`, "error"); }
+    finally { setSavingBorrador(p => ({ ...p, [uid]: false })); }
+  };
+
+  // Guardar y bloquear — acción definitiva desde el modal de confirmación
+  const guardarUsuario = async (uid) => {
+    setSaving(p => ({ ...p, [uid]: true }));
+    try {
+      await postNotas(uid, true);
+      setBloqueados(p => ({ ...p, [uid]: true }));
+      showToast("✅ Calificaciones registradas y bloqueadas");
+    } catch(e) { showToast(`❌ ${e.message}`, "error"); }
+    finally { setSaving(p => ({ ...p, [uid]: false })); setConfirmUid(null); }
+  };
+
+  const MIN_APRO = 63; // 70% de 90 pts
+  const confirmParticipante = participantes.find(p => p.id === confirmUid);
   const totalBloqueados = Object.keys(bloqueados).length;
+  const dimCfg = SHD_CONFIG.find(c => c.dim === dimActiva);
 
   return (
     <div>
-      {/* ── Modal confirmación por cursante ── */}
+      {/* ── Modal confirmación ── */}
       {confirmUid && confirmParticipante && (
         <div style={{
           position:"fixed", inset:0, background:"rgba(0,0,0,0.6)",
@@ -279,7 +294,7 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
         }}>
           <div style={{
             background:"#fff", borderRadius:20, padding:"36px 40px",
-            maxWidth:460, width:"92%", boxShadow:"0 24px 80px rgba(0,0,0,0.28)",
+            maxWidth:480, width:"92%", boxShadow:"0 24px 80px rgba(0,0,0,0.28)",
             display:"flex", flexDirection:"column", alignItems:"center", gap:18, textAlign:"center"
           }}>
             <div style={{fontSize:52}}>🔒</div>
@@ -300,28 +315,24 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
                 {confirmParticipante.ap_paterno} {confirmParticipante.ap_materno}, {confirmParticipante.nombre}
               </div>
             </div>
-
-            {/* Resumen del cursante */}
             <div style={{
               width:"100%", background:"#f7f9fc", borderRadius:12,
               padding:"14px 18px", textAlign:"left", border:"1.5px solid #eef2f7"
             }}>
-              {activeEvals.map(ev => {
-                const nota = getNotaEval(confirmUid, ev.nombre);
-                const esAuto = esTareaEval(ev.nombre);
+              {SHD_CONFIG.map(cfg => {
+                const pr = promDim(confirmUid, cfg.dim);
+                const ap = aporteDim(confirmUid, cfg.dim);
                 return (
-                  <div key={ev.nombre} style={{
+                  <div key={cfg.dim} style={{
                     display:"flex", justifyContent:"space-between",
-                    padding:"5px 0", borderBottom:"1px solid #f0f4f8", fontSize:13
+                    padding:"6px 0", borderBottom:"1px solid #f0f4f8", fontSize:13
                   }}>
                     <span style={{color:"#5a6a80"}}>
-                      {ev.nombre} <span style={{fontSize:11, color:"#aaa"}}>({ev.peso}%)</span>
-                      {esAuto && <span style={{marginLeft:4}}>🔄</span>}
+                      {cfg.dim} <span style={{fontSize:11,color:"#aaa"}}>({cfg.peso} pts)</span>
                     </span>
-                    <span style={{
-                      fontFamily:"'IBM Plex Mono',monospace", fontWeight:800,
-                      color: nota >= min ? "#2e7d32" : "#c62828"
-                    }}>{nota.toFixed(1)}</span>
+                    <span style={{fontFamily:"'IBM Plex Mono',monospace",fontWeight:800,color:cfg.color}}>
+                      {pr.toFixed(1)}/100 → {ap.toFixed(1)} pts
+                    </span>
                   </div>
                 );
               })}
@@ -329,26 +340,23 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
                 display:"flex", justifyContent:"space-between",
                 paddingTop:10, marginTop:4, fontSize:14, fontWeight:700
               }}>
-                <span style={{color:"#003366"}}>Promedio final</span>
+                <span style={{color:"#003366"}}>Total catedrático</span>
                 <span style={{
                   fontFamily:"'IBM Plex Mono',monospace", fontSize:18,
-                  color: prom(confirmUid) >= min ? "#2e7d32" : "#c62828"
-                }}>{prom(confirmUid).toFixed(1)}</span>
+                  color: promCatedratico(confirmUid) >= MIN_APRO ? "#2e7d32" : "#c62828"
+                }}>{promCatedratico(confirmUid).toFixed(1)} / 90</span>
               </div>
             </div>
-
-            {/* Advertencia */}
             <div style={{
               background:"#fff8e1", border:"2px solid #ffe082", borderRadius:10,
               padding:"12px 16px", fontSize:13, color:"#b45309",
               lineHeight:1.6, width:"100%", textAlign:"left"
             }}>
               ⚠️ <strong>Esta acción es permanente.</strong> Las notas quedarán
-              bloqueadas en el sistema. Para modificarlas deberá contactar al Jefe de Estudios.
+              bloqueadas en el sistema.
             </div>
-
             <div style={{display:"flex", gap:10, width:"100%"}}>
-              <button onClick={()=>guardarUsuario(confirmUid)} disabled={saving[confirmUid]} style={{
+              <button onClick={() => guardarUsuario(confirmUid)} disabled={saving[confirmUid]} style={{
                 flex:1, padding:"12px 0", background:"#003366", color:"#fff",
                 border:"none", borderRadius:10, fontSize:14, fontWeight:700,
                 cursor:saving[confirmUid]?"not-allowed":"pointer",
@@ -356,7 +364,7 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
               }}>
                 {saving[confirmUid] ? "⏳ Guardando..." : "✅ Confirmar y bloquear"}
               </button>
-              <button onClick={()=>setConfirmUid(null)} style={{
+              <button onClick={() => setConfirmUid(null)} style={{
                 flex:1, padding:"12px 0", background:"transparent", color:"#5a6a80",
                 border:"2px solid #e8ecf2", borderRadius:10, fontSize:13.5,
                 fontWeight:600, cursor:"pointer", fontFamily:"inherit"
@@ -366,175 +374,292 @@ function VistaCalificaciones({ materia, participantes, showToast }) {
         </div>
       )}
 
-      {/* Banner fijo — pesos del sistema */}
+      {/* Banner pesos */}
       <div style={{
         display:"flex", flexWrap:"wrap", gap:8, marginBottom:16,
         background:"#f0f4ff", borderRadius:10, padding:"10px 16px",
         fontSize:12, color:"#003366", border:"1.5px solid #c5cae9"
       }}>
         <span style={{fontWeight:700, marginRight:4}}>Sistema de calificación:</span>
-        <span style={{background:"#003366",color:"#fff",padding:"2px 10px",borderRadius:20}}>📝 Catedrático <strong>90%</strong> <span style={{opacity:.75,fontSize:11}}>(Examen 70% + Tarea 20%)</span></span>
-        <span style={{background:"#ff6600",color:"#fff",padding:"2px 10px",borderRadius:20}}>🎯 Facilitador <strong>2.5%</strong></span>
-        <span style={{background:"#1565c0",color:"#fff",padding:"2px 10px",borderRadius:20}}>👥 Cursantes <strong>5%</strong></span>
-        <span style={{background:"#2e7d32",color:"#fff",padding:"2px 10px",borderRadius:20}}>⚖️ Disciplina <strong>2.5%</strong></span>
+        <span style={{background:"#1565c0",color:"#fff",padding:"2px 10px",borderRadius:20}}>
+          📘 SABER <strong>30 pts</strong>
+        </span>
+        <span style={{background:"#6a1b9a",color:"#fff",padding:"2px 10px",borderRadius:20}}>
+          ✋ HACER <strong>40 pts</strong>
+        </span>
+        <span style={{background:"#2e7d32",color:"#fff",padding:"2px 10px",borderRadius:20}}>
+          🧠 DECIDIR <strong>20 pts</strong>
+        </span>
+        <span style={{background:"#ff6600",color:"#fff",padding:"2px 10px",borderRadius:20}}>
+          🎯 Facilitador <strong>2.5 pts</strong>
+        </span>
+        <span style={{background:"#1565c0",color:"#fff",padding:"2px 10px",borderRadius:20,opacity:.7}}>
+          👥 Cursantes <strong>5 pts</strong>
+        </span>
+        <span style={{background:"#2e7d32",color:"#fff",padding:"2px 10px",borderRadius:20,opacity:.7}}>
+          ⚖️ Disciplina <strong>2.5 pts</strong>
+        </span>
       </div>
 
-      {loadingEvals ? (
+      {totalBloqueados > 0 && (
+        <div style={{
+          display:"flex", alignItems:"center", gap:8,
+          background:"#f3e5f5", border:"1.5px solid #ce93d8",
+          borderRadius:10, padding:"9px 16px", marginBottom:14, fontSize:13, color:"#6a1b9a"
+        }}>
+          🔒 <strong>{totalBloqueados}</strong> de {participantes.length} cursantes con calificaciones bloqueadas.
+        </div>
+      )}
+
+      {loading ? (
         <div className="doc-spinner"><div className="spin-ring"/></div>
       ) : (<>
-        {/* Info tareas automáticas */}
-        {activeEvals.some(ev => esTareaEval(ev.nombre)) && (
-          <div style={{
-            display:"flex", alignItems:"center", gap:10,
-            background:"#e3f2fd", border:"1.5px solid #90caf9",
-            borderRadius:10, padding:"10px 16px", marginBottom:14,
-            fontSize:13, color:"#1565c0"
+        {/* Tabs de dimensiones */}
+        <div style={{display:"flex", gap:6, marginBottom:16, flexWrap:"wrap"}}>
+          {SHD_CONFIG.map(cfg => (
+            <button key={cfg.dim} onClick={() => setDimActiva(cfg.dim)} style={{
+              padding:"8px 20px", borderRadius:8, border:"2px solid",
+              borderColor: dimActiva === cfg.dim ? cfg.color : "#e0e0e0",
+              background: dimActiva === cfg.dim ? cfg.color : "#fff",
+              color: dimActiva === cfg.dim ? "#fff" : "#555",
+              fontWeight:700, cursor:"pointer", fontSize:13, fontFamily:"inherit",
+              transition:"all .15s"
+            }}>
+              {cfg.dim === "SABER" ? "📘" : cfg.dim === "HACER" ? "✋" : "🧠"} {cfg.dim} / {cfg.peso} pts
+            </button>
+          ))}
+          <button onClick={() => setDimActiva("RESUMEN")} style={{
+            padding:"8px 20px", borderRadius:8, border:"2px solid",
+            borderColor: dimActiva === "RESUMEN" ? "#e65100" : "#e0e0e0",
+            background: dimActiva === "RESUMEN" ? "#e65100" : "#fff",
+            color: dimActiva === "RESUMEN" ? "#fff" : "#555",
+            fontWeight:700, cursor:"pointer", fontSize:13, fontFamily:"inherit",
+            marginLeft:"auto"
           }}>
-            <span style={{fontSize:18}}>📊</span>
-            <span>
-              Las columnas <strong>Trabajo / Tarea / Práctica</strong> se calculan automáticamente
-              como promedio de tareas calificadas
-              ({conTareas>0 ? `${conTareas} cursante${conTareas>1?"s":""} con tareas calificadas` : "sin tareas calificadas aún"}).
-            </span>
-          </div>
-        )}
-
-        {/* Resumen bloqueados */}
-        {totalBloqueados > 0 && (
-          <div style={{
-            display:"flex", alignItems:"center", gap:8,
-            background:"#f3e5f5", border:"1.5px solid #ce93d8",
-            borderRadius:10, padding:"9px 16px", marginBottom:14,
-            fontSize:13, color:"#6a1b9a"
-          }}>
-            🔒 <strong>{totalBloqueados}</strong> de {participantes.length} cursantes con calificaciones bloqueadas.
-          </div>
-        )}
-
-        <div className="doc-table-wrap" style={{overflowX:"auto"}}>
-          <table className="doc-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Participante</th>
-                <th>CI</th>
-                {activeEvals.map(ev => (
-                  <th key={ev.nombre} style={{textAlign:"center"}}>
-                    {ev.nombre}
-                    {esTareaEval(ev.nombre) && <span title="Auto" style={{marginLeft:3}}>🔄</span>}
-                    <br/>
-                    <span style={{fontSize:10,color:"#aaa",fontWeight:400}}>{ev.peso}%</span>
-                  </th>
-                ))}
-                <th style={{textAlign:"center", background:"#fff3e0", color:"#e65100"}}>
-                  🎯 Facilitador<br/><span style={{fontSize:10,fontWeight:400}}>(/ 2.5 pts)</span>
-                </th>
-                <th style={{textAlign:"center"}}>Promedio</th>
-                <th style={{textAlign:"center"}}>Estado</th>
-                <th style={{textAlign:"center"}}>Acción</th>
-              </tr>
-            </thead>
-            <tbody>
-              {participantes.map((p, i) => {
-                const pr      = prom(p.id);
-                const ap      = pr >= min;
-                const locked  = bloqueados[p.id] || false;
-                const isSaving = saving[p.id] || false;
-                return (
-                  <tr key={p.id} style={{background: locked ? "#fafffe" : undefined}}>
-                    <td className="muted">{i+1}</td>
-                    <td className="bold">{p.ap_paterno} {p.ap_materno}, {p.nombre}</td>
-                    <td className="muted">{p.ci}</td>
-                    {activeEvals.map(ev => {
-                      const nota   = getNotaEval(p.id, ev.nombre);
-                      const esAuto = esTareaEval(ev.nombre);
-                      return (
-                        <td key={ev.nombre} style={{textAlign:"center"}}>
-                          {esAuto ? (
-                            <div style={{
-                              display:"inline-flex", alignItems:"center", justifyContent:"center",
-                              minWidth:60, padding:"6px 10px",
-                              background: nota>=min ? "#e8f5e9" : "#fff3e0",
-                              border:`2px solid ${nota>=min ? "#a5d6a7" : "#ffcc80"}`,
-                              borderRadius:8, fontWeight:700,
-                              fontFamily:"'IBM Plex Mono',monospace",
-                              color: nota>=min ? "#2e7d32" : "#e65100",
-                              fontSize:14
-                            }}>🔄 {nota.toFixed(1)}</div>
-                          ) : locked ? (
-                            <div style={{
-                              display:"inline-flex", alignItems:"center", justifyContent:"center",
-                              minWidth:60, padding:"6px 10px",
-                              background:"#f5f5f5", border:"2px solid #e0e0e0",
-                              borderRadius:8, fontWeight:700,
-                              fontFamily:"'IBM Plex Mono',monospace",
-                              color: nota>=min ? "#2e7d32" : "#c62828",
-                              fontSize:14
-                            }}>🔒 {nota.toFixed(1)}</div>
-                          ) : (
-                            <input
-                              type="number" min="0" max="100"
-                              className={`nota-input ${nota>=min?"nota-ap":"nota-rp"}`}
-                              value={nota}
-                              onChange={e => setNotas(prev=>({
-                                ...prev,
-                                [p.id]:{...prev[p.id],[ev.nombre]:Math.min(100,Math.max(0,Number(e.target.value)||0))}
-                              }))}
-                            />
-                          )}
-                        </td>
-                      );
-                    })}
-                    <td style={{textAlign:"center"}}>
-                      {(() => {
-                        const fac = getFacPonderaje(p.id);
-                        const facPr = getFacPromedio(p.id);
-                        if (fac === null) return <span style={{color:"#9e9e9e", fontSize:12}}>—</span>;
-                        return (
-                          <div style={{display:"flex", flexDirection:"column", alignItems:"center", gap:2}}>
-                            <strong style={{
-                              fontFamily:"'IBM Plex Mono',monospace", fontSize:14,
-                              color: fac >= 1.75 ? "#2e7d32" : fac >= 1.25 ? "#e65100" : "#c62828"
-                            }}>{fac.toFixed(2)}</strong>
-                            {facPr !== null && <span style={{fontSize:10, color:"#888"}}>({facPr.toFixed(1)}/10)</span>}
-                          </div>
-                        );
-                      })()}
-                    </td>
-                    <td style={{textAlign:"center"}}>
-                      <strong style={{
-                        color: ap?"#2e7d32":"#c62828",
-                        fontFamily:"'IBM Plex Mono',monospace", fontSize:15
-                      }}>{promTotal(p.id).toFixed(1)}</strong>
-                    </td>
-                    <td style={{textAlign:"center"}}>
-                      <span className={`badge ${ap?"badge-pres":"badge-aus"}`}>
-                        {ap?"Aprobado":"Reprobado"}
-                      </span>
-                    </td>
-                    <td style={{textAlign:"center"}}>
-                      {locked ? (
-                        <span style={{
-                          fontSize:12, color:"#9c27b0", fontWeight:700,
-                          display:"inline-flex", alignItems:"center", gap:4
-                        }}>🔒 Bloqueado</span>
-                      ) : (
-                        <button
-                          className="btn-sm btn-cal"
-                          disabled={isSaving}
-                          onClick={() => setConfirmUid(p.id)}
-                          style={{whiteSpace:"nowrap"}}
-                        >
-                          {isSaving ? "⏳..." : "💾 Guardar"}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+            📊 Resumen
+          </button>
         </div>
+
+        {/* ── TABLA POR DIMENSIÓN ── */}
+        {dimActiva !== "RESUMEN" && dimCfg && (
+          <div className="doc-table-wrap" style={{overflowX:"auto"}}>
+            <table className="doc-table">
+              <thead>
+                <tr>
+                  <th rowSpan={2}>#</th>
+                  <th rowSpan={2}>Participante</th>
+                  <th rowSpan={2}>CI</th>
+                  {dimCfg.secciones.map(sec => (
+                    <th key={sec.nombre}
+                      colSpan={sec.indicadores.length}
+                      style={{textAlign:"center", background:dimCfg.bg, color:dimCfg.color, fontWeight:800, borderBottom:"1px solid "+dimCfg.border}}>
+                      {sec.nombre}
+                    </th>
+                  ))}
+                  <th rowSpan={2} style={{textAlign:"center",background:dimCfg.bg,color:dimCfg.color}}>
+                    Prom<br/><span style={{fontSize:10,fontWeight:400}}>(0-100)</span>
+                  </th>
+                  <th rowSpan={2} style={{textAlign:"center",background:dimCfg.bg,color:dimCfg.color}}>
+                    Aporte<br/><span style={{fontSize:10,fontWeight:400}}>/{dimCfg.peso} pts</span>
+                  </th>
+                  <th rowSpan={2} style={{textAlign:"center"}}>Acción</th>
+                </tr>
+                <tr>
+                  {dimCfg.secciones.flatMap(sec =>
+                    sec.indicadores.map(ind => {
+                      const indId = getIndicadorId(dimCfg.dim, ind.codigo, ind.nombre);
+                      return (
+                        <th key={indId} style={{
+                          textAlign:"center", minWidth:60, maxWidth:80,
+                          fontWeight:600, fontSize:11, color:"#444", background:"#fafafa"
+                        }} title={ind.nombre}>
+                          {ind.codigo.toUpperCase()}
+                          <div style={{fontSize:9,fontWeight:400,color:"#888",whiteSpace:"normal",maxWidth:70,margin:"0 auto"}}>
+                            {ind.nombre.length > 22 ? ind.nombre.slice(0,20)+"…" : ind.nombre}
+                          </div>
+                        </th>
+                      );
+                    })
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {participantes.map((p, i) => {
+                  const locked  = bloqueados[p.id] || false;
+                  const isSaving = saving[p.id] || false;
+                  const pd = promDim(p.id, dimCfg.dim);
+                  const ad = aporteDim(p.id, dimCfg.dim);
+                  return (
+                    <tr key={p.id} style={{background: locked ? "#fafffe" : undefined}}>
+                      <td className="muted">{i+1}</td>
+                      <td className="bold">{p.ap_paterno} {p.ap_materno}, {p.nombre}</td>
+                      <td className="muted">{p.ci}</td>
+                      {dimCfg.secciones.flatMap(sec =>
+                        sec.indicadores.map(ind => {
+                          const indId = getIndicadorId(dimCfg.dim, ind.codigo, ind.nombre);
+                          const nota = getNota(p.id, indId);
+                          return (
+                            <td key={indId} style={{textAlign:"center", padding:"4px"}}>
+                              {locked ? (
+                                <div style={{
+                                  display:"inline-flex",alignItems:"center",justifyContent:"center",
+                                  minWidth:50, padding:"5px 8px",
+                                  background:"#f5f5f5", border:"2px solid #e0e0e0",
+                                  borderRadius:7, fontWeight:700,
+                                  fontFamily:"'IBM Plex Mono',monospace",
+                                  color: nota>=70 ? "#2e7d32" : "#c62828", fontSize:13
+                                }}>🔒 {nota}</div>
+                              ) : (
+                                <input
+                                  type="number" min="0" max="100"
+                                  className={`nota-input ${nota>=70?"nota-ap":"nota-rp"}`}
+                                  style={{width:62}}
+                                  value={nota}
+                                  onChange={e => setNota(p.id, indId, e.target.value)}
+                                />
+                              )}
+                            </td>
+                          );
+                        })
+                      )}
+                      <td style={{textAlign:"center"}}>
+                        <strong style={{
+                          fontFamily:"'IBM Plex Mono',monospace", fontSize:14,
+                          color: pd>=70 ? dimCfg.color : "#c62828"
+                        }}>{pd.toFixed(1)}</strong>
+                      </td>
+                      <td style={{textAlign:"center"}}>
+                        <strong style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:14,color:dimCfg.color}}>
+                          {ad.toFixed(1)}
+                        </strong>
+                      </td>
+                      <td style={{textAlign:"center"}}>
+                        {locked ? (
+                          <span style={{fontSize:12,color:"#9c27b0",fontWeight:700}}>🔒 Bloqueado</span>
+                        ) : (
+                          <button
+                            className="btn-sm btn-cal"
+                            disabled={savingBorrador[p.id]}
+                            onClick={() => guardarBorrador(p.id)}
+                            style={{whiteSpace:"nowrap", background:"#e3f2fd", color:"#1565c0", border:"1.5px solid #90caf9"}}
+                          >
+                            {savingBorrador[p.id] ? "⏳..." : "💾 Borrador"}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* ── TABLA RESUMEN ── */}
+        {dimActiva === "RESUMEN" && (
+          <div className="doc-table-wrap" style={{overflowX:"auto"}}>
+            <table className="doc-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Participante</th>
+                  <th>CI</th>
+                  <th style={{textAlign:"center",background:"#e3f2fd",color:"#1565c0"}}>
+                    📘 SABER<br/><span style={{fontSize:10,fontWeight:400}}>/30</span>
+                  </th>
+                  <th style={{textAlign:"center",background:"#f3e5f5",color:"#6a1b9a"}}>
+                    ✋ HACER<br/><span style={{fontSize:10,fontWeight:400}}>/40</span>
+                  </th>
+                  <th style={{textAlign:"center",background:"#e8f5e9",color:"#2e7d32"}}>
+                    🧠 DECIDIR<br/><span style={{fontSize:10,fontWeight:400}}>/20</span>
+                  </th>
+                  <th style={{textAlign:"center",background:"#fff3e0",color:"#e65100"}}>
+                    🎯 Facilitador<br/><span style={{fontSize:10,fontWeight:400}}>/2.5</span>
+                  </th>
+                  <th style={{textAlign:"center"}}>Total<br/><span style={{fontSize:10,fontWeight:400}}>/92.5</span></th>
+                  <th style={{textAlign:"center"}}>Estado</th>
+                  <th style={{textAlign:"center"}}>Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                {participantes.map((p, i) => {
+                  const locked   = bloqueados[p.id] || false;
+                  const isSaving = saving[p.id] || false;
+                  const saber    = aporteDim(p.id, "SABER");
+                  const hacer    = aporteDim(p.id, "HACER");
+                  const decidir  = aporteDim(p.id, "DECIDIR");
+                  const cat      = saber + hacer + decidir;
+                  const facPon   = getFacPonderaje(p.id);
+                  const facPr    = getFacPromedio(p.id);
+                  const total    = cat + (facPon ?? 0);
+                  const aprobado = cat >= MIN_APRO;
+                  return (
+                    <tr key={p.id} style={{background: locked ? "#fafffe" : undefined}}>
+                      <td className="muted">{i+1}</td>
+                      <td className="bold">{p.ap_paterno} {p.ap_materno}, {p.nombre}</td>
+                      <td className="muted">{p.ci}</td>
+                      <td style={{textAlign:"center"}}>
+                        <strong style={{fontFamily:"'IBM Plex Mono',monospace",color:"#1565c0"}}>{saber.toFixed(1)}</strong>
+                      </td>
+                      <td style={{textAlign:"center"}}>
+                        <strong style={{fontFamily:"'IBM Plex Mono',monospace",color:"#6a1b9a"}}>{hacer.toFixed(1)}</strong>
+                      </td>
+                      <td style={{textAlign:"center"}}>
+                        <strong style={{fontFamily:"'IBM Plex Mono',monospace",color:"#2e7d32"}}>{decidir.toFixed(1)}</strong>
+                      </td>
+                      <td style={{textAlign:"center"}}>
+                        {facPon === null
+                          ? <span style={{color:"#9e9e9e",fontSize:12}}>—</span>
+                          : <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                              <strong style={{fontFamily:"'IBM Plex Mono',monospace",fontSize:14,color:"#e65100"}}>{facPon.toFixed(2)}</strong>
+                              {facPr !== null && <span style={{fontSize:10,color:"#888"}}>({facPr.toFixed(1)}/10)</span>}
+                            </div>
+                        }
+                      </td>
+                      <td style={{textAlign:"center"}}>
+                        <strong style={{
+                          color: aprobado?"#2e7d32":"#c62828",
+                          fontFamily:"'IBM Plex Mono',monospace", fontSize:15
+                        }}>{total.toFixed(1)}</strong>
+                      </td>
+                      <td style={{textAlign:"center"}}>
+                        <span className={`badge ${aprobado?"badge-pres":"badge-aus"}`}>
+                          {aprobado?"Aprobado":"Reprobado"}
+                        </span>
+                      </td>
+                      <td style={{textAlign:"center"}}>
+                        {locked ? (
+                          <span style={{fontSize:12,color:"#9c27b0",fontWeight:700,display:"inline-flex",alignItems:"center",gap:4}}>
+                            🔒 Bloqueado
+                          </span>
+                        ) : (
+                          <div style={{display:"flex",flexDirection:"column",gap:5,alignItems:"center"}}>
+                            <button
+                              className="btn-sm btn-cal"
+                              disabled={savingBorrador[p.id]}
+                              onClick={() => guardarBorrador(p.id)}
+                              style={{whiteSpace:"nowrap",background:"#e3f2fd",color:"#1565c0",border:"1.5px solid #90caf9",width:"100%"}}
+                            >
+                              {savingBorrador[p.id] ? "⏳..." : "💾 Borrador"}
+                            </button>
+                            <button
+                              className="btn-sm btn-cal"
+                              disabled={isSaving}
+                              onClick={() => setConfirmUid(p.id)}
+                              style={{whiteSpace:"nowrap",width:"100%"}}
+                            >
+                              {isSaving ? "⏳..." : "🔒 Bloquear"}
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </>)}
     </div>
   );
@@ -1102,7 +1227,7 @@ export default function DashboardDocente() {
       .then(r => r.json())
       .then(async cursos => {
         if (!Array.isArray(cursos)) return;
-        setTodosLosCursos(cursos);  // guardar todos para el calendario
+        setTodosLosCursos(cursos);
         const todas = [];
         for (const c of cursos) {
           const mr = await fetch(`${API}/cursos/${c.id}/materias`);

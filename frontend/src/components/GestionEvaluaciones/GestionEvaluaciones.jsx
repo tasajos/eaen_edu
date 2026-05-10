@@ -9,14 +9,22 @@ function fmtFecha(f){ if(!f) return "—"; return new Date(f).toLocaleDateString
 function Spinner(){ return <div className="gev-spinner"><div className="gev-ring"/></div>; }
 
 /* ── MODAL Habilitar evaluación ─────────────────────────── */
-function ModalHabilitar({ plantillas, cursos, materias, onClose, onCreated }){
+function ModalHabilitar({ plantillas: plantillasProps, cursos, materias, onClose, onCreated }){
   const session = getSession();
   const [form, setForm] = useState({ plantilla_id:"", curso_id:"", materia_id:"", titulo:"", fecha_fin:"" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [plantillas, setPlantillas] = useState(plantillasProps || []);
+
+  // Carga plantillas frescas al abrir (dispara el seed en el backend si la tabla estaba vacía)
+  useEffect(() => {
+    fetch(`${API}/eval-inst/plantillas`).then(r => r.json())
+      .then(d => { if(Array.isArray(d) && d.length) setPlantillas(d); })
+      .catch(() => {});
+  }, []);
 
   const plantilla = plantillas.find(p => p.id === Number(form.plantilla_id));
-  const necesitaMateria = !!plantilla; // toda evaluación institucional requiere materia
+  const necesitaMateria = !!plantilla;
   const materiasDelCurso = materias.filter(m => m.curso_id === Number(form.curso_id));
 
   const crear = async () => {

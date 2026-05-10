@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useNotificaciones } from "../../../hooks/useNotificaciones";
 import { NotificacionesPanel, NotifBell } from "../../Shared/NotificacionesPanel";
@@ -106,6 +106,11 @@ function resumenComponentes(final) {
     cursantes,
     disciplina,
     acumulado: Number(acumulado.toFixed(2)),
+    // SHD (si el backend usa el sistema nuevo)
+    usaSHD: !!final.prom_saber || !!final.prom_hacer || !!final.prom_decidir,
+    saber:   final.prom_saber   != null ? Number(final.prom_saber)   : null,
+    hacer:   final.prom_hacer   != null ? Number(final.prom_hacer)   : null,
+    decidir: final.prom_decidir != null ? Number(final.prom_decidir) : null,
   };
 }
 
@@ -127,10 +132,10 @@ function NotaAcademicaResumen({ notas, onVerDetalle }) {
         </span>
         {final && (
           <div className="nota-resumen-detalle">
-            Catedr�tico: {componentes.catedratico.toFixed(1)}
-            {componentes.facilitador !== null && ` � Facilitador: ${componentes.facilitador.toFixed(2)}`}
-            {componentes.cursantes !== null && ` � Cursantes: ${componentes.cursantes.toFixed(2)}`}
-            {componentes.disciplina !== null && ` � Disciplina: ${componentes.disciplina.toFixed(2)}`}
+            Docente: {componentes.catedratico.toFixed(1)}
+            {componentes.facilitador !== null && ` | Facilitador: ${componentes.facilitador.toFixed(2)}`}
+            {componentes.cursantes !== null && ` | Cursantes: ${componentes.cursantes.toFixed(2)}`}
+            {componentes.disciplina !== null && ` | Disciplina: ${componentes.disciplina.toFixed(2)}`}
           </div>
         )}
       </div>
@@ -405,6 +410,7 @@ export default function DashboardCursante() {
       calcularMiPromedioTareas(materiaId, session.id),
     ])
       .then(([calif, finalData, promedioTareas]) => {
+        const usaSHD = finalData?.usa_shd === true;
         const libro = Array.isArray(calif?.libro) ? calif.libro : [];
         const finales = Array.isArray(finalData?.resultado) ? finalData.resultado : [];
         const evaluaciones = Array.isArray(calif?.evaluaciones) ? calif.evaluaciones : [];
@@ -413,13 +419,18 @@ export default function DashboardCursante() {
         const notasMezcladas = mezclarNotaTarea(e?.notas || {}, evaluaciones, promedioTareas);
         const promedioEvaluaciones = calcularPromedioEvaluaciones(notasMezcladas, evaluaciones, e?.promedio || 0);
         const aporteFac = aporteFacilitador(final);
+
+        // Cuando se usa SHD el prom_catedratico ya viene calculado desde el backend;
+        // no se sobreescribe con el cálculo del sistema viejo (que daría 0).
+        const promCat = usaSHD ? Number(final?.prom_catedratico || 0) : promedioEvaluaciones;
+
         const notaFinalAjustada = final
           ? {
               ...final,
-              prom_catedratico: promedioEvaluaciones,
+              prom_catedratico: promCat,
               ponderaje_facilitador: aporteFac,
               nota_final: Number((
-                promedioEvaluaciones +
+                promCat +
                 (aporteFac ?? 0) +
                 (final.prom_cursantes ?? 0) * 0.05 +
                 (resumenComponentes(final)?.disciplina ?? 0)
@@ -432,7 +443,11 @@ export default function DashboardCursante() {
             : "reprobado";
         }
         const tieneNotas = Object.keys(notasMezcladas).length > 0;
-        const tienePromedioFinal = final && (Number(final.prom_catedratico || 0) > 0 || final.prom_facilitador !== null);
+        const tienePromedioFinal = final && (
+          Number(final.prom_catedratico || 0) > 0 ||
+          final.prom_facilitador !== null ||
+          usaSHD
+        );
 
         if (!tieneNotas && !tienePromedioFinal) {
           setNotas(null);
@@ -671,9 +686,33 @@ export default function DashboardCursante() {
                                     </div>
                                   </div>
 
+                                  {/* Desglose SHD si el sistema lo usa */}
+                                  {comp.usaSHD && (
+                                    <div className="nota-componentes nota-componentes-detalle" style={{marginBottom:10}}>
+                                      <div className="nota-component-card" style={{borderLeft:"4px solid #1565c0"}}>
+                                        <span style={{color:"#1565c0",fontWeight:700}}>📘 SABER (/30)</span>
+                                        <strong style={{color:"#1565c0"}}>
+                                          {comp.saber != null ? `${comp.saber.toFixed(1)}/100 → ${(comp.saber*0.30).toFixed(1)} pts` : "Pendiente"}
+                                        </strong>
+                                      </div>
+                                      <div className="nota-component-card" style={{borderLeft:"4px solid #6a1b9a"}}>
+                                        <span style={{color:"#6a1b9a",fontWeight:700}}>✋ HACER (/40)</span>
+                                        <strong style={{color:"#6a1b9a"}}>
+                                          {comp.hacer != null ? `${comp.hacer.toFixed(1)}/100 → ${(comp.hacer*0.40).toFixed(1)} pts` : "Pendiente"}
+                                        </strong>
+                                      </div>
+                                      <div className="nota-component-card" style={{borderLeft:"4px solid #2e7d32"}}>
+                                        <span style={{color:"#2e7d32",fontWeight:700}}>🧠 DECIDIR (/20)</span>
+                                        <strong style={{color:"#2e7d32"}}>
+                                          {comp.decidir != null ? `${comp.decidir.toFixed(1)}/100 → ${(comp.decidir*0.20).toFixed(1)} pts` : "Pendiente"}
+                                        </strong>
+                                      </div>
+                                    </div>
+                                  )}
+
                                   <div className="nota-componentes nota-componentes-detalle">
                                     <div className="nota-component-card">
-                                      <span>Catedratico (/90)</span>
+                                      <span>Catedrático (/90)</span>
                                       <strong>{comp.catedratico.toFixed(1)}</strong>
                                     </div>
                                     <div className="nota-component-card">
@@ -696,33 +735,121 @@ export default function DashboardCursante() {
                                 </>
                               );
                             })()}
-                            {/*
-                              <div className={`promedio-grande ${Number(notas.promedio) >= 70 ? "ap" : "rp"}`}>
-                                {Number(notas.promedio).toFixed(1)}
-                              </div>
-                              <div>
-                                <div className="promedio-label">Promedio final</div>
-                                <span className={`estado-badge ${notas.estado === "aprobado" ? "badge-ap" : "badge-rp"}`}>
-                                  {notas.estado === "aprobado" ? "✅ Aprobado" : "❌ Reprobado"}
-                                </span>
-                              </div>
-                            */}
-                            <div className="notas-grid">
-                              {(notas.evaluaciones || []).map(ev => {
-                                const n  = Object.prototype.hasOwnProperty.call(notas.notas || {}, ev.nombre)
-                                  ? notas.notas[ev.nombre]
-                                  : 0;
-                                const ap = n !== null && n >= Number(ev.nota_min_apro);
-                                return (
-                                  <div key={ev.nombre} className={`nota-card ${n === null ? "sin-nota" : ap ? "nota-ap" : "nota-rp"}`}>
-                                    <div className="nota-eval-name">{ev.nombre}</div>
-                                    <div className="nota-valor">{n !== null ? n : "—"}</div>
-                                    <div className="nota-peso">{ev.peso}% del total</div>
-                                    {n !== null && <div className="nota-estado">{ap ? "✓ Aprobado" : "✗ Reprobado"}</div>}
+                            {/* ── Tarjetas por componente ── */}
+                            {(() => {
+                              const fn = notas.notaFinal;
+                              if (!fn) return null;
+                              const pSaber   = fn.prom_saber   != null ? Number(fn.prom_saber)   : null;
+                              const pHacer   = fn.prom_hacer   != null ? Number(fn.prom_hacer)   : null;
+                              const pDecidir = fn.prom_decidir != null ? Number(fn.prom_decidir) : null;
+                              const usaSHD   = pSaber != null || pHacer != null || pDecidir != null;
+                              const pFac     = fn.prom_facilitador != null ? Number(fn.prom_facilitador) : null;
+                              const ponFac   = fn.ponderaje_facilitador != null ? Number(fn.ponderaje_facilitador) : null;
+                              const pCur     = fn.prom_cursantes != null ? Number(fn.prom_cursantes) : null;
+                              const ponDisc  = fn.ponderaje_disciplina != null ? Number(fn.ponderaje_disciplina) : null;
+                              const saldoDisc = fn.nota_disciplina != null ? Number(fn.nota_disciplina) : null;
+
+                              const Card = ({ titulo, subtitulo, valor, maximo, color, icon, estado, detalle }) => (
+                                <div style={{
+                                  border:`2px solid ${color}22`, borderLeft:`4px solid ${color}`,
+                                  borderRadius:12, padding:"14px 16px",
+                                  background: estado === "ap" ? `${color}08` : estado === "pend" ? "#fff9e6" : "#fff5f5",
+                                  display:"flex", flexDirection:"column", gap:6
+                                }}>
+                                  <div style={{fontSize:11, fontWeight:700, color, textTransform:"uppercase", letterSpacing:.5}}>
+                                    {icon} {titulo}
                                   </div>
-                                );
-                              })}
-                            </div>
+                                  {subtitulo && <div style={{fontSize:10, color:"#888"}}>{subtitulo}</div>}
+                                  <div style={{fontFamily:"'IBM Plex Mono',monospace", fontSize:22, fontWeight:800, color:
+                                    estado === "pend" ? "#e65100" : estado === "ap" ? color : "#c62828"
+                                  }}>
+                                    {valor != null ? valor : "—"}
+                                  </div>
+                                  {maximo && <div style={{fontSize:11, color:"#777"}}>de {maximo} pts</div>}
+                                  {detalle && <div style={{fontSize:11, color:"#555", marginTop:2}}>{detalle}</div>}
+                                  <div style={{fontSize:11, fontWeight:700,
+                                    color: estado === "pend" ? "#e65100" : estado === "ap" ? "#2e7d32" : "#c62828"
+                                  }}>
+                                    {estado === "pend" ? "⏳ Pendiente" : estado === "ap" ? "✓ Aprobado" : "✗ Sin datos"}
+                                  </div>
+                                </div>
+                              );
+
+                              return (
+                                <div style={{marginTop:16}}>
+                                  {/* DOCENTE */}
+                                  <div style={{fontSize:12, fontWeight:700, color:"#003366", marginBottom:8, marginTop:4, textTransform:"uppercase", letterSpacing:.5}}>
+                                    Evaluación del Docente
+                                  </div>
+                                  <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(160px, 1fr))", gap:10, marginBottom:16}}>
+                                    {usaSHD ? (<>
+                                      <Card
+                                        titulo="SABER" subtitulo="Resolución de Problemas + Expresión Escrita"
+                                        icon="📘" color="#1565c0"
+                                        valor={pSaber != null ? `${pSaber.toFixed(1)}/100` : null}
+                                        maximo="30"
+                                        detalle={pSaber != null ? `→ ${(pSaber * 0.30).toFixed(1)} pts` : null}
+                                        estado={pSaber != null ? "ap" : "pend"}
+                                      />
+                                      <Card
+                                        titulo="HACER" subtitulo="Expresión Oral"
+                                        icon="✋" color="#6a1b9a"
+                                        valor={pHacer != null ? `${pHacer.toFixed(1)}/100` : null}
+                                        maximo="40"
+                                        detalle={pHacer != null ? `→ ${(pHacer * 0.40).toFixed(1)} pts` : null}
+                                        estado={pHacer != null ? "ap" : "pend"}
+                                      />
+                                      <Card
+                                        titulo="DECIDIR" subtitulo="Actuación en Grupos + Toma de Decisiones"
+                                        icon="🧠" color="#2e7d32"
+                                        valor={pDecidir != null ? `${pDecidir.toFixed(1)}/100` : null}
+                                        maximo="20"
+                                        detalle={pDecidir != null ? `→ ${(pDecidir * 0.20).toFixed(1)} pts` : null}
+                                        estado={pDecidir != null ? "ap" : "pend"}
+                                      />
+                                    </>) : (
+                                      <Card
+                                        titulo="Docente" icon="📝" color="#003366"
+                                        valor={Number(fn.prom_catedratico || 0).toFixed(1)}
+                                        maximo="90"
+                                        estado={Number(fn.prom_catedratico || 0) > 0 ? "ap" : "pend"}
+                                      />
+                                    )}
+                                  </div>
+
+                                  {/* OTRAS EVALUACIONES */}
+                                  <div style={{fontSize:12, fontWeight:700, color:"#003366", marginBottom:8, textTransform:"uppercase", letterSpacing:.5}}>
+                                    Otras evaluaciones
+                                  </div>
+                                  <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(180px, 1fr))", gap:10}}>
+                                    <Card
+                                      titulo="Facilitador" subtitulo="Evaluado por el docente"
+                                      icon="🎯" color="#e65100"
+                                      valor={pFac != null ? `${(pFac / 10).toFixed(1)} / 10` : null}
+                                      maximo="2.5"
+                                      detalle={ponFac != null ? `→ ${ponFac.toFixed(2)} pts` : null}
+                                      estado={pFac != null ? "ap" : "pend"}
+                                    />
+                                    <Card
+                                      titulo="Cursante a Cursante" subtitulo="Evaluación entre pares"
+                                      icon="👥" color="#1565c0"
+                                      valor={pCur != null ? `${pCur.toFixed(1)} / 100` : null}
+                                      maximo="5"
+                                      detalle={pCur != null ? `→ ${(pCur * 0.05).toFixed(2)} pts` : null}
+                                      estado={pCur != null ? "ap" : "pend"}
+                                    />
+                                    <Card
+                                      titulo="Disciplina" subtitulo="Méritos y deméritos"
+                                      icon="⚖️" color="#2e7d32"
+                                      valor={saldoDisc != null ? `${saldoDisc > 0 ? "+" : ""}${saldoDisc.toFixed(1)} pts` : null}
+                                      maximo="2.5"
+                                      detalle={ponDisc != null ? `→ ${ponDisc.toFixed(2)} pts` : null}
+                                      estado={saldoDisc != null ? "ap" : "pend"}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
                     )}
 
