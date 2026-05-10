@@ -1214,6 +1214,7 @@ export default function DashboardDocente() {
   const [loading,       setLoading]       = useState(true);
   const [vista,         setVista]         = useState("asistencia");
   const [toast,         setToast]         = useState(null);
+  const [sidebarOpen,   setSidebarOpen]   = useState(false);
 
   const { notifs, noLeidas, loading: loadingNotifs, marcarLeida, marcarTodasLeidas } = useNotificaciones(30);
 
@@ -1273,8 +1274,15 @@ export default function DashboardDocente() {
 
   return (
     <div className="doc-page">
-      {/* Sidebar */}
-      <aside className="doc-sidebar">
+      <div className="mobile-topbar">
+        <button className="mobile-topbar-btn" onClick={() => setSidebarOpen(o => !o)} aria-label="Menú">☰</button>
+        <span className="mobile-topbar-title">EAEN Avaroa</span>
+        <button className="mobile-topbar-btn mobile-logout" onClick={() => { localStorage.removeItem("eaen_session"); navigate("/", { replace: true }); }} aria-label="Cerrar sesión">🚪 Cerrar sesión</button>
+      </div>
+      {sidebarOpen && (
+        <div className="sidebar-overlay open" onClick={() => setSidebarOpen(false)} />
+      )}
+      <aside className={`doc-sidebar${sidebarOpen ? " open" : ""}`}>
         <div className="sidebar-brand">
           <div style={{
             width:48, height:48, flexShrink:0,

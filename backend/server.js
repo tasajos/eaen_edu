@@ -1918,6 +1918,13 @@ app.get("/api/disciplina/historial/:cursoId/:usuarioId", async (req, res) => {
   try {
     const { cursoId, usuarioId } = req.params;
     const materiaId = req.query.materia_id ? Number(req.query.materia_id) : null;
+
+    // Cuando materia_id no se provee, muestra todos los registros del curso
+    const whereMateria = materiaId ? "AND dr.materia_id = ?" : "";
+    const params = materiaId
+      ? [cursoId, usuarioId, materiaId]
+      : [cursoId, usuarioId];
+
     try {
       const [rows] = await pool.query(
         `SELECT dr.id, dr.tipo, dr.descripcion, dr.puntos, dr.fecha, dr.observacion, dr.creado_en,
@@ -1928,10 +1935,9 @@ app.get("/api/disciplina/historial/:cursoId/:usuarioId", async (req, res) => {
          LEFT JOIN disciplina_catalogo dc ON dc.id = dr.catalogo_id
          LEFT JOIN curso_materias cm ON cm.id = dr.materia_id
          JOIN usuarios u ON u.id = dr.registrado_por
-         WHERE dr.curso_id = ? AND dr.usuario_id = ?
-           AND dr.materia_id = ?
+         WHERE dr.curso_id = ? AND dr.usuario_id = ? ${whereMateria}
          ORDER BY dr.fecha DESC, dr.creado_en DESC`,
-        [cursoId, usuarioId, materiaId || 0]
+        params
       );
       res.json(rows);
     } catch (_) {

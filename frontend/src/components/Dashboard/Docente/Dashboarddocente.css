@@ -422,3 +422,39 @@
 .visor-content p  { margin: 0.5em 0; }
 .visor-content table { border-collapse: collapse; width: 100%; margin: 1em 0; }
 .visor-content td,.visor-content th { border: 1px solid #ccc; padding: 6px 10px; }
+
+/* ══════════════════════════════════════════════════════════════
+   RESPONSIVE — DashboardDocente
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .doc-page { overflow-x: hidden; }
+  .doc-sidebar {
+    position: fixed !important;
+    top: 0; left: 0; height: 100% !important;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+  }
+  .doc-sidebar.open { transform: translateX(0); }
+  .doc-main { padding: 60px 14px 20px !important; }
+  .doc-header { flex-wrap: wrap; gap: 8px; }
+  .doc-header h1 { font-size: 18px !important; }
+  .doc-stats { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+  .doc-panel .panel-header { flex-direction: column; gap: 10px; padding: 12px 14px; }
+  .materia-selector select { min-width: unset !important; width: 100%; }
+  .panel-tabs { gap: 4px; flex-wrap: wrap; padding: 8px 14px; }
+  .ptab { padding: 6px 10px; font-size: 12px; }
+  .doc-panel .panel-body { padding: 12px 14px; }
+  .doc-form .form-row,
+  .form-row { grid-template-columns: 1fr !important; }
+  .nota-input { width: 58px !important; }
+  .visor-modal { max-width: 96vw !important; max-height: 88vh !important; overflow-y: auto; }
+  .doc-toast { left: 14px !important; right: 14px !important; bottom: 14px; text-align: center; }
+}
+
+@media (max-width: 480px) {
+  .doc-stats { grid-template-columns: repeat(2, 1fr) !important; }
+  .doc-header h1 { font-size: 15px !important; }
+  .ptab { padding: 5px 8px; font-size: 11px; }
+  .nota-input { width: 50px !important; }
+}

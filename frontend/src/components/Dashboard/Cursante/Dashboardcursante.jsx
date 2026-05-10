@@ -357,6 +357,7 @@ export default function DashboardCursante() {
   const [toast,           setToast]           = useState(null);
   const [bloqueoFin,      setBloqueoFin]      = useState(null);   // null | {deudas, totalDeuda}
   const [checkingFin,     setCheckingFin]     = useState(true);   // true mientras verifica finanzas
+  const [sidebarOpen,     setSidebarOpen]     = useState(false);
 
   const { notifs, noLeidas, loading: loadingNotifs, marcarLeida, marcarTodasLeidas } = useNotificaciones(30);
 
@@ -498,8 +499,17 @@ export default function DashboardCursante() {
 
   return (
     <div className="cur-page">
+      {/* Barra superior móvil */}
+      <div className="mobile-topbar">
+        <button className="mobile-topbar-btn" onClick={() => setSidebarOpen(o => !o)} aria-label="Menú">☰</button>
+        <span className="mobile-topbar-title">EAEN Avaroa</span>
+        <button className="mobile-topbar-btn mobile-logout" onClick={() => { localStorage.removeItem("eaen_session"); navigate("/", { replace: true }); }} aria-label="Cerrar sesión">🚪 Cerrar sesión</button>
+      </div>
+      {sidebarOpen && (
+        <div className="sidebar-overlay open" onClick={() => setSidebarOpen(false)} />
+      )}
       {/* Sidebar */}
-      <aside className="cur-sidebar">
+      <aside className={`cur-sidebar${sidebarOpen ? " open" : ""}`}>
         <div className="sidebar-brand">
           <div style={{
             width:48, height:48, flexShrink:0,
@@ -582,9 +592,13 @@ export default function DashboardCursante() {
                   <div className="panel-selectors">
                     <div className="selector-group">
                       <label>Curso</label>
-                      <select value={cursoId || ""} onChange={e => setCursoId(Number(e.target.value))}>
-                        {cursos.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                      </select>
+                      <div style={{
+                        padding:"8px 14px", background:"#f3f4f6",
+                        borderRadius:9, fontSize:13, color:"#1a2535",
+                        border:"2px solid #e8ecf2", fontWeight:600
+                      }}>
+                        {cursos.find(c => c.id === cursoId)?.nombre || cursos[0]?.nombre || "—"}
+                      </div>
                     </div>
                     <span style={{color:"#ccc", alignSelf:"flex-end", paddingBottom:8, fontSize:20}}>›</span>
                     <div className="selector-group">

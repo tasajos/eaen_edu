@@ -24,6 +24,7 @@ export default function DashboardJefeCurso() {
   const [loading,      setLoading]      = useState(true);
   const [loadingCurso, setLoadingCurso] = useState(false);
   const [vista,        setVista]        = useState("resumen");
+  const [sidebarOpen,  setSidebarOpen]  = useState(false);
 
   const { notifs, noLeidas, loading: loadingNotifs, marcarLeida, marcarTodasLeidas } = useNotificaciones(30);
 
@@ -57,7 +58,15 @@ export default function DashboardJefeCurso() {
 
   return (
     <div className="jc-page">
-      <aside className="jc-sidebar">
+      <div className="mobile-topbar">
+        <button className="mobile-topbar-btn" onClick={() => setSidebarOpen(o => !o)} aria-label="Menú">☰</button>
+        <span className="mobile-topbar-title">EAEN Avaroa</span>
+        <button className="mobile-topbar-btn mobile-logout" onClick={() => { localStorage.removeItem("eaen_session"); navigate("/", { replace: true }); }} aria-label="Cerrar sesión">🚪 Cerrar sesión</button>
+      </div>
+      {sidebarOpen && (
+        <div className="sidebar-overlay open" onClick={() => setSidebarOpen(false)} />
+      )}
+      <aside className={`jc-sidebar${sidebarOpen ? " open" : ""}`}>
         <div className="sidebar-brand">
           <div style={{
             width:48, height:48, flexShrink:0,

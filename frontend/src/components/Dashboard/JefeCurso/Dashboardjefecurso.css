@@ -267,3 +267,28 @@
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+/* ══════════════════════════════════════════════════════════════
+   RESPONSIVE — DashboardJefeCurso
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .jc-page { overflow-x: hidden; }
+  .jc-sidebar {
+    position: fixed !important;
+    top: 0; left: 0; height: 100% !important;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+  }
+  .jc-sidebar.open { transform: translateX(0); }
+  .jc-main { padding: 60px 14px 20px !important; }
+  .jc-header { flex-wrap: wrap; gap: 8px; }
+  .jc-header h1 { font-size: 18px !important; }
+  .jc-stats { flex-wrap: wrap; gap: 8px; }
+  .jc-stat { flex: 1 1 calc(50% - 4px); min-width: unset; }
+  .jc-panel { padding: 0 !important; }
+}
+
+@media (max-width: 480px) {
+  .jc-header h1 { font-size: 15px !important; }
+  .jc-stat { flex: 1 1 100%; }
+}
