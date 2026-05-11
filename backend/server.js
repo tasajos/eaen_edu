@@ -1923,9 +1923,10 @@ app.get("/api/finanzas/resumen/:usuarioId", async (req,res) => {
   try {
     const uid = Number(req.params.usuarioId);
     const [rows] = await pool.execute(
-      `SELECT fp.estado, fc.tipo, fc.descripcion, fc.monto, fc.mes, fc.anio,
+      `SELECT fp.id AS pago_id, fp.concepto_id, fp.estado,
+              fc.tipo, fc.descripcion, fc.monto, fc.mes, fc.anio,
               fc.fecha_venc, fp.monto_pagado, fp.fecha_pago, fp.comprobante,
-              c.nombre AS curso_nombre
+              fp.observacion, c.nombre AS curso_nombre
        FROM finanzas_pagos fp
        JOIN finanzas_conceptos fc ON fc.id=fp.concepto_id
        JOIN cursos c ON c.id=fp.curso_id

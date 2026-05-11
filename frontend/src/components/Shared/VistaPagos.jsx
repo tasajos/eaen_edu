@@ -137,13 +137,155 @@ function generarVoucher(pago, session) {
   if (win) { win.document.write(html); win.document.close(); }
 }
 
+/* ── Modal Registrar Pago ─────────────────────────────────── */
+function generarNroComprobante() {
+  const now = new Date();
+  const ymd = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,"0")}${String(now.getDate()).padStart(2,"0")}`;
+  const rand = Math.floor(Math.random() * 9000) + 1000;
+  return `PAG-${ymd}-${rand}`;
+}
+
+function ModalPagar({ pago, session, onClose, onSuccess }) {
+  const tipo = TIPO_INFO[pago.tipo] || TIPO_INFO.OTRO;
+  const concepto = pago.descripcion
+    || `${tipo.label}${pago.mes ? " " + MESES[pago.mes] : ""}${pago.anio ? " " + pago.anio : ""}`;
+
+  const [nroComprobante] = useState(generarNroComprobante);
+  const [observacion, setObservacion] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error,  setError]  = useState("");
+
+  const registrar = async () => {
+    setSaving(true); setError("");
+    try {
+      const fechaPago = new Date().toISOString().slice(0, 10);
+      const r = await fetch(`${API}/finanzas/pagos/${pago.concepto_id}/${session.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          estado:         "PAGADO",
+          monto_pagado:   pago.monto,
+          fecha_pago:     fechaPago,
+          comprobante:    nroComprobante,
+          observacion:    observacion.trim() || null,
+          registrado_por: session.id,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.message || "Error al registrar");
+      onSuccess({
+        ...pago,
+        estado: "PAGADO",
+        monto_pagado: pago.monto,
+        fecha_pago:   fechaPago,
+        comprobante:  nroComprobante,
+        observacion:  observacion.trim() || null,
+      });
+    } catch(e) { setError(e.message); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div style={{
+      position:"fixed", inset:0, background:"rgba(0,0,0,0.55)",
+      display:"flex", alignItems:"center", justifyContent:"center",
+      zIndex:3000, backdropFilter:"blur(4px)", padding:16
+    }}>
+      <div style={{
+        background:"#fff", borderRadius:18, padding:"28px 28px 24px",
+        maxWidth:420, width:"100%", boxShadow:"0 20px 60px rgba(0,0,0,0.25)",
+        display:"flex", flexDirection:"column", gap:16
+      }}>
+        {/* Header */}
+        <div style={{display:"flex", alignItems:"center", gap:12}}>
+          <div style={{
+            width:44, height:44, borderRadius:12,
+            background: tipo.bg, color: tipo.color,
+            display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0
+          }}>{tipo.icon}</div>
+          <div>
+            <div style={{fontWeight:800, fontSize:16, color:"#1a2535"}}>Registrar pago</div>
+            <div style={{fontSize:13, color:"#6b7a90", marginTop:2}}>{concepto}</div>
+          </div>
+        </div>
+
+        {/* Monto */}
+        <div style={{
+          background:"#f0f4ff", borderRadius:12, padding:"14px 18px",
+          border:"2px solid #c5cae9", textAlign:"center"
+        }}>
+          <div style={{fontSize:11, color:"#5a6a80", textTransform:"uppercase", letterSpacing:.5}}>Monto a pagar</div>
+          <div style={{fontSize:32, fontWeight:900, color:"#003366", fontFamily:"'IBM Plex Mono',monospace", marginTop:4}}>
+            Bs. {Number(pago.monto).toFixed(2)}
+          </div>
+        </div>
+
+        {/* Comprobante auto-generado */}
+        <div style={{
+          background:"#f0faf0", border:"1.5px solid #a5d6a7",
+          borderRadius:10, padding:"10px 16px",
+          display:"flex", justifyContent:"space-between", alignItems:"center"
+        }}>
+          <span style={{fontSize:12, color:"#2e7d32", fontWeight:700}}>🧾 N° Comprobante</span>
+          <span style={{fontFamily:"'IBM Plex Mono',monospace", fontWeight:800, color:"#003366", fontSize:14}}>
+            {nroComprobante}
+          </span>
+        </div>
+
+        {/* Observación opcional */}
+        <div>
+          <label style={{fontSize:12, fontWeight:700, color:"#5a6a80", display:"block", marginBottom:5}}>
+            Observación <span style={{color:"#aaa", fontWeight:400}}>(opcional)</span>
+          </label>
+          <textarea
+            rows={2}
+            placeholder="Ej: Pago en efectivo en caja..."
+            value={observacion}
+            onChange={e => setObservacion(e.target.value)}
+            style={{
+              width:"100%", padding:"9px 13px", border:"2px solid #e8ecf2",
+              borderRadius:9, fontSize:13, fontFamily:"inherit", resize:"vertical", outline:"none",
+            }}
+            onFocus={e => e.target.style.borderColor = "#003366"}
+            onBlur={e => e.target.style.borderColor = "#e8ecf2"}
+          />
+        </div>
+
+        {error && (
+          <div style={{
+            background:"#ffebee", border:"1.5px solid #ef9a9a",
+            borderRadius:9, padding:"10px 14px", fontSize:13, color:"#c62828"
+          }}>⚠️ {error}</div>
+        )}
+
+        {/* Botones */}
+        <div style={{display:"flex", gap:10}}>
+          <button onClick={registrar} disabled={saving} style={{
+            flex:1, padding:"12px 0", background:"#003366", color:"#fff",
+            border:"none", borderRadius:10, fontSize:14, fontWeight:700,
+            cursor:saving?"not-allowed":"pointer", opacity:saving?.65:1, fontFamily:"inherit"
+          }}>
+            {saving ? "⏳ Registrando..." : "💳 Confirmar pago"}
+          </button>
+          <button onClick={onClose} style={{
+            flex:1, padding:"12px 0", background:"transparent", color:"#5a6a80",
+            border:"2px solid #e8ecf2", borderRadius:10, fontSize:13.5,
+            fontWeight:600, cursor:"pointer", fontFamily:"inherit"
+          }}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ══════════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
 ══════════════════════════════════════════════════════════ */
 export default function VistaPagos({ session }) {
-  const [pagos,   setPagos]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filtro,  setFiltro]  = useState("TODOS"); // TODOS | PAGADO | PENDIENTE | MORA
+  const [pagos,      setPagos]      = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [filtro,     setFiltro]     = useState("TODOS");
+  const [pagoModal,  setPagoModal]  = useState(null); // pago a registrar
 
   useEffect(() => {
     if (!session?.id) return;
@@ -306,6 +448,14 @@ export default function VistaPagos({ session }) {
                         🖨️ Voucher
                       </button>
                     )}
+                    {(pago.estado === "PENDIENTE" || pago.estado === "MORA") && (
+                      <button
+                        className="vpag-pagar-btn"
+                        onClick={() => setPagoModal(pago)}
+                      >
+                        💳 Pagar
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -319,6 +469,22 @@ export default function VistaPagos({ session }) {
           <div>💰</div>
           <p>No tienes conceptos de pago registrados aún.</p>
         </div>
+      )}
+
+      {/* Modal registrar pago */}
+      {pagoModal && (
+        <ModalPagar
+          pago={pagoModal}
+          session={session}
+          onClose={() => setPagoModal(null)}
+          onSuccess={(pagoActualizado) => {
+            setPagos(prev => prev.map(p =>
+              p.concepto_id === pagoActualizado.concepto_id ? { ...p, ...pagoActualizado } : p
+            ));
+            setPagoModal(null);
+            generarVoucher(pagoActualizado, session);
+          }}
+        />
       )}
     </div>
   );
