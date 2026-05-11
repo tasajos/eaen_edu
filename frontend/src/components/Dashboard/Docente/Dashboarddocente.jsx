@@ -944,7 +944,31 @@ function VistaTareas({ materia, participantes, showToast }) {
   const [form,     setForm]     = useState({ titulo: "", descripcion: "", fecha_limite: "" });
   const [calForm,  setCalForm]  = useState({});
   const [calSaving,setCalSaving]= useState({});
-  const [visor,    setVisor]    = useState(null);
+  const [visor,         setVisor]         = useState(null);
+  const [confirmElim,   setConfirmElim]   = useState(null); // { tarea, entrega }
+  const [elimSaving,    setElimSaving]    = useState(false);
+
+  const eliminarDocumento = async () => {
+    if (!confirmElim) return;
+    setElimSaving(true);
+    try {
+      const r = await fetch(
+        `${API}/tareas/${confirmElim.tarea.id}/entregas/${confirmElim.entrega.usuario_id}/documento`,
+        { method: "DELETE" }
+      );
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.message);
+      setEntregas(prev => prev.map(e =>
+        e.usuario_id === confirmElim.entrega.usuario_id
+          ? { ...e, estado: "PENDIENTE", archivo_nombre: null, archivo_ruta: null,
+              nota: null, feedback: null }
+          : e
+      ));
+      cargarResumen();
+      showToast("🗑️ Documento eliminado. El cursante puede volver a entregar.");
+    } catch(e) { showToast(`❌ ${e.message}`, "error"); }
+    finally { setElimSaving(false); setConfirmElim(null); }
+  };
 
   const cargarResumen = useCallback(async () => {
     if (!materia?.id) return;
@@ -1146,10 +1170,20 @@ function VistaTareas({ materia, participantes, showToast }) {
                         <td className="muted">{fmtFecha(e.entregado_en)}</td>
                         <td>
                           {entregado && e.archivo_nombre
-                            ? <button className="btn-sm btn-ver-doc"
-                                onClick={() => setVisor({ ruta: e.archivo_ruta, nombre: e.archivo_nombre })}>
-                                📄 Ver documento
-                              </button>
+                            ? <div style={{display:"flex",gap:5,alignItems:"center"}}>
+                                <button className="btn-sm btn-ver-doc"
+                                  onClick={() => setVisor({ ruta: e.archivo_ruta, nombre: e.archivo_nombre })}>
+                                  📄 Ver
+                                </button>
+                                <button
+                                  className="btn-sm"
+                                  title="Eliminar documento"
+                                  onClick={() => setConfirmElim({ tarea: tareaAct, entrega: e })}
+                                  style={{background:"#ffebee",color:"#c62828",border:"1.5px solid #ef9a9a"}}
+                                >
+                                  🗑️
+                                </button>
+                              </div>
                             : <span className="muted">—</span>}
                         </td>
                         <td style={{textAlign:"center"}}>
@@ -1196,6 +1230,68 @@ function VistaTareas({ materia, participantes, showToast }) {
           archivoNombre={visor.nombre}
           onClose={() => setVisor(null)}
         />
+      )}
+
+      {/* ── Modal confirmación eliminar documento ── */}
+      {confirmElim && (
+        <div style={{
+          position:"fixed", inset:0, background:"rgba(0,0,0,0.6)",
+          display:"flex", alignItems:"center", justifyContent:"center",
+          zIndex:2000, backdropFilter:"blur(4px)"
+        }}>
+          <div style={{
+            background:"#fff", borderRadius:18, padding:"32px 36px",
+            maxWidth:420, width:"92%", boxShadow:"0 20px 60px rgba(0,0,0,0.28)",
+            display:"flex", flexDirection:"column", alignItems:"center", gap:16, textAlign:"center"
+          }}>
+            <div style={{fontSize:48}}>🗑️</div>
+            <div style={{fontSize:18, fontWeight:800, color:"#c62828"}}>
+              ¿Eliminar documento?
+            </div>
+            <div style={{
+              background:"#fff5f5", border:"1.5px solid #ef9a9a",
+              borderRadius:10, padding:"12px 16px", fontSize:13, color:"#5a6a80", width:"100%"
+            }}>
+              <strong style={{color:"#1a2535"}}>
+                {confirmElim.entrega.ap_paterno} {confirmElim.entrega.ap_materno},&nbsp;
+                {confirmElim.entrega.nombre}
+              </strong>
+              <br/>
+              <span style={{fontSize:12}}>📄 {confirmElim.entrega.archivo_nombre}</span>
+            </div>
+            <div style={{
+              background:"#fff8e1", border:"1.5px solid #ffe082",
+              borderRadius:9, padding:"10px 14px", fontSize:12, color:"#b45309",
+              lineHeight:1.6, width:"100%"
+            }}>
+              ⚠️ Se eliminará el archivo del servidor. El cursante podrá volver a subir su tarea.
+            </div>
+            <div style={{display:"flex", gap:10, width:"100%"}}>
+              <button
+                onClick={eliminarDocumento}
+                disabled={elimSaving}
+                style={{
+                  flex:1, padding:"12px 0", background:"#c62828", color:"#fff",
+                  border:"none", borderRadius:10, fontSize:14, fontWeight:700,
+                  cursor:elimSaving?"not-allowed":"pointer", opacity:elimSaving?.65:1,
+                  fontFamily:"inherit"
+                }}
+              >
+                {elimSaving ? "⏳ Eliminando..." : "🗑️ Sí, eliminar"}
+              </button>
+              <button
+                onClick={() => setConfirmElim(null)}
+                style={{
+                  flex:1, padding:"12px 0", background:"transparent", color:"#5a6a80",
+                  border:"2px solid #e8ecf2", borderRadius:10, fontSize:13.5,
+                  fontWeight:600, cursor:"pointer", fontFamily:"inherit"
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

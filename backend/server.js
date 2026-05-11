@@ -1587,6 +1587,40 @@ app.get("/api/eval-inst/periodos/:id/resultados", async (req,res) => {
 // TAREAS — ENDPOINTS EXTENDIDOS
 // ════════════════════════════════════════════════════════════
 
+/**
+ * DELETE /api/tareas/:tareaId/entregas/:usuarioId/documento
+ * El docente elimina el archivo subido por el cursante y resetea la entrega a PENDIENTE.
+ */
+app.delete("/api/tareas/:tareaId/entregas/:usuarioId/documento", async (req, res) => {
+  try {
+    const tareaId   = Number(req.params.tareaId);
+    const usuarioId = Number(req.params.usuarioId);
+    if (!tareaId || !usuarioId) return res.status(400).json({ message: "IDs inválidos" });
+
+    // Obtener ruta del archivo
+    const [[entrega]] = await pool.execute(
+      `SELECT archivo_ruta FROM tarea_entregas WHERE tarea_id=? AND usuario_id=? LIMIT 1`,
+      [tareaId, usuarioId]);
+    if (!entrega) return res.status(404).json({ message: "Entrega no encontrada" });
+
+    // Eliminar archivo físico del disco (si existe)
+    if (entrega.archivo_ruta) {
+      const filePath = path.join(UPLOADS_DIR, entrega.archivo_ruta);
+      fs.unlink(filePath, () => {}); // silencioso si ya no existe
+    }
+
+    // Resetear la entrega a PENDIENTE
+    await pool.execute(
+      `UPDATE tarea_entregas
+       SET estado='PENDIENTE', archivo_nombre=NULL, archivo_ruta=NULL,
+           nota=NULL, feedback=NULL, calificado_por=NULL, entregado_en=NULL, actualizado_en=NOW()
+       WHERE tarea_id=? AND usuario_id=? LIMIT 1`,
+      [tareaId, usuarioId]);
+
+    res.json({ message: "Documento eliminado. El cursante puede volver a entregar." });
+  } catch(e) { res.status(500).json({ message: "Error interno", detail: e.message }); }
+});
+
 /** POST /api/tareas/:tareaId/entregar — multipart/form-data: archivo (Word) + usuario_id */
 app.post("/api/tareas/:tareaId/entregar", uploadTarea.single("archivo"), async (req,res) => {
   try {
