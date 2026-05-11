@@ -193,23 +193,79 @@ app.put("/api/usuarios/ci/:ci", async (req,res) => {
     if(!ci) return res.status(400).json({message:"CI requerido"});
     const {tipo_usuario,grado,ap_paterno,ap_materno,nombre,ex,filial,fuerza,turno,telefono,
            fecha_inscripcion,lugar_trabajo,correo,fecha_nacimiento,email,rol,estado} = req.body;
-    const required = {tipo_usuario,grado,ap_paterno,ap_materno,nombre,ex,filial,fuerza,turno,telefono,fecha_inscripcion,lugar_trabajo,correo,fecha_nacimiento};
+
+    // Solo validar campos realmente obligatorios (no correo, no fecha_nacimiento si vienen vacíos)
+    const required = {tipo_usuario,grado,ap_paterno,ap_materno,nombre,ex,filial,fuerza,
+                      turno,telefono,fecha_inscripcion,lugar_trabajo};
     for(const [k,v] of Object.entries(required)){
       if(String(v??"").trim().length===0) return res.status(400).json({message:`Campo requerido: ${k}`});
     }
+
     const apellido = `${ap_paterno} ${ap_materno}`.trim();
-    const [result] = await pool.execute(
-      `UPDATE usuarios SET tipo_usuario=?,grado=?,ap_paterno=?,ap_materno=?,nombre=?,apellido=?,ex=?,filial=?,fuerza=?,
-       turno=?,telefono=?,fecha_inscripcion=?,lugar_trabajo=?,correo=?,fecha_nacimiento=?,
-       email=COALESCE(?,email),rol=COALESCE(?,rol),estado=COALESCE(?,estado) WHERE ci=? LIMIT 1`,
-      [tipo_usuario,grado,ap_paterno,ap_materno,nombre,apellido,ex,filial,fuerza,turno,telefono,
-       fecha_inscripcion,lugar_trabajo,correo,fecha_nacimiento,email??null,rol??null,estado??null,ci]
-    );
-    if(result.affectedRows===0) return res.status(404).json({message:"Usuario no encontrado"});
-    res.json({message:"Usuario actualizado"});
+
+    // correo puede ser null — usa el valor enviado si no está vacío
+    const correoParsed  = String(correo  || "").trim() || null;
+    const emailParsed   = String(email   || "").trim() || null;
+    const fnacParsed    = String(fecha_nacimiento || "").trim() || null;
+
+    const rolFinal   = String(rol    || "").trim() || null;
+    const estadoFinal = estado ?? null;
+
+    // Función auxiliar para ejecutar el update con o sin correo
+    const runUpdate = async (incluirCorreo) => {
+      const sql = incluirCorreo
+        ? `UPDATE usuarios
+           SET tipo_usuario=?, grado=?, ap_paterno=?, ap_materno=?, nombre=?, apellido=?,
+               ex=?, filial=?, fuerza=?, turno=?, telefono=?,
+               fecha_inscripcion=?, lugar_trabajo=?,
+               correo=?, fecha_nacimiento=?,
+               email=COALESCE(?,email), rol=?, estado=COALESCE(?,estado)
+           WHERE ci=? LIMIT 1`
+        : `UPDATE usuarios
+           SET tipo_usuario=?, grado=?, ap_paterno=?, ap_materno=?, nombre=?, apellido=?,
+               ex=?, filial=?, fuerza=?, turno=?, telefono=?,
+               fecha_inscripcion=?, lugar_trabajo=?,
+               fecha_nacimiento=?,
+               email=COALESCE(?,email), rol=?, estado=COALESCE(?,estado)
+           WHERE ci=? LIMIT 1`;
+
+      const params = incluirCorreo
+        ? [tipo_usuario, grado, ap_paterno, ap_materno, nombre, apellido,
+           ex, filial, fuerza, turno, telefono,
+           fecha_inscripcion, lugar_trabajo,
+           correoParsed, fnacParsed,
+           emailParsed, rolFinal, estadoFinal, ci]
+        : [tipo_usuario, grado, ap_paterno, ap_materno, nombre, apellido,
+           ex, filial, fuerza, turno, telefono,
+           fecha_inscripcion, lugar_trabajo,
+           fnacParsed,
+           emailParsed, rolFinal, estadoFinal, ci];
+
+      return pool.execute(sql, params);
+    };
+
+    let aviso = null;
+    let result;
+    try {
+      [result] = await runUpdate(true);
+    } catch(e2) {
+      if(e2?.code !== "ER_DUP_ENTRY") throw e2;
+      // Correo/email conflictivo → reintenta sin actualizar correo
+      [result] = await runUpdate(false);
+      aviso = "Nota: el correo no se actualizó porque ya pertenece a otro usuario.";
+    }
+
+    if(result.affectedRows===0) return res.status(404).json({message:`No se encontró usuario con CI ${ci}`});
+    res.json({message:"Usuario actualizado correctamente", ci, rol: rolFinal, aviso});
   } catch(e){
-    if(e?.code==="ER_DUP_ENTRY") return res.status(409).json({message:"Correo o email ya existe en otro usuario."});
-    res.status(500).json({message:"Error interno",detail:e.message});
+    console.error("[PUT /usuarios/ci]", e.message, e.code);
+    if(e?.code==="ER_DUP_ENTRY"){
+      const campo = e.message.includes("correo") ? "correo" :
+                    e.message.includes("email")  ? "email"  :
+                    e.message.includes("ci")     ? "CI"     : "campo";
+      return res.status(409).json({message:`El ${campo} ya está registrado en otro usuario.`});
+    }
+    res.status(500).json({message:"Error interno al actualizar", detail:e.message});
   }
 });
 
@@ -1070,6 +1126,53 @@ app.delete("/api/tareas/:id", async (req,res) => {
 // EVALUACIONES INSTITUCIONALES
 // ════════════════════════════════════════════════════════════
 
+async function seedFinanzas() {
+  try {
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS finanzas_conceptos (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        curso_id    INT NOT NULL,
+        tipo        ENUM('MATRICULA','GUIA','MENSUALIDAD','OTRO') NOT NULL,
+        descripcion VARCHAR(200) DEFAULT NULL,
+        monto       DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+        fecha_venc  DATE DEFAULT NULL,
+        mes         TINYINT DEFAULT NULL,
+        anio        SMALLINT DEFAULT NULL,
+        activo      TINYINT NOT NULL DEFAULT 1,
+        creado_por  INT DEFAULT NULL,
+        creado_en   DATETIME DEFAULT CURRENT_TIMESTAMP,
+        KEY idx_conceptos_tipo (tipo, curso_id),
+        CONSTRAINT fk_fc_curso FOREIGN KEY (curso_id) REFERENCES cursos(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
+    await pool.execute(`
+      CREATE TABLE IF NOT EXISTS finanzas_pagos (
+        id             INT AUTO_INCREMENT PRIMARY KEY,
+        concepto_id    INT NOT NULL,
+        usuario_id     INT NOT NULL,
+        curso_id       INT NOT NULL,
+        estado         ENUM('PENDIENTE','PAGADO','EXONERADO','MORA') NOT NULL DEFAULT 'PENDIENTE',
+        monto_pagado   DECIMAL(10,2) DEFAULT NULL,
+        fecha_pago     DATE DEFAULT NULL,
+        comprobante    VARCHAR(255) DEFAULT NULL,
+        observacion    VARCHAR(500) DEFAULT NULL,
+        registrado_por INT DEFAULT NULL,
+        creado_en      DATETIME DEFAULT CURRENT_TIMESTAMP,
+        actualizado_en DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_pago (concepto_id, usuario_id),
+        KEY idx_pagos_usuario (usuario_id),
+        KEY idx_pagos_estado  (estado),
+        CONSTRAINT fk_fp_concepto FOREIGN KEY (concepto_id) REFERENCES finanzas_conceptos(id) ON DELETE CASCADE,
+        CONSTRAINT fk_fp_usuario  FOREIGN KEY (usuario_id)  REFERENCES usuarios(id),
+        CONSTRAINT fk_fp_curso    FOREIGN KEY (curso_id)    REFERENCES cursos(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
+    console.log("✅ finanzas: tablas listas");
+  } catch(e) {
+    console.warn("⚠️  seedFinanzas:", e.message);
+  }
+}
+
 async function seedDisciplina() {
   try {
     await pool.execute(`
@@ -1642,6 +1745,7 @@ app.put("/api/horarios/:id", async (req,res) => {
 /** GET /api/finanzas/conceptos?curso_id=X */
 app.get("/api/finanzas/conceptos", async (req,res) => {
   try {
+    await seedFinanzas();
     const {curso_id} = req.query;
     if(!curso_id) return res.status(400).json({message:"curso_id requerido"});
     const [rows] = await pool.execute(
@@ -1695,6 +1799,7 @@ app.delete("/api/finanzas/conceptos/:id", async (req,res) => {
  */
 app.get("/api/finanzas/pagos", async (req,res) => {
   try {
+    await seedFinanzas();
     const {curso_id} = req.query;
     if(!curso_id) return res.status(400).json({message:"curso_id requerido"});
 
@@ -2538,6 +2643,7 @@ app.post("/api/shd/notas/usuario", async (req, res) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, async () => {
   console.log(`✅ API EAEN corriendo en http://localhost:${PORT}`);
+  await seedFinanzas();
   await seedDisciplina();
   await seedEvalInstPlantillas();
 });

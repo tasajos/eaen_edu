@@ -1,0 +1,466 @@
+/* ═══════════════════════════════════════════════════════════════
+   responsive.css — EAEN Avaroa
+   Sistema responsive global: mobile-first breakpoints
+   Breakpoints: 480px | 640px | 768px | 1024px
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Variables de breakpoint ──────────────────────────────── */
+:root {
+  --bp-sm:  480px;
+  --bp-md:  768px;
+  --bp-lg: 1024px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   BARRA SUPERIOR MÓVIL — hamburger + título + logout
+   Solo visible en pantallas ≤768px
+══════════════════════════════════════════════════════════════ */
+.mobile-topbar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 300;
+    height: 52px;
+    background: #003366;
+    padding: 0 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.22);
+  }
+
+  .mobile-topbar-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.3px;
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+
+  .mobile-topbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 36px;
+    padding: 0 10px;
+    border: none;
+    border-radius: 9px;
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    font-size: 17px;
+    cursor: pointer;
+    transition: background 0.18s;
+    flex-shrink: 0;
+  }
+  .mobile-topbar-btn:hover { background: rgba(255,255,255,0.22); }
+
+  .mobile-logout {
+    font-size: 13px;
+    font-weight: 700;
+    gap: 5px;
+    padding: 0 12px;
+    background: rgba(220,38,38,0.25);
+    letter-spacing: 0.2px;
+  }
+  .mobile-logout:hover { background: rgba(220,38,38,0.55); }
+
+  /* El contenido principal debe empezar debajo de la topbar */
+  .cur-main,
+  .doc-main,
+  .jc-main { padding-top: 66px !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   OVERLAY — cierra el sidebar al tocar fuera
+══════════════════════════════════════════════════════════════ */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 198;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(2px);
+  animation: overlay-fade 0.2s ease;
+}
+.sidebar-overlay.open { display: block; }
+@keyframes overlay-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ══════════════════════════════════════════════════════════════
+   DASHBOARD CURSANTE — responsive
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .cur-sidebar {
+    position: fixed !important;
+    top: 0; left: 0;
+    height: 100% !important;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    overflow-y: auto;
+  }
+  .cur-sidebar.open { transform: translateX(0); }
+
+  .cur-main {
+    padding: 60px 16px 20px !important;
+  }
+  .cur-header { flex-wrap: wrap; gap: 8px; }
+  .cur-header h1 { font-size: 18px !important; }
+  .cur-stats { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+  .cur-stat span { font-size: 20px !important; }
+  .st-val { font-size: 20px !important; }
+
+  .panel-selectors { flex-direction: column; align-items: stretch; padding: 14px 16px; }
+  .selector-group select { min-width: unset !important; width: 100%; }
+  .panel-tabs { padding: 10px 16px; gap: 4px; }
+  .ptab { padding: 6px 12px; font-size: 12px; }
+  .panel-body { padding: 14px 16px; }
+
+  .nota-resumen { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .promedio-grande { font-size: 40px !important; }
+  .facilitador-detalle-card { grid-template-columns: 1fr !important; }
+  .nota-componentes { grid-template-columns: repeat(2, 1fr) !important; }
+
+  .cur-toast { bottom: 16px; right: 16px; left: 16px; text-align: center; }
+}
+
+@media (max-width: 480px) {
+  .cur-stats { grid-template-columns: repeat(2, 1fr) !important; }
+  .cur-header h1 { font-size: 16px !important; }
+  .nota-componentes { grid-template-columns: 1fr !important; }
+  .notas-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .panel-tabs { gap: 3px; }
+  .ptab { padding: 5px 10px; font-size: 11px; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DASHBOARD DOCENTE — responsive
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .doc-page { position: relative; }
+  .doc-sidebar {
+    position: fixed !important;
+    top: 0; left: 0;
+    height: 100% !important;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    overflow-y: auto;
+  }
+  .doc-sidebar.open { transform: translateX(0); }
+
+  .doc-main { padding: 60px 16px 20px !important; }
+  .doc-header { flex-wrap: wrap; gap: 8px; }
+  .doc-header h1 { font-size: 18px; }
+  .doc-stats { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+
+  .doc-panel .panel-header { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px 16px; }
+  .materia-selector { width: 100%; }
+  .materia-selector select { min-width: unset !important; width: 100%; }
+  .panel-tabs { gap: 4px; flex-wrap: wrap; padding: 10px 16px; }
+  .ptab { padding: 6px 12px; font-size: 12px; }
+  .doc-panel .panel-body { padding: 14px 16px; }
+
+  .doc-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .doc-form .form-row { grid-template-columns: 1fr !important; }
+  .doc-toast { bottom: 16px; right: 16px; left: 16px; text-align: center; }
+  .nota-input { width: 56px !important; }
+}
+
+@media (max-width: 480px) {
+  .doc-stats { grid-template-columns: repeat(2, 1fr) !important; }
+  .doc-header h1 { font-size: 15px; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DASHBOARD JEFE DE CURSO — responsive
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .jc-page { position: relative; }
+  .jc-sidebar {
+    position: fixed !important;
+    top: 0; left: 0;
+    height: 100% !important;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    overflow-y: auto;
+  }
+  .jc-sidebar.open { transform: translateX(0); }
+
+  .jc-main { padding: 60px 16px 20px !important; }
+  .jc-header h1 { font-size: 18px; }
+  .jc-stats { flex-wrap: wrap; gap: 10px; }
+  .jc-stat { min-width: calc(50% - 5px); flex: 1 1 calc(50% - 5px); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DASHBOARD JEFE DE UNIDAD — mejoras responsive
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .eaen-sidebar-toggle { display: flex !important; }
+  .main-content { padding: 60px 16px 20px !important; }
+  .header { flex-wrap: wrap; justify-content: center; padding: 12px 14px; }
+  .header h1 { font-size: 16px; text-align: center; width: 100%; order: 3; }
+  .dashboard-grid { grid-template-columns: 1fr !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SIDEBAR JEFE (shared) — mejoras
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .sjefe-page { overflow: hidden; }
+  .sjefe-main { padding-top: 56px; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   GESTIÓN EDUCATIVA / CURSOS / USUARIOS — responsive
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Headers de sección con padding reducido */
+  .eaen-header,
+  .edu-header,
+  .gev-header { padding: 12px 14px !important; flex-wrap: wrap; gap: 8px; }
+
+  .eaen-header h1,
+  .edu-header h1,
+  .gev-header h1 { font-size: 16px !important; }
+
+  /* Contenido principal */
+  .eaen-content,
+  .edu-content { padding: 14px 14px !important; }
+
+  /* Grids de detalle */
+  .eaen-lc-detail-grid { grid-template-columns: 1fr !important; }
+  .eaen-lc-group input { width: 100% !important; max-width: 100%; }
+  .edu-form-row { grid-template-columns: 1fr !important; }
+  .gev-form-row { grid-template-columns: 1fr !important; }
+
+  /* Stats */
+  .eaen-stats,
+  .edu-stats,
+  .gev-stats { flex-wrap: wrap; gap: 10px; }
+  .eaen-stat,
+  .edu-stat { flex: 1 1 calc(50% - 5px); min-width: calc(50% - 5px); }
+
+  /* Tablas */
+  .eaen-lc-table-wrap,
+  .eaen-pm-detail-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Modales */
+  .eaen-pm-modal,
+  .eaen-lc-modal,
+  .gev-modal { width: min(96vw, 540px) !important; max-height: 90vh !important; overflow-y: auto; }
+
+  /* Toolbar / filtros */
+  .eaen-lc-toolbar,
+  .eaen-pm-toolbar,
+  .edu-toolbar { flex-direction: column; align-items: stretch; gap: 8px; }
+  .eaen-lc-toolbar input,
+  .eaen-lc-toolbar select { width: 100%; min-width: unset !important; }
+
+  /* Pestañas */
+  .eaen-tabs,
+  .edu-tabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+  .eaen-tab,
+  .edu-tab { white-space: nowrap; }
+}
+
+@media (max-width: 480px) {
+  .eaen-stat,
+  .edu-stat { flex: 1 1 100%; }
+  .eaen-header h1,
+  .edu-header h1 { font-size: 14px !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   GESTIÓN DE EVALUACIONES — responsive
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .gev-stats-bar { flex-wrap: wrap; gap: 8px; }
+  .gev-stat-card { flex: 1 1 calc(50% - 4px); min-width: calc(50% - 4px); }
+  .gev-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .gev-tipo-grid { grid-template-columns: 1fr !important; }
+  .gev-modal { width: min(96vw, 480px) !important; max-height: 90vh !important; overflow-y: auto; }
+  .gev-modal-body { padding: 14px !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MÓDULO DISCIPLINA — responsive
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .disc-tabla-wrap,
+  .disc-resumen-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .disc-historial-grid { grid-template-columns: 1fr !important; }
+  .disc-modal { width: min(96vw, 480px) !important; max-height: 90vh !important; overflow-y: auto; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   EVALUACIÓN INSTITUCIONAL (cursante) — responsive
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .ev-main { padding: 12px !important; }
+  .ev-indicador { flex-direction: column !important; gap: 8px !important; }
+  .ev-opciones { flex-wrap: wrap !important; gap: 6px !important; }
+  .ev-opc-btn { flex: 1 1 calc(50% - 3px) !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   LOGIN — mejoras
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  .login-container { padding: 24px 18px !important; }
+  .login-logo { width: 60px !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TABLAS — scroll horizontal global
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .doc-table-wrap,
+  .cur-table-wrap,
+  .gev-table-wrap,
+  [class*="-table-wrap"] {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Asegura que las tablas no reduzcan sus celdas hasta ser ilegibles */
+  .doc-table th,
+  .doc-table td,
+  .cur-table th,
+  .cur-table td { white-space: nowrap; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   GRIDS ADAPTATIVOS — patrones comunes
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  /* Grids de 3 cols → 1 col */
+  .nota-componentes { grid-template-columns: repeat(2, 1fr) !important; }
+  .facilitador-detalle-card { grid-template-columns: 1fr !important; }
+
+  /* Grids auto-fill con minmax alto → 2 o 1 col */
+  .notas-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+@media (max-width: 400px) {
+  .notas-grid { grid-template-columns: 1fr !important; }
+  .nota-componentes { grid-template-columns: 1fr !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TOASTS — posición correcta en móvil
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .cur-toast,
+  .doc-toast,
+  [class*="-toast"] {
+    left: 14px !important;
+    right: 14px !important;
+    bottom: 14px !important;
+    text-align: center;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MODALES — centrado y scroll en móvil
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  /* Padding interno de modales */
+  [class*="-modal"] {
+    padding: 20px 16px !important;
+    width: min(96vw, 500px) !important;
+    max-height: 88vh !important;
+    overflow-y: auto !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   INPUTS Y SELECTS — full width en móvil
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .selector-group select,
+  .materia-selector select,
+  .gev-form-group select,
+  .gev-form-group input {
+    min-width: unset !important;
+    width: 100% !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PANEL HEADER — stack en móvil
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .panel-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FINANZAS — responsive
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .fin-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .fin-stats { flex-wrap: wrap; gap: 8px; }
+  .fin-stat { flex: 1 1 calc(50% - 4px); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   NOTIFICACIONES — responsive
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .notif-drawer { width: min(92vw, 420px) !important; padding: 20px 16px !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SHD TABS (calificaciones docente) — wrap en móvil
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  /* Los tabs de SABER/HACER/DECIDIR en móvil */
+  .doc-table-wrap table th,
+  .doc-table-wrap table td { font-size: 12px !important; padding: 6px 8px !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   VISTA PAGOS — responsive
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .pagos-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CALENDARIO — responsive
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .cal-grid { grid-template-columns: repeat(7, minmax(36px, 1fr)) !important; }
+  .cal-day { min-height: 40px !important; padding: 4px !important; }
+  .cal-header { flex-wrap: wrap; gap: 6px; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   UTILIDADES GENERALES responsive
+══════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Reduce padding en contenedores principales */
+  .panel-body { padding: 14px 16px !important; }
+  .empty-msg { padding: 28px 16px !important; }
+
+  /* Formularios siempre en columna */
+  .form-row,
+  .doc-form .form-row { grid-template-columns: 1fr !important; }
+
+  /* Botones de acción en móvil: ancho completo cuando están solos */
+  .vista-footer { flex-direction: column; gap: 8px; }
+  .vista-footer button { width: 100%; }
+}
+
+/* Previene overflow horizontal global */
+@media (max-width: 768px) {
+  body { overflow-x: hidden; }
+}

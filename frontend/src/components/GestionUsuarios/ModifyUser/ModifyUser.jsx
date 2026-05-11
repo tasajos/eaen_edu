@@ -186,22 +186,25 @@ export default function ModifyUser({ onBack }) {
     setSaving(false);
   };
 
-  // Mapa: rol -> tipo_usuario equivalente
+  // Solo sincroniza tipo_usuario cuando el rol lo requiere claramente
   const ROL_TO_TIPO = {
-    "ADMIN":           "Administrador",
-    "JEFE_ESTUDIOS":   "Jefe de Unidad o Director",
-    "DOCENTE":         "Docente",
-    "JEFE_CURSO":      "Jefe de Carrera",
-    "CURSANTE":        "Cursante",
-    "ADMIN_FINANZAS":  "Administrador",
+    "JEFE_ESTUDIOS":  "Jefe de Unidad o Director",
+    "DOCENTE":        "Docente",
+    "JEFE_CURSO":     "Jefe de Carrera",
+    "CURSANTE":       "Cursante",
+    // ADMIN y ADMIN_FINANZAS no sobreescriben tipo_usuario automáticamente
   };
 
   const onEditChange = (e) => {
     const { name, value } = e.target;
     if (name === "rol") {
-      // Sincronizar tipo_usuario automáticamente según el rol
-      const tipoAuto = ROL_TO_TIPO[value] || "";
-      setEditUser((prev) => ({ ...prev, rol: value, tipo_usuario: tipoAuto }));
+      const tipoAuto = ROL_TO_TIPO[value];
+      // Solo auto-asigna tipo_usuario si hay un mapeo explícito para ese rol
+      if (tipoAuto) {
+        setEditUser((prev) => ({ ...prev, rol: value, tipo_usuario: tipoAuto }));
+      } else {
+        setEditUser((prev) => ({ ...prev, rol: value }));
+      }
     } else {
       setEditUser((prev) => ({ ...prev, [name]: value }));
     }
@@ -322,18 +325,23 @@ export default function ModifyUser({ onBack }) {
       const data = await resp.json().catch(() => ({}));
 
       if (!resp.ok) {
+        // Mostrar el error exacto del servidor (incluyendo campo duplicado, not found, etc.)
+        const msg = data?.message || `Error ${resp.status}: no se pudo actualizar el usuario.`;
         openStatus({
           type: "error",
-          title: "No se pudo guardar",
-          message: data?.message || "Ocurrió un error al actualizar el usuario.",
+          title: resp.status === 409 ? "Dato duplicado" :
+                 resp.status === 404 ? "Usuario no encontrado" : "Error al guardar",
+          message: msg,
         });
         return;
       }
 
       openStatus({
-        type: "success",
-        title: "Cambios guardados",
-        message: `Se actualizaron los datos del CI: ${ciExacto}.`,
+        type: data.aviso ? "error" : "success",
+        title: data.aviso ? "Guardado con advertencia" : "Cambios guardados",
+        message: data.aviso
+          ? `Rol actualizado a ${data.rol || "—"}. ⚠️ ${data.aviso}`
+          : `Datos del CI ${ciExacto} actualizados correctamente.${data.rol ? ` Rol: ${data.rol}` : ""}`,
       });
 
       closeEditModal();

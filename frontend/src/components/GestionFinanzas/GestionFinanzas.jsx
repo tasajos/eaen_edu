@@ -338,7 +338,9 @@ export default function GestionFinanzas(){
       <div className="gfin-page" style={{minHeight:"unset",flex:1}}>
       {/* Header */}
       <header className="gfin-header">
-        <button className="gfin-back" onClick={()=>navigate("/dashboard-jefe")}>← Dashboard</button>
+        {session?.rol !== "ADMIN_FINANZAS" && (
+          <button className="gfin-back" onClick={()=>navigate("/dashboard-jefe")}>← Dashboard</button>
+        )}
         <div style={{flex:1}}>
           <h1>💰 Gestión de Finanzas</h1>
           <p>Control de matrícula, guía y mensualidades por participante.</p>
