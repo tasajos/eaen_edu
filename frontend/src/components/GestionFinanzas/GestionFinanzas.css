@@ -106,3 +106,69 @@
 .gfin-toast{position:fixed;bottom:28px;right:28px;background:#1b5e20;color:#fff;padding:13px 22px;border-radius:12px;font-weight:700;font-size:14px;box-shadow:0 8px 28px rgba(0,0,0,.18);z-index:9999;animation:gfin-tin .3s cubic-bezier(.34,1.2,.64,1);}
 .gfin-toast-error{background:#b71c1c;}
 @keyframes gfin-tin{from{opacity:0;transform:translateY(16px) scale(.95)}to{opacity:1;transform:none}}
+/* ══════════════════════════════════════════════════════════
+   RESPONSIVE — GestionFinanzas
+══════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Header */
+  .gfin-header { padding: 12px 14px; gap: 10px; }
+  .gfin-header h1 { font-size: 17px; }
+  .gfin-header p  { font-size: 12px; display: none; }
+
+  /* Main */
+  .gfin-main { padding: 14px 12px; gap: 12px; }
+
+  /* Curso bar */
+  .gfin-curso-bar { flex-direction: column; align-items: stretch; gap: 10px; }
+  .gfin-btn-primary { width: 100%; text-align: center; }
+
+  /* Stats: 2 columnas */
+  .gfin-stats { grid-template-columns: repeat(2, 1fr) !important; gap: 10px; }
+  .gfin-stat  { padding: 12px 14px; gap: 10px; }
+  .gfin-stat-val  { font-size: 20px; }
+  .gfin-stat-icon { font-size: 22px; }
+
+  /* Card */
+  .gfin-card-header { padding: 12px 14px; flex-wrap: wrap; gap: 8px; }
+  .gfin-search { width: 100%; }
+
+  /* Filtros */
+  .gfin-card-header > div { flex-wrap: wrap; gap: 6px; }
+  .gfin-filter-btn { padding: 4px 10px; font-size: 11px; }
+
+  /* Conceptos */
+  .gfin-conceptos-list { padding: 10px 12px; }
+  .gfin-concepto-row   { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+
+  /* Tabla: scroll horizontal */
+  .gfin-tabla-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .gfin-tabla th, .gfin-tabla td { padding: 8px 10px; font-size: 12px; }
+  .gfin-bold   { font-size: 12px; }
+  .gfin-pago-btn { padding: 4px 8px; font-size: 10.5px; }
+
+  /* Tabla columna nombre: no hacer nowrap */
+  .gfin-tabla td:nth-child(2) { min-width: 130px; }
+
+  /* Modal */
+  .gfin-modal { max-width: 96vw; max-height: 92vh; }
+  .gfin-modal-body { padding: 14px 14px; }
+  .gfin-modal-footer { padding: 10px 14px; }
+  .gfin-form-row { grid-template-columns: 1fr !important; gap: 10px; }
+  .gfin-tipo-grid { grid-template-columns: 1fr !important; gap: 8px; }
+
+  /* Toast */
+  .gfin-toast { left: 12px; right: 12px; bottom: 14px; text-align: center; }
+}
+
+@media (max-width: 480px) {
+  /* Stats: 2 cols compactas */
+  .gfin-stats { grid-template-columns: repeat(2, 1fr) !important; gap: 8px; }
+  .gfin-stat  { padding: 10px 12px; }
+  .gfin-stat-val  { font-size: 18px; }
+  .gfin-stat-lbl  { font-size: 10px; }
+  .gfin-stat-icon { display: none; }
+
+  /* Header */
+  .gfin-header h1 { font-size: 15px; }
+  .gfin-main { padding: 10px; gap: 10px; }
+}

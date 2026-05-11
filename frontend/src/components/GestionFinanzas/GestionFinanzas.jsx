@@ -36,6 +36,168 @@ function fmtFecha(f){
   return d.toLocaleDateString("es-BO",{day:"2-digit",month:"2-digit",year:"numeric"});
 }
 
+/* ── Generador de voucher para el admin ──────────────────── */
+function generarVoucherAdmin(pago, usuario) {
+  const tc = TIPO_COLOR[pago.tipo] || TIPO_COLOR.OTRO;
+  const concepto = pago.descripcion
+    || `${tc.icon} ${pago.tipo}${pago.mes ? " " + MESES_ES[pago.mes] : ""}${pago.anio ? " " + pago.anio : ""}`;
+  const nombre = `${usuario.ap_paterno || ""} ${usuario.ap_materno || ""}, ${usuario.nombre || ""}`.trim();
+
+  const html = `<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="UTF-8"/><title>Voucher — ${nombre}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4f8;display:flex;justify-content:center;padding:32px 16px}
+  .v{background:#fff;border-radius:16px;width:480px;box-shadow:0 8px 40px rgba(0,0,0,.15);overflow:hidden}
+  .vh{background:#003366;color:#fff;padding:22px 28px;display:flex;align-items:center;gap:14}
+  .vl{width:48px;height:48px;background:rgba(255,255,255,.15);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:24px}
+  .vi h1{font-size:15px;font-weight:800}.vi p{font-size:11px;opacity:.7;margin-top:2px}
+  .vbadge{background:#ff6600;color:#fff;padding:5px 13px;border-radius:20px;font-size:11px;font-weight:700;margin-left:auto}
+  .vb{padding:22px 28px}.vt{font-size:18px;font-weight:800;color:#003366;margin-bottom:16px}
+  .vm{text-align:center;background:#f0f4ff;border-radius:12px;padding:16px;margin-bottom:18px;border:2px solid #c5cae9}
+  .vm label{font-size:10px;color:#5a6a80;text-transform:uppercase;letter-spacing:.5px}
+  .vm .mv{font-size:34px;font-weight:900;color:#003366;font-family:'Courier New',monospace;margin-top:3px}
+  .vs{margin-bottom:16px}.vs h3{font-size:10px;font-weight:700;color:#8898aa;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;padding-bottom:5px;border-bottom:1.5px solid #f0f4f8}
+  .vr{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f8fafc;font-size:13px}
+  .vr:last-child{border:none}.vr span:first-child{color:#6b7a90}.vr span:last-child{font-weight:600;color:#1a2535}
+  .vf{background:#f7f9fc;border-top:2px solid #f0f4f8;padding:14px 28px;text-align:center}
+  .vf p{font-size:11px;color:#8898aa;line-height:1.5}.vf strong{color:#003366}
+  .vnum{font-size:10px;color:#bbb;margin-top:6px;font-family:monospace}
+  @media print{body{background:white;padding:0}.v{box-shadow:none;border-radius:0;width:100%}}
+</style></head><body>
+<div class="v">
+  <div class="vh">
+    <div class="vl"><img src="/eaen.png" style="width:40px;height:40px;object-fit:contain" alt="EAEN"/></div>
+    <div class="vi"><h1>EAEN Avaroa</h1><p>Escuela de Altos Estudios Nacionales</p></div>
+    <div class="vbadge">VOUCHER</div>
+  </div>
+  <div class="vb">
+    <div class="vt">🧾 Comprobante de Pago</div>
+    <div class="vm">
+      <label>Monto pagado</label>
+      <div class="mv">Bs. ${Number(pago.monto_pagado||pago.monto).toFixed(2)}</div>
+    </div>
+    <div class="vs"><h3>Concepto</h3>
+      <div class="vr"><span>Descripción</span><span>${concepto}</span></div>
+      <div class="vr"><span>Monto original</span><span>Bs. ${Number(pago.monto).toFixed(2)}</span></div>
+      ${pago.fecha_venc?`<div class="vr"><span>Vencimiento</span><span>${fmtFecha(pago.fecha_venc)}</span></div>`:""}
+    </div>
+    <div class="vs"><h3>Datos del pago</h3>
+      <div class="vr"><span>Fecha de pago</span><span>${fmtFecha(pago.fecha_pago)}</span></div>
+      ${pago.comprobante?`<div class="vr"><span>N° Comprobante</span><span>${pago.comprobante}</span></div>`:""}
+      ${pago.observacion?`<div class="vr"><span>Observación</span><span>${pago.observacion}</span></div>`:""}
+    </div>
+    <div class="vs"><h3>Cursante</h3>
+      <div class="vr"><span>Nombre</span><span>${nombre}</span></div>
+      <div class="vr"><span>CI</span><span>${usuario.ci||"—"}</span></div>
+    </div>
+  </div>
+  <div class="vf">
+    <p><strong>EAEN Avaroa — Departamento de Finanzas</strong><br/>Comprobante oficial de pago.</p>
+    <div class="vnum">Generado: ${new Date().toLocaleString("es-BO")} · ID: ${pago.id||"—"}</div>
+  </div>
+</div>
+<div style="text-align:center;padding:20px;background:#f7f9fc;border-top:2px solid #f0f4f8">
+  <button onclick="window.print()" style="padding:11px 28px;background:#003366;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Guardar PDF</button>
+</div>
+</body></html>`;
+  const win = window.open("", "_blank", "width=560,height=800");
+  if(win){ win.document.write(html); win.document.close(); }
+}
+
+/* ── Modal: historial de pagos de un cursante ─────────────── */
+function ModalHistorial({ usuario, conceptos, onClose, onEditar }) {
+  const MESES = MESES_ES;
+  return (
+    <div className="gfin-overlay" onClick={onClose}>
+      <div className="gfin-modal" style={{maxWidth:620}} onClick={e=>e.stopPropagation()}>
+        <div className="gfin-modal-header">
+          <div style={{display:"flex",flexDirection:"column"}}>
+            <div className="gfin-modal-title">📋 Historial de pagos</div>
+            <div style={{fontSize:13,color:"rgba(255,255,255,.7)",marginTop:2}}>
+              {usuario.ap_paterno} {usuario.ap_materno}, {usuario.nombre} — CI: {usuario.ci}
+            </div>
+          </div>
+          <button className="gfin-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="gfin-modal-body" style={{maxHeight:"65vh",overflowY:"auto"}}>
+          {usuario.pagos.length === 0 ? (
+            <p style={{textAlign:"center",color:"#888",padding:24}}>Sin pagos registrados.</p>
+          ) : (
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {usuario.pagos.map((pg, i) => {
+                const tc  = TIPO_COLOR[pg.tipo] || TIPO_COLOR.OTRO;
+                const est = ESTADO_STYLE[pg.estado] || ESTADO_STYLE.PENDIENTE;
+                const concepto = pg.descripcion
+                  || `${tc.icon} ${pg.tipo}${pg.mes?" "+MESES[pg.mes]:""}${pg.anio?" "+pg.anio:""}`;
+                return (
+                  <div key={i} style={{
+                    display:"flex", alignItems:"center", gap:12,
+                    padding:"12px 14px", borderRadius:12,
+                    border:`1.5px solid ${tc.border}20`,
+                    background: pg.estado==="PAGADO" ? "#f8fff8" : pg.estado==="MORA" ? "#fff8f8" : "#fffdf0"
+                  }}>
+                    {/* Tipo badge */}
+                    <div style={{
+                      width:44,height:44,borderRadius:10,flexShrink:0,
+                      background:tc.bg,color:tc.color,
+                      display:"flex",alignItems:"center",justifyContent:"center",fontSize:22
+                    }}>{tc.icon}</div>
+
+                    {/* Info */}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:700,fontSize:14,color:"#1a2535"}}>{concepto}</div>
+                      <div style={{fontSize:12,color:"#6b7a90",marginTop:3,display:"flex",gap:10,flexWrap:"wrap"}}>
+                        <span>Bs. {Number(pg.monto).toFixed(2)}</span>
+                        {pg.fecha_pago && <span>📅 Pagado: {fmtFecha(pg.fecha_pago)}</span>}
+                        {pg.comprobante && <span>🧾 {pg.comprobante}</span>}
+                        {pg.fecha_venc && pg.estado !== "PAGADO" && (
+                          <span style={{color: pg.estado==="MORA"?"#c62828":"#f57f17"}}>
+                            ⏰ Vence: {fmtFecha(pg.fecha_venc)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Estado + acciones */}
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6,flexShrink:0}}>
+                      <span style={{
+                        padding:"4px 10px",borderRadius:20,fontSize:11,fontWeight:700,
+                        background:est.bg,color:est.color,whiteSpace:"nowrap"
+                      }}>{est.label}</span>
+                      <div style={{display:"flex",gap:6}}>
+                        {pg.estado==="PAGADO" && (
+                          <button
+                            onClick={()=>generarVoucherAdmin(pg, usuario)}
+                            style={{
+                              padding:"5px 10px",borderRadius:7,border:"none",
+                              background:"#003366",color:"#fff",
+                              fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"
+                            }}
+                          >🖨️ Voucher</button>
+                        )}
+                        <button
+                          onClick={()=>onEditar(pg)}
+                          style={{
+                            padding:"5px 10px",borderRadius:7,border:"1.5px solid #e8ecf2",
+                            background:"#fff",color:"#5a6a80",
+                            fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"
+                          }}
+                        >✏️ Editar</button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Modal: registrar pago ─────────────────────────────── */
 function ModalPago({ pago, usuario, onClose, onGuardado, registrado_por }){
   const [form, setForm] = useState({
@@ -274,8 +436,9 @@ export default function GestionFinanzas(){
   const [partics,     setPartics]     = useState([]);
   const [loading,     setLoading]     = useState(false);
   const [toast,       setToast]       = useState(null);
-  const [modalPago,   setModalPago]   = useState(null); // {pago, usuario}
-  const [modalConc,   setModalConc]   = useState(false);
+  const [modalPago,      setModalPago]      = useState(null); // {pago, usuario}
+  const [modalConc,      setModalConc]      = useState(false);
+  const [historialModal, setHistorialModal] = useState(null); // usuario
   const [filtroTipo,  setFiltroTipo]  = useState("TODOS");
   const [filtroEst,   setFiltroEst]   = useState("TODOS");
   const [busqueda,    setBusqueda]    = useState("");
@@ -350,26 +513,26 @@ export default function GestionFinanzas(){
           <h1>💰 Gestión de Finanzas</h1>
           <p>Control de matrícula, guía y mensualidades por participante.</p>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0,flexWrap:"wrap"}}>
           <div style={{
             display:"flex",alignItems:"center",gap:8,
             background:"rgba(255,255,255,.12)",
             border:"1.5px solid rgba(255,255,255,.25)",
-            borderRadius:10,padding:"7px 14px"
+            borderRadius:10,padding:"7px 12px"
           }}>
             <div style={{
-              width:30,height:30,borderRadius:"50%",
+              width:28,height:28,borderRadius:"50%",
               background:"#ff6600",color:"#fff",
               display:"flex",alignItems:"center",justifyContent:"center",
-              fontWeight:700,fontSize:13,flexShrink:0
+              fontWeight:700,fontSize:12,flexShrink:0
             }}>
               {session?.ap_paterno?.[0] || "U"}
             </div>
             <div style={{lineHeight:1.3}}>
-              <div style={{fontSize:13,fontWeight:700,color:"#fff"}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>
                 {session?.ap_paterno} {session?.nombre}
               </div>
-              <div style={{fontSize:11,color:"rgba(255,255,255,.6)"}}>
+              <div style={{fontSize:10,color:"rgba(255,255,255,.6)"}}>
                 💰 Admin Finanzas
               </div>
             </div>
@@ -377,11 +540,12 @@ export default function GestionFinanzas(){
           <button
             onClick={()=>{ localStorage.removeItem("eaen_session"); navigate("/", { replace: true }); }}
             style={{
-              padding:"8px 16px",borderRadius:9,
+              padding:"8px 14px",borderRadius:9,
               background:"rgba(220,38,38,.25)",
               border:"1.5px solid rgba(220,38,38,.5)",
-              color:"#fca5a5",fontSize:13,fontWeight:700,
-              cursor:"pointer",fontFamily:"inherit",transition:"all .2s"
+              color:"#fca5a5",fontSize:12,fontWeight:700,
+              cursor:"pointer",fontFamily:"inherit",transition:"all .2s",
+              whiteSpace:"nowrap"
             }}
           >
             🚪 Cerrar sesión
@@ -539,13 +703,24 @@ export default function GestionFinanzas(){
                           {totalDeuda>0 ? `Bs. ${totalDeuda.toFixed(0)}` : "—"}
                         </td>
                         <td style={{textAlign:"center"}}>
-                          {tieneMora ? (
-                            <span className="gfin-badge mora">🔴 Mora</span>
-                          ) : p.pagos.every(x=>x.estado==="PAGADO"||x.estado==="EXONERADO") ? (
-                            <span className="gfin-badge ok">✅ Al día</span>
-                          ) : (
-                            <span className="gfin-badge pend">⏳ Pendiente</span>
-                          )}
+                          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5}}>
+                            {tieneMora ? (
+                              <span className="gfin-badge mora">🔴 Mora</span>
+                            ) : p.pagos.every(x=>x.estado==="PAGADO"||x.estado==="EXONERADO") ? (
+                              <span className="gfin-badge ok">✅ Al día</span>
+                            ) : (
+                              <span className="gfin-badge pend">⏳ Pendiente</span>
+                            )}
+                            <button
+                              onClick={()=>setHistorialModal(p)}
+                              style={{
+                                padding:"3px 10px",borderRadius:6,
+                                background:"#e3f2fd",color:"#1565c0",
+                                border:"none",fontSize:11,fontWeight:700,
+                                cursor:"pointer",whiteSpace:"nowrap"
+                              }}
+                            >📋 Historial</button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -561,6 +736,17 @@ export default function GestionFinanzas(){
         <ModalConcepto cursoId={cursoId} creado_por={session?.id}
           onClose={()=>setModalConc(false)}
           onCreado={d=>{ setModalConc(false); showToast(`✅ Concepto creado — ${d.pagos_generados} pagos generados`); cargar(); }}
+        />
+      )}
+      {historialModal && (
+        <ModalHistorial
+          usuario={historialModal}
+          conceptos={conceptos}
+          onClose={()=>setHistorialModal(null)}
+          onEditar={(pg)=>{
+            setHistorialModal(null);
+            setModalPago({ pago: pg, usuario: historialModal });
+          }}
         />
       )}
       {modalPago && (
