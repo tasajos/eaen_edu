@@ -187,6 +187,39 @@ app.get("/api/usuarios/ci/:ci", async (req,res) => {
   } catch(e){ res.status(500).json({message:"Error interno",detail:e.message}); }
 });
 
+/**
+ * PATCH /api/usuarios/:id/password — Cambio de contraseña (requiere password actual)
+ */
+app.patch("/api/usuarios/:id/password", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ message: "ID inválido" });
+    const { password_actual, password_nueva } = req.body;
+    if (!password_actual?.trim()) return res.status(400).json({ message: "Ingrese su contraseña actual" });
+    if (!password_nueva?.trim() || password_nueva.trim().length < 6)
+      return res.status(400).json({ message: "La nueva contraseña debe tener al menos 6 caracteres" });
+
+    const [[user]] = await pool.execute(
+      `SELECT id, password FROM usuarios WHERE id=? AND estado='ACTIVO' LIMIT 1`, [id]);
+    if (!user) return res.status(404).json({ message: "Usuario no encontrado" });
+
+    const hash = String(user.password || "");
+    let valid = false;
+    if (hash.startsWith("$2b$") || hash.startsWith("$2a$")) {
+      valid = await bcrypt.compare(String(password_actual), hash);
+    } else {
+      valid = hash === String(password_actual);
+    }
+    if (!valid) return res.status(401).json({ message: "La contraseña actual es incorrecta" });
+
+    const nuevoHash = await bcrypt.hash(String(password_nueva.trim()), 10);
+    await pool.execute(`UPDATE usuarios SET password=? WHERE id=? LIMIT 1`, [nuevoHash, id]);
+    res.json({ message: "Contraseña actualizada correctamente" });
+  } catch(e) {
+    res.status(500).json({ message: "Error interno", detail: e.message });
+  }
+});
+
 app.put("/api/usuarios/ci/:ci", async (req,res) => {
   try {
     const ci = String(req.params.ci||"").trim();

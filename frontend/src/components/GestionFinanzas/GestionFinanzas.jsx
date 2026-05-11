@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "./GestionFinanzas.css";
 import SidebarJefe from "../Shared/SidebarJefe";
+import PerfilUsuario from "../Shared/PerfilUsuario";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const getSession = () => { try{ return JSON.parse(localStorage.getItem("eaen_session")||"null"); }catch{ return null; } };
@@ -494,6 +495,7 @@ export default function GestionFinanzas(){
   };
 
   const esAdminFinanzas = session?.rol === "ADMIN_FINANZAS";
+  const [perfilOpen, setPerfilOpen] = useState(false);
 
   return (
     <div className="sjefe-page">
@@ -537,6 +539,19 @@ export default function GestionFinanzas(){
               </div>
             </div>
           </div>
+          <button
+            onClick={() => setPerfilOpen(true)}
+            style={{
+              padding:"8px 14px",borderRadius:9,
+              background:"rgba(255,255,255,.15)",
+              border:"1.5px solid rgba(255,255,255,.25)",
+              color:"#fff",fontSize:12,fontWeight:700,
+              cursor:"pointer",fontFamily:"inherit",transition:"all .2s",
+              whiteSpace:"nowrap"
+            }}
+          >
+            👤 Mi Perfil
+          </button>
           <button
             onClick={()=>{ localStorage.removeItem("eaen_session"); navigate("/", { replace: true }); }}
             style={{
@@ -738,6 +753,7 @@ export default function GestionFinanzas(){
           onCreado={d=>{ setModalConc(false); showToast(`✅ Concepto creado — ${d.pagos_generados} pagos generados`); cargar(); }}
         />
       )}
+      {perfilOpen && <PerfilUsuario session={session} onClose={() => setPerfilOpen(false)} />}
       {historialModal && (
         <ModalHistorial
           usuario={historialModal}

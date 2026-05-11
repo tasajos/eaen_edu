@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import PerfilUsuario from "../../Shared/PerfilUsuario";
 import { useNavigate } from "react-router-dom";
 import { useNotificaciones } from "../../../hooks/useNotificaciones";
 import { NotificacionesPanel, NotifBell } from "../../Shared/NotificacionesPanel";
@@ -25,6 +26,7 @@ export default function DashboardJefeCurso() {
   const [loadingCurso, setLoadingCurso] = useState(false);
   const [vista,        setVista]        = useState("resumen");
   const [sidebarOpen,  setSidebarOpen]  = useState(false);
+  const [perfilOpen,   setPerfilOpen]   = useState(false);
 
   const { notifs, noLeidas, loading: loadingNotifs, marcarLeida, marcarTodasLeidas } = useNotificaciones(30);
 
@@ -95,8 +97,12 @@ export default function DashboardJefeCurso() {
           ))}
         </nav>
         <div style={{flex:1}}/>
+        <button className="nav-btn" onClick={()=>{setSidebarOpen(false);setPerfilOpen(true);}} style={{marginBottom:4}}>
+          👤 Mi Perfil
+        </button>
         <button className="nav-btn logout" onClick={()=>{localStorage.removeItem("eaen_session");navigate("/", { replace: true });}}>🚪 Cerrar sesión</button>
       </aside>
+      {perfilOpen && <PerfilUsuario session={session} onClose={() => setPerfilOpen(false)} />}
 
       <main className="jc-main">
         <header className="jc-header">
