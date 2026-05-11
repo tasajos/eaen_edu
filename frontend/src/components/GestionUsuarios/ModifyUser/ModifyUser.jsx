@@ -186,25 +186,27 @@ export default function ModifyUser({ onBack }) {
     setSaving(false);
   };
 
-  // Solo sincroniza tipo_usuario cuando el rol lo requiere claramente
+  // Rol → tipo_usuario sugerido (editable después por el usuario)
   const ROL_TO_TIPO = {
+    "ADMIN":          "Administrador",
+    "ADMIN_FINANZAS": "Administrador",
     "JEFE_ESTUDIOS":  "Jefe de Unidad o Director",
     "DOCENTE":        "Docente",
     "JEFE_CURSO":     "Jefe de Carrera",
     "CURSANTE":       "Cursante",
-    // ADMIN y ADMIN_FINANZAS no sobreescriben tipo_usuario automáticamente
   };
 
   const onEditChange = (e) => {
     const { name, value } = e.target;
     if (name === "rol") {
-      const tipoAuto = ROL_TO_TIPO[value];
-      // Solo auto-asigna tipo_usuario si hay un mapeo explícito para ese rol
-      if (tipoAuto) {
-        setEditUser((prev) => ({ ...prev, rol: value, tipo_usuario: tipoAuto }));
-      } else {
-        setEditUser((prev) => ({ ...prev, rol: value }));
-      }
+      const tipoAuto = ROL_TO_TIPO[value] || "";
+      // Siempre actualiza tipo_usuario al cambiar de rol (el usuario puede cambiarlo después)
+      setEditUser((prev) => ({
+        ...prev,
+        rol: value,
+        // Solo sobreescribe tipo_usuario si el campo estaba vacío o si hay sugerencia clara
+        tipo_usuario: prev.tipo_usuario && !tipoAuto ? prev.tipo_usuario : tipoAuto,
+      }));
     } else {
       setEditUser((prev) => ({ ...prev, [name]: value }));
     }

@@ -2641,8 +2641,25 @@ app.post("/api/shd/notas/usuario", async (req, res) => {
 // START
 // ════════════════════════════════════════════════════════════
 const PORT = process.env.PORT || 5000;
+async function migrateRolEnum() {
+  try {
+    await pool.execute(`
+      ALTER TABLE usuarios
+        MODIFY COLUMN rol
+          ENUM('ADMIN','JEFE_ESTUDIOS','DOCENTE','JEFE_CURSO','CURSANTE','ADMIN_FINANZAS')
+          DEFAULT NULL`);
+    console.log("✅ usuarios.rol: ENUM actualizado con ADMIN_FINANZAS");
+  } catch(e) {
+    // Ya existe o no necesita cambio
+    if (!e.message?.includes("Duplicate column") && !e.message?.includes("same definition")) {
+      console.warn("⚠️  migrateRolEnum:", e.message);
+    }
+  }
+}
+
 app.listen(PORT, async () => {
   console.log(`✅ API EAEN corriendo en http://localhost:${PORT}`);
+  await migrateRolEnum();
   await seedFinanzas();
   await seedDisciplina();
   await seedEvalInstPlantillas();
