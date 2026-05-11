@@ -330,10 +330,15 @@ export default function GestionFinanzas(){
     } catch(e){ showToast(`❌ ${e.message}`,"error"); }
   };
 
+  const esAdminFinanzas = session?.rol === "ADMIN_FINANZAS";
+
   return (
     <div className="sjefe-page">
-      <SidebarJefe open={sidebarOpen} />
-      <button className="sjefe-toggle" onClick={()=>setSidebarOpen(v=>!v)}>☰</button>
+      {/* Solo el Jefe de Estudios ve el sidebar completo */}
+      {!esAdminFinanzas && <SidebarJefe open={sidebarOpen} />}
+      {!esAdminFinanzas && (
+        <button className="sjefe-toggle" onClick={()=>setSidebarOpen(v=>!v)}>☰</button>
+      )}
       <div className="sjefe-main">
       <div className="gfin-page" style={{minHeight:"unset",flex:1}}>
       {/* Header */}
