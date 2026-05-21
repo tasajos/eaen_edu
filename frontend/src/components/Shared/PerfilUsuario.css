@@ -1,0 +1,184 @@
+/* ═══════════════════════════════════════════════
+   PerfilUsuario.css — Panel lateral de perfil
+   ═══════════════════════════════════════════════ */
+
+.perf-overlay {
+  position: fixed; inset: 0; z-index: 600;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(3px);
+  display: flex; justify-content: flex-end;
+  animation: perf-fade 0.18s ease;
+}
+@keyframes perf-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.perf-panel {
+  width: min(400px, 100vw);
+  height: 100vh;
+  background: #fff;
+  display: flex; flex-direction: column;
+  box-shadow: -8px 0 40px rgba(0,0,0,0.20);
+  animation: perf-slide 0.25s cubic-bezier(0.4,0,0.2,1);
+  overflow: hidden;
+}
+@keyframes perf-slide { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+/* ── Header ─────────────────────────────────── */
+.perf-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 20px 18px 16px;
+  background: #003366; color: #fff;
+  flex-shrink: 0;
+}
+.perf-avatar {
+  width: 46px; height: 46px; border-radius: 50%;
+  background: #ff6600; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; font-weight: 800; flex-shrink: 0;
+}
+.perf-header-info { flex: 1; min-width: 0; }
+.perf-nombre {
+  font-size: 14px; font-weight: 700; color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.perf-rol { font-size: 11px; color: rgba(255,255,255,.6); margin-top: 2px; }
+.perf-close {
+  background: rgba(255,255,255,.15); border: none; color: #fff;
+  width: 32px; height: 32px; border-radius: 8px;
+  font-size: 16px; cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.18s;
+}
+.perf-close:hover { background: rgba(255,255,255,.28); }
+
+/* ── Tabs ────────────────────────────────────── */
+.perf-tabs {
+  display: flex; flex-shrink: 0;
+  border-bottom: 2px solid #f0f4f8;
+}
+.perf-tab {
+  flex: 1; padding: 12px 8px;
+  background: none; border: none; border-bottom: 3px solid transparent;
+  font-size: 13px; font-weight: 600; color: #8898aa;
+  cursor: pointer; transition: all 0.18s; font-family: inherit;
+  margin-bottom: -2px;
+}
+.perf-tab:hover { color: #003366; background: #f7f9fc; }
+.perf-tab.active { color: #003366; border-bottom-color: #003366; background: #fff; }
+
+/* ── Body ────────────────────────────────────── */
+.perf-body {
+  flex: 1; overflow-y: auto; padding: 16px 18px;
+}
+
+/* ── Datos personales ────────────────────────── */
+.perf-secciones { display: flex; flex-direction: column; gap: 18px; }
+
+.perf-seccion-titulo {
+  font-size: 10.5px; font-weight: 700; color: #8898aa;
+  text-transform: uppercase; letter-spacing: .8px;
+  margin-bottom: 10px; padding-bottom: 6px;
+  border-bottom: 1.5px solid #f0f4f8;
+}
+.perf-campos { display: flex; flex-direction: column; gap: 0; }
+
+.perf-campo {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 8px 0; border-bottom: 1px solid #f8fafc; gap: 8px;
+}
+.perf-campo:last-child { border-bottom: none; }
+.perf-campo-lbl {
+  font-size: 12px; color: #8898aa; font-weight: 600;
+  min-width: 130px; flex-shrink: 0;
+}
+.perf-campo-val {
+  font-size: 13px; color: #1a2535; font-weight: 500;
+  text-align: right; word-break: break-word;
+}
+
+/* ── Cambiar contraseña ──────────────────────── */
+.perf-pw-form { display: flex; flex-direction: column; gap: 16px; }
+
+.perf-pw-hint {
+  font-size: 13px; color: #6b7a90; line-height: 1.5;
+  padding: 10px 14px; background: #f0f4ff;
+  border-radius: 9px; border-left: 4px solid #003366;
+}
+
+.perf-pw-group { display: flex; flex-direction: column; gap: 6px; }
+.perf-pw-group label {
+  font-size: 12px; font-weight: 700; color: #5a6a80;
+  text-transform: uppercase; letter-spacing: .4px;
+}
+.perf-pw-group label span { font-weight: 400; text-transform: none; color: #aaa; }
+
+.perf-pw-input-wrap {
+  position: relative; display: flex; align-items: center;
+}
+.perf-pw-input-wrap input {
+  width: 100%; padding: 10px 40px 10px 13px;
+  border: 2px solid #e8ecf2; border-radius: 9px;
+  font-size: 14px; font-family: inherit; color: #1a2535;
+  transition: border-color .2s; outline: none;
+}
+.perf-pw-input-wrap input:focus { border-color: #003366; }
+.perf-eye {
+  position: absolute; right: 10px;
+  background: none; border: none; cursor: pointer;
+  font-size: 16px; padding: 2px; line-height: 1;
+  opacity: .6; transition: opacity .18s;
+}
+.perf-eye:hover { opacity: 1; }
+
+.perf-match-icon {
+  position: absolute; right: 10px; font-size: 15px; pointer-events: none;
+}
+
+/* Barra de fortaleza */
+.perf-strength {
+  margin-top: 5px; display: flex; align-items: center; gap: 8px;
+}
+.perf-strength-bar {
+  height: 4px; border-radius: 3px; transition: width .3s, background .3s;
+  min-width: 4px;
+}
+.perf-strength-bar.weak   { background: #ef5350; }
+.perf-strength-bar.medium { background: #ff9800; }
+.perf-strength-bar.strong { background: #43a047; }
+.perf-strength span { font-size: 11px; color: #888; white-space: nowrap; }
+
+/* Mensajes */
+.perf-msg {
+  padding: 10px 14px; border-radius: 9px;
+  font-size: 13px; font-weight: 600;
+}
+.perf-msg.ok    { background: #e8f5e9; color: #2e7d32; border: 1.5px solid #a5d6a7; }
+.perf-msg.error { background: #ffebee; color: #c62828; border: 1.5px solid #ef9a9a; }
+
+.perf-pw-submit {
+  padding: 12px 0; border-radius: 10px;
+  background: #003366; color: #fff; border: none;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  font-family: inherit; transition: all .18s; margin-top: 4px;
+}
+.perf-pw-submit:hover:not(:disabled) { background: #0055aa; transform: translateY(-1px); }
+.perf-pw-submit:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+
+/* Loading */
+.perf-loading {
+  display: flex; justify-content: center; padding: 40px;
+}
+.perf-ring {
+  width: 32px; height: 32px;
+  border: 3px solid #e8ecf2; border-top-color: #003366;
+  border-radius: 50%; animation: perf-spin .7s linear infinite;
+}
+@keyframes perf-spin { to { transform: rotate(360deg); } }
+
+.perf-empty { text-align: center; color: #8898aa; padding: 32px; font-size: 14px; }
+
+/* ── Responsive ──────────────────────────────── */
+@media (max-width: 480px) {
+  .perf-panel { width: 100vw; }
+  .perf-campo-lbl { min-width: 100px; font-size: 11px; }
+  .perf-campo-val { font-size: 12px; }
+}
