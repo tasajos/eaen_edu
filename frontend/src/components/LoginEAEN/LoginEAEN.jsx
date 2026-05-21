@@ -69,8 +69,8 @@ export default function LoginEAEN() {
         setError(data.message || "Credenciales incorrectas.");
         return;
       }
-      // Guardar sesión completa
-      localStorage.setItem("eaen_session", JSON.stringify(data.usuario));
+      // Guardar sesión + token (el token viaja con la sesión para que logout lo limpie junto)
+      localStorage.setItem("eaen_session", JSON.stringify({ ...data.usuario, _token: data.token }));
       navigate(getDashboard(data.usuario), { replace: true });
     } catch {
       setError("No se pudo conectar con el servidor. Verifique su conexión.");

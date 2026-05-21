@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import mysql from "mysql2/promise";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -101,6 +102,33 @@ async function assertCursanteInscrito(c, cursoId, uid) {
   if (!r.length) return {ok:false,code:400,msg:"El encargado debe ser cursante inscrito en el curso"};
   return {ok:true};
 }
+
+// ════════════════════════════════════════════════════════════
+// AUTH MIDDLEWARE
+// ════════════════════════════════════════════════════════════
+const JWT_SECRET = process.env.JWT_SECRET || "eaen_fallback_secret_change_me";
+const JWT_EXPIRES = "8h";
+
+function requireAuth(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "No autenticado. Inicie sesión." });
+  }
+  try {
+    req.user = jwt.verify(auth.slice(7), JWT_SECRET);
+    next();
+  } catch {
+    return res.status(401).json({ message: "Sesión expirada o inválida. Inicie sesión nuevamente." });
+  }
+}
+
+// Protege todas las rutas /api/* excepto las públicas
+app.use((req, res, next) => {
+  if (!req.path.startsWith("/api/")) return next();
+  if (req.method === "GET"  && req.path === "/api/health")     return next();
+  if (req.method === "POST" && req.path === "/api/auth/login")  return next();
+  return requireAuth(req, res, next);
+});
 
 // ════════════════════════════════════════════════════════════
 // HEALTH
@@ -2286,7 +2314,12 @@ app.post("/api/auth/login", async (req, res) => {
     }
 
     const { password_hash, ...sesion } = usuario;
-    return res.json({ message: "Login exitoso", usuario: sesion });
+    const token = jwt.sign(
+      { id: sesion.id, ci: sesion.ci, rol: sesion.rol, tipo_usuario: sesion.tipo_usuario },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES }
+    );
+    return res.json({ message: "Login exitoso", token, usuario: sesion });
 
   } catch (e) {
     console.error("[auth/login]", e);
