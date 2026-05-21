@@ -18,10 +18,10 @@ export default function DashboardJefe() {
       <nav className={`sidebar ${open ? "open" : ""}`}>
         <h2>Panel Jefe de Estudios</h2>
         <ul>
-          <li><button className="navlink" onClick={() => navigate("/gestion-usuarios")}>👥 Gestión de Usuarios</button></li>
-          <li><button className="navlink" onClick={() => navigate("/gestion-cursos")}>📚 Gestión de Cursos</button></li>
-          <li><button className="navlink" onClick={() => navigate("/gestion-notificaciones")}>🔔 Gestión de Notificaciones</button></li>
-          <li><button className="navlink" onClick={() => navigate("/gestion-educativa")}>🎓 Gestión Educativa</button></li>
+          <li><button className="navlink" onClick={() => navigate("/gestion-usuarios")}>👥 Administración de Usuarios</button></li>
+          <li><button className="navlink" onClick={() => navigate("/gestion-cursos")}>📚 Administración de Promociones</button></li>
+          <li><button className="navlink" onClick={() => navigate("/gestion-notificaciones")}>🔔 Administración de Notificaciones</button></li>
+          <li><button className="navlink" onClick={() => navigate("/gestion-educativa")}>🎓 Seguimiento Académico</button></li>
           <li><button className="navlink" onClick={() => navigate("/gestion-evaluaciones")}>📋 Evaluaciones Inst.</button></li>
           <li><button className="navlink" onClick={() => navigate("/gestion-disciplina")}>⚖️ Disciplina</button></li>
           <li><button className="navlink" onClick={() => navigate("/gestion-finanzas")}>💰 Finanzas</button></li>
@@ -54,25 +54,25 @@ export default function DashboardJefe() {
         </header>
 
         <section className="dashboard-grid">
-          <Card icon="👥" title="Gestión de Usuarios"
+          <Card icon="👥" title="Administración de Usuarios"
             desc="Administre usuarios: oficiales, personal civil y estudiantes de postgrado."
             onAccess={() => navigate("/gestion-usuarios")} />
-          <Card icon="📚" title="Gestión de Cursos"
+          <Card icon="📚" title="Administración de Promociones"
             desc="Cree y edite cursos para formación superior militar y civil."
             onAccess={() => navigate("/gestion-cursos")} />
-          <Card icon="🔔" title="Gestión de Notificaciones"
+          <Card icon="🔔" title="Administración de Notificaciones"
             desc="Envíe alertas y actualizaciones a usuarios."
             onAccess={() => navigate("/gestion-notificaciones")} />
           <Card icon="⚖️" title="Disciplina"
             desc="Configura el porcentaje de la nota final que corresponde a méritos y deméritos por materia."
             onAccess={() => navigate("/gestion-disciplina")} />
-          <Card icon="💰" title="Gestión de Finanzas"
+          <Card icon="💰" title="Administración Finanzas"
             desc="Control de matrícula, guía y mensualidades. Bloqueo automático por mora."
             onAccess={() => navigate("/gestion-finanzas")} />
           <Card icon="📋" title="Evaluaciones Institucionales"
             desc="Habilite y gestione evaluaciones entre cursantes y a docentes."
             onAccess={() => navigate("/gestion-evaluaciones")} />
-          <Card icon="🎓" title="Gestión Educativa"
+          <Card icon="🎓" title="Seguimiento Académico"
             desc="Supervise evaluaciones, calificaciones y progreso académico."
             onAccess={() => navigate("/gestion-educativa")} />
         </section>
